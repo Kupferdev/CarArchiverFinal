@@ -48,7 +48,7 @@ export const LanguageStep = ({ onNext, updateData }: any) => {
               <img src={getFlagUrl(lang.flag)} className="flag-img" alt={lang.code} />
               <span className="lang-name">{lang.name}</span>
               <img 
-                src={new URL('../../assets/flagicons/check_circle_blue.svg', import.meta.url).href} 
+                src={new URL('../../assets/icons/check_circle_blue.svg', import.meta.url).href} 
                 className="check-icon" 
                 alt="selected" 
                 style={{ display: isSelected ? 'block' : 'none' }}
@@ -61,7 +61,7 @@ export const LanguageStep = ({ onNext, updateData }: any) => {
       <div className="footer-action">
         <button className="next-btn" onClick={handleNext}>
           <img 
-            src={new URL('../../assets/flagicons/right_arrow-blue.svg', import.meta.url).href} 
+            src={new URL('../../assets/icons/right_arrow-blue.svg', import.meta.url).href} 
             alt="İleri" 
           />
         </button>

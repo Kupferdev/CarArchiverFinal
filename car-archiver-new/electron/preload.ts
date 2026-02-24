@@ -22,3 +22,12 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   // You can expose other APTs you need here.
   // ...
 })
+
+contextBridge.exposeInMainWorld('electron', {
+  ipcRenderer: {
+    // React'ten Electron'a mesaj gönderip cevap beklemek için (Invoke)
+    invoke: (channel: string, data: any) => ipcRenderer.invoke(channel, data),
+    // Sadece mesaj göndermek için (Send)
+    send: (channel: string, data: any) => ipcRenderer.send(channel, data),
+  }
+});

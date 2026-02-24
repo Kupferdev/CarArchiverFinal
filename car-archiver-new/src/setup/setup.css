@@ -1,0 +1,190 @@
+/* --- GLOBAL RESET & BASE --- */
+* {
+  box-sizing: border-box; /* Padding ve border'ların genişliği bozmasını engeller (Altın Kural) */
+}
+
+body, html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  font-family: 'Inter', sans-serif;
+  background-color: #f5f7f9;
+}
+
+/* React'in ana kapsayıcısının tam ekran olmasını sağlama */
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+/* --- ANA KURULUM EKRANI KAPSAYICISI --- */
+.wizard-main-container {
+  width: 100%; /* 100vw yerine 100% kullandık, yatay scroll bar bug'ını çözer */
+  min-height: 100vh; /* Ekran küçüldüğünde içeriğin taşmasını engeller */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px; /* Mobil veya küçük pencerelerde kutunun kenarlara yapışmasını önler */
+  
+  /* Arka plan ayarları */
+  background-image: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), 
+                    url('../assets/bg_setup.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #2c3e50; 
+}
+
+/* --- BEYAZ KUTULAR (SETUP CARD / OUTER WRAPPER) --- */
+.setup-card {
+  background-color: rgba(255, 255, 255, 0.95);
+  padding: 30px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  
+  width: 100%;
+  max-width: 420px; /* İçeriğe göre esneyebilen maksimum genişlik */
+}
+
+.outer-wrapper {
+  background-color: #ffffff;
+  width: 100%;
+  max-width: 360px; /* Sabit 360px yerine max-width kullandık. Artık esneyebilir. */
+  padding: 24px 0 16px 0;
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* --- SCROLL ALANI --- */
+.scroll-area {
+  width: 100%;
+  /* Yüksekliği ekranın %50'sine duyarlı hale getirdik, ancak maksimum 448px'i geçmeyecek */
+  max-height: clamp(250px, 50vh, 448px); 
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #D1D1D1 transparent;
+}
+
+.scroll-area::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scroll-area::-webkit-scrollbar-thumb {
+  background-color: #E0E0E0;
+  border-radius: 10px;
+}
+
+/* --- DİL KARTI STİLLERİ --- */
+.lang-card {
+  width: 100%;
+  max-width: 280px; /* Sabit 280px yerine tam genişlik + max sınır koyduk */
+  height: 64px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  cursor: pointer;
+  background-color: transparent; /* Wrapper'ın rengine uyum sağlasın */
+  position: relative;
+  border-bottom: 1px solid #EDEDED;
+  transition: background 0.2s ease;
+}
+
+.lang-card:first-child {
+  border-top: 1px solid #EDEDED;
+}
+
+.lang-card:hover {
+  background-color: #F9FBFF;
+}
+
+.flag-img {
+  width: 32px;
+  height: 32px;
+  margin-right: 16px;
+  object-fit: contain;
+}
+
+.lang-name {
+  font-size: 16px;
+  color: #1A1A1B;
+  font-weight: 500;
+  flex-grow: 1;
+}
+
+.check-icon {
+  width: 20px;
+  height: 20px;
+  display: none;
+}
+
+/* Seçili Durum */
+.lang-card.selected {
+  border-bottom: 1px solid #007AFF !important;
+  z-index: 1;
+}
+
+.lang-card.selected .check-icon {
+  display: block;
+}
+
+.prev-of-selected {
+  border-bottom: 1px solid #007AFF !important;
+}
+
+.lang-card.selected:first-child {
+  border-top: 1px solid #007AFF;
+}
+
+/* --- ALT BUTON (FOOTER ACTION) --- */
+.footer-action {
+  width: 100%;
+  max-width: 280px;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-right: 4px;
+}
+
+.next-btn {
+  background: none;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  transition: transform 0.2s ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.next-btn:hover {
+  transform: translateX(5px);
+}
+
+.next-btn img {
+  width: 40px;
+  height: auto;
+}
+
+/* --- EULA --- */
+.eula-container {
+  width: 100%;
+  max-width: 800px; /* Ekrana göre küçülmesini sağladık */
+  padding: 0 20px; /* Küçük ekranlarda yazının kenarlara yapışmasını engeller */
+  margin: 0 auto;
+  line-height: 1.6;
+  color: #333;
+  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.eula-container p { margin-bottom: 10px; }
+.eula-container h1 { font-size: 18px; margin-bottom: 12px; }
+.eula-container h3 { font-size: 16px; margin-top: 18px; margin-bottom: 6px; }
+.eula-container ul { padding-left: 20px; margin-top: 6px; }
+.eula-container ul li { margin-bottom: 4px; }

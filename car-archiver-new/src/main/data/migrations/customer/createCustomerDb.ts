@@ -1,8 +1,11 @@
-import db from "../../db";
 import { createCustomerEmailsTable } from "./createCustomerEmailDb";
 import { createCustomerPhoneNumbersTable } from "./createCustomerPhoneNumberDb";
 
+import { getDb } from "../../db";
+
 export function createCustomersTable() {
+
+    const db = getDb();
 
     const createCustomersTableSql = `
     CREATE TABLE IF NOT EXISTS Customers (

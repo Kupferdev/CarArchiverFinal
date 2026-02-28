@@ -1,7 +1,9 @@
-import db from "../../db";
+import { getDb } from "../../db";
 
 
 export function createPartsTable(){
+
+    const db = getDb();
 
 const createPartTableSql = `
     CREATE TABLE IF NOT EXISTS Parts(

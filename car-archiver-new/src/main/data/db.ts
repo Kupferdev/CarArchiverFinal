@@ -1,22 +1,39 @@
 import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from 'url';
 
-let filePath = "C:\\Users\\bakir\\Desktop\\";
+// İsimleri değiştiriyoruz (Bundler'ın kafası karışmasın diye)
+const currentFilePath = fileURLToPath(import.meta.url);
+const currentDirPath = path.dirname(currentFilePath);
 
-const dbPath = path.resolve(filePath + "data_carArchiver.sqlite");
+export let dbInstance: any = null;
 
-let db: Database.Database;
+export function CreateDefaultDb(dbPath: string) {
+    const dbPathFinal = path.normalize(dbPath); 
 
-try {
-    fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-    db = new Database(dbPath);
-    db.pragma("foreign_keys = on");
+    try {
+        const folder = path.dirname(dbPathFinal);
+        if (!fs.existsSync(folder)) {
+            fs.mkdirSync(folder, { recursive: true });
+        }
 
-    console.log("❇️ Db created!");
-} catch (err) {
-    console.log("🆘 Db not created! ", (err as Error).message);
-    process.exit(1);
+        // Eğer hala hata veriyorsa, sorun better-sqlite3'ün içindedir.
+        // Ama bu atama ile aşmış olmamız lazım.
+
+        dbInstance = new Database(dbPathFinal);
+        dbInstance.pragma("foreign_keys = on");
+
+        
+        console.log("❇️ SQLite Motoru Ateşlendi: ", dbPathFinal);
+    } catch (err) {
+        // HATA MESAJINI DAHA NET GÖRELİM
+        console.error("🆘 DB OLUŞTURMA SIRASINDA PATLADI:", err);
+        throw err; 
+    }
+    
 }
 
-export default db;
+export function getDb() {
+    return dbInstance;   
+}

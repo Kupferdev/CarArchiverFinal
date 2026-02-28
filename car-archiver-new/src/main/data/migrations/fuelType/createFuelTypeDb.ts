@@ -1,8 +1,9 @@
 import { FuelType } from "../../../../shared/types/fueltype";
-import db from "../../db";
 import { drizzleDb } from "../../drizzle/drizzleDb";
 import { FuelTypes } from "../../drizzle/schemas/fuelTypesSchema/fuelTypeSchema";
 import { createFuelTypesTranslationsTable } from "../../translations/fuelTypeTranslationsDb";
+
+import { getDb } from "../../db";
 
 
 const baseFuelTypes: Array<FuelType> = [
@@ -15,6 +16,8 @@ const baseFuelTypes: Array<FuelType> = [
 
 
 export async function createFuelTypesTable() {
+
+    const db = getDb();
 
     const createFuelTypesTableSql = `
     CREATE TABLE IF NOT EXISTS FuelTypes(

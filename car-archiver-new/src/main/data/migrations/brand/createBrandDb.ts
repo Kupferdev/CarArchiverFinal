@@ -1,7 +1,10 @@
 import { Brand } from "../../../../shared/types/brand";
-import db from "../../db";
 import { drizzleDb } from "../../drizzle/drizzleDb";
 import { Brands } from "../../drizzle/schemas/brandsSchema";
+
+import { getDb } from "../../db";
+
+
 
 const baseCarBrands: Array<Brand> = [
   { brandName: "Abarth" },
@@ -122,6 +125,8 @@ const baseCarBrands: Array<Brand> = [
 
 
 export async function createBrandsTable(){
+
+    const db = getDb();
 
     const createBrandsTableSql = `
         CREATE TABLE IF NOT EXISTS Brands(

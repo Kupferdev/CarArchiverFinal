@@ -1,6 +1,8 @@
-import db from "../db";
 import { drizzleDb } from "../drizzle/drizzleDb";
 import { bodyTypeTranslations } from "../drizzle/schemas/bodyTypesSchema/bodyTypeTranslationsSchemas";
+
+import { getDb } from "../db";
+
 
 export interface BodyTypeTranslations {
   bodyTypeId: number,
@@ -165,6 +167,8 @@ const baseBodyTypeTranslations: Array<BodyTypeTranslations> = [
 ];
 
 export async function createBodyTypesTranslationsTable() {
+
+  const db = getDb();
 
   try {
     db.exec(baseBodyTypeTranslationsSql);

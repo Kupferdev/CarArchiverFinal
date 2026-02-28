@@ -1,8 +1,10 @@
 import { drizzle } from "drizzle-orm/singlestore";
-import db from "../db";
 import { drizzleDb } from "../drizzle/drizzleDb";
 import { FuelTypes } from "../drizzle/schemas/fuelTypesSchema/fuelTypeSchema";
 import { fuelTypeTranslations } from "../drizzle/schemas/fuelTypesSchema/fuelTypeTranslationsSchema";
+
+import { getDb } from "../db";
+
 
 export interface FuelTypeTranslations {
     fuelTypeId: number,
@@ -103,6 +105,8 @@ const baseFuelTypeTranslationsSql = `
 `;
 
 export async function createFuelTypesTranslationsTable() {
+
+    const db = getDb();
 
     try {
         db.exec(baseFuelTypeTranslationsSql);

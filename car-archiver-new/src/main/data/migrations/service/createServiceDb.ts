@@ -1,6 +1,9 @@
-import db from "../../db";
+import { getDb } from "../../db";
+
 
 export function createServicesTable() {
+
+    const db = getDb();
 
     const createServicesTableSql = `
         CREATE TABLE IF NOT EXISTS Services(

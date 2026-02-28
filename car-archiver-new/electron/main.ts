@@ -5,7 +5,11 @@ import path from 'node:path'
 import { registerIpcHandlers } from './ipcHandlers'
 
 const require = createRequire(import.meta.url)
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
+//const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+
+const currentFilePath = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(currentFilePath);
 
 // The built directory structure
 //

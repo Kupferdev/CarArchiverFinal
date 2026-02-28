@@ -1,6 +1,9 @@
-import db from "../../db";
+import { getDb } from "../../db";
+
 
 export function createCustomerPhoneNumbersTable() {
+
+    const db = getDb();
 
     const createPhoneNumbersTableSql = `
     CREATE TABLE IF NOT EXISTS PhoneNumbers(

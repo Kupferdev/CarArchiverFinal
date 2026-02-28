@@ -1,79 +1,207 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
+import { SetupInfoTexts } from "../../i18n/setupWizard";
+import styles from "../../styles/setup/DataDitStep.module.css";
 
-export const DataDirStep = ({ onNext, onBack, updateData, language }: any) => {
-  // 'new' veya 'existing' değerini tutar
-  const [setupMode, setSetupMode] = useState<'new' | 'existing' | null>(null);
-  const [selectedPath, setSelectedPath] = useState('');
+export const DataDirStep = ({ language, onNext, onBack, updateData }: any) => {
+  const [subStep, setSubStep] = useState(1);
+  const [setupMode, setSetupMode] = useState<"import" | "create" | null>(null);
+  const [path, setPath] = useState("");
+  const [error, setError] = useState("");
 
-  const handleSelectFolder = async () => {
-    const path = await (window as any).electron.ipcRenderer.invoke('select-directory');
-    
-    if (path) {
-      setSelectedPath(path);
-      updateData({ 
-        savePath: path,
-        isNewSetup: setupMode === 'new' // Verinin yeni mi eski mi olduğunu config'e not düşüyoruz
+  const t =
+    SetupInfoTexts.find((x) => x.languageCode === language) ||
+    SetupInfoTexts[0];
+
+  const getAsset = (name: string) =>
+    new URL(`../../assets/cats/${name}`, import.meta.url).href;
+
+  const getIcon = (name: string) =>
+    new URL(`../../assets/icons/${name}`, import.meta.url).href;
+
+  const handleBrowse = async () => {
+    const selected = await (window as any).electron.ipcRenderer.invoke(
+      "select-directory",
+    );
+    if (!selected) return;
+
+    if (setupMode === "import") {
+      const dbFile = await (window as any).electron.ipcRenderer.invoke(
+        "verify-import-path",
+        selected,
+      );
+      if (dbFile) {
+        setPath(dbFile);
+        setError("");
+      } else {
+        setError(
+          language === "tr"
+            ? "Hata: data_carArcihiver.sqlite bulunamadı!"
+            : "Error: .sqlite file not found!",
+        );
+        setPath("");
+      }
+    } else {
+      setPath(selected);
+      setError("");
+    }
+  };
+
+  const handleFinalStart = async () => {
+    let finalDbPath = path;
+
+    if (setupMode === "create") {
+      finalDbPath = await (window as any).electron.ipcRenderer.invoke(
+        "setup-new-data-structure",
+        path,
+      );
+    }
+
+    if (finalDbPath) {
+      updateData({
+        savePath: finalDbPath,
+        isNewUser: setupMode === "create",
       });
+      onNext();
     }
   };
 
   return (
-    <>
-      <h2 style={{ textAlign: 'center' }}>
-        {language === 'tr' ? 'Veri Yapılandırması' : 'Data Configuration'}
-      </h2>
+    <div className={styles["setup-container"]}>
+      {subStep === 1 && (
+        <>
+          <img
+            src={getAsset("catDb.png")}
+            className={styles["setup-cat-img"]}
+            alt="Data Cat"
+          />
 
-      <div className="scroll-area" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-        
-        {/* MOD SEÇİMİ */}
-        {!setupMode ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <button className="lang-card" onClick={() => setSetupMode('new')} style={{ justifyContent: 'center', width: '100%' }}>
-              {language === 'tr' ? 'Sıfırdan Kurulum Yap' : 'Fresh Installation'}
+          <h2 className={styles["setup-header"]}>{t.infoHeader}</h2>
+
+          <div className={styles["scroll-area"]}>
+            <p className={styles["setup-main-text"]}>{t.mainText}</p>
+          </div>
+
+          <div className={styles["footer-action"]}>
+            <button
+              className={`${styles["nav-arrow"]} ${styles["prev"]}`}
+              onClick={onBack}
+            >
+              <img src={getIcon("left-arrow-grey.svg")} alt="back" />
             </button>
-            <button className="lang-card" onClick={() => setSetupMode('existing')} style={{ justifyContent: 'center', width: '100%' }}>
-              {language === 'tr' ? 'Mevcut Verilerimi Aktar' : 'Use Existing Data'}
+            <button
+              className={`${styles["nav-arrow"]} ${styles["next"]}`}
+              onClick={() => setSubStep(2)}
+            >
+              <img src={getIcon("right_arrow-blue.svg")} alt="next" />
             </button>
           </div>
-        ) : (
-          /* KLASÖR SEÇİMİ */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', textAlign: 'center' }}>
-            <p style={{ fontSize: '14px', color: '#555' }}>
-              {setupMode === 'new' 
-                ? (language === 'tr' ? 'Verilerin saklanacağı boş bir klasör seçin.' : 'Select an empty folder to store data.')
-                : (language === 'tr' ? 'Eski verilerinizin olduğu klasörü seçin.' : 'Select the folder containing your old data.')}
-            </p>
-            
-            <button onClick={handleSelectFolder} style={{ padding: '10px', cursor: 'pointer', borderRadius: '8px', border: '1px solid #007AFF', backgroundColor: '#f0f7ff' }}>
-              {language === 'tr' ? 'Klasör Seç' : 'Select Folder'}
+        </>
+      )}
+
+      {subStep === 2 && (
+        <>
+          <img
+            src={getAsset("catLift.png")}
+            className={styles["setup-cat-img"]}
+            alt="Forklift Cat"
+          />
+
+          <p className={styles["setup-option-text"]}>{t.optionText}</p>
+
+          <div className={styles["opt-container"]}>
+            <button
+              className={`${styles["data-opt-btn"]} ${styles["white"]}`}
+              onClick={() => {
+                setSetupMode("import");
+                setSubStep(3);
+              }}
+            >
+              <img
+                src={getIcon("arrow_downward.svg")}
+                className={styles["btn-icon"]}
+                alt="import"
+              />
+              {t.importButton}
             </button>
 
-            {selectedPath && (
-              <div style={{ fontSize: '12px', wordBreak: 'break-all', backgroundColor: '#eee', padding: '10px', borderRadius: '5px' }}>
-                {selectedPath}
-              </div>
-            )}
-            
-            <button onClick={() => { setSetupMode(null); setSelectedPath(''); }} style={{ fontSize: '12px', background: 'none', border: 'none', color: '#007AFF', cursor: 'pointer' }}>
-              {language === 'tr' ? '← Seçimi Değiştir' : '← Change Mode'}
+            <button
+              className={`${styles["data-opt-btn"]} ${styles["blue"]}`}
+              onClick={() => {
+                setSetupMode("create");
+                setSubStep(4);
+              }}
+            >
+              <img
+                src={getIcon("add_2.svg")}
+                className={styles["btn-icon"]}
+                alt="new"
+              />
+              {t.createNewButton}
             </button>
           </div>
-        )}
-      </div>
 
-      <div className="footer-action">
-        <button className="decline-btn" onClick={onBack}>
-          {language === 'tr' ? 'Geri' : 'Back'}
-        </button>
-        <button 
-          disabled={!selectedPath}
-          onClick={onNext}
-          className="accept-btn"
-          style={{ backgroundColor: selectedPath ? '#007AFF' : '#ccc', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 24px' }}
-        >
-          {language === 'tr' ? 'Devam Et' : 'Continue'}
-        </button>
-      </div>
-    </>
+          <div className={styles["footer-action"]}>
+            <button
+              className={`${styles["nav-arrow"]} ${styles["prev"]}`}
+              onClick={() => setSubStep(1)}
+            >
+              <img src={getIcon("left-arrow-grey.svg")} alt="back" />
+            </button>
+            <div></div>
+          </div>
+        </>
+      )}
+
+      {(subStep === 3 || subStep === 4) && (
+        <>
+          <img
+            src={getAsset("catLift.png")}
+            className={styles["setup-cat-img"]}
+            alt="Forklift Cat"
+          />
+
+          <h3 className={styles["setup-sub-header"]}>
+            {subStep === 3 ? t.importText : t.createNewText}
+          </h3>
+
+          <div className={styles["path-selection-row"]}>
+            <input
+              type="text"
+              readOnly
+              value={path}
+              className={styles["path-input"]}
+              placeholder="C:\Users\Documents\..."
+            />
+
+            <button className={styles["browse-btn"]} onClick={handleBrowse}>
+              {t.browseButton}
+            </button>
+          </div>
+
+          {error && <p className={styles["error-text"]}>{error}</p>}
+
+          <div className={styles["footer-action"]}>
+            <button
+              className={`${styles["nav-arrow"]} ${styles["prev"]}`}
+              onClick={() => {
+                setSubStep(2);
+                setPath("");
+                setError("");
+              }}
+            >
+              <img src={getIcon("left-arrow-grey.svg")} alt="back" />
+            </button>
+
+            <button
+              className={styles["start-btn"]}
+              disabled={!path}
+              onClick={handleFinalStart}
+            >
+              {t.continueText}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
 };

@@ -1,79 +1,94 @@
-import React from 'react';
+import React, { useState } from 'react';
+import styles from '../../styles/setup/DataDitStep.module.css'; 
+import { SetupInfoTexts } from "../../i18n/setupWizard";
 
 interface FinishStepProps {
-  configData: any;
-  language: string;
+    configData: any;
+    language: string;
+    onComplete: () => Promise<void> | void; 
+    onBack: () => void;
 }
 
-export const FinishStep = ({ configData, language }: FinishStepProps) => {
-  
-  const handleFinalize = async () => {
-    // 1. Electron'un ana sürecine (ipcHandlers) verileri gönderiyoruz
-    const success = await (window as any).electron.ipcRenderer.invoke('save-config', configData);
+export const FinishStep: React.FC<FinishStepProps> = ({ configData, language, onComplete, onBack }) => {
     
-    if (success) {
-      // 2. Kayıt başarılıysa uygulamayı yeniden yükle
-      // App.tsx yeniden çalışacak, config'i bulacak ve bizi ana sayfaya alacak.
-      window.location.reload(); 
-    } else {
-      // Hata durumunda (mesela yazma izni yoksa) kullanıcıyı uyar
-      const errorMsg = language === 'tr' 
-        ? 'Ayarlar kaydedilemedi. Lütfen yönetici izinlerini kontrol edin.' 
-        : 'Failed to save settings. Please check administrator permissions.';
-      alert(errorMsg);
-    }
-  };
+    const getAsset = (name: string) =>
+        new URL(`../../assets/cats/${name}`, import.meta.url).href;
 
-  return (
-    <div className="setup-container" style={{ textAlign: 'center', padding: '20px' }}>
-      {/* Başarı İkonu (Opsiyonel) */}
-      <div style={{ fontSize: '64px', marginBottom: '20px' }}>🎉</div>
+    const getIcon = (name: string) =>
+        new URL(`../../assets/icons/${name}`, import.meta.url).href;
 
-      <h2>
-        {language === 'tr' ? 'Kurulum Tamamlandı!' : 'Setup Complete!'}
-      </h2>
+    const t = SetupInfoTexts.find((x) => x.languageCode === language) || SetupInfoTexts[0];
 
-      <div style={{ margin: '24px 0', color: '#555', fontSize: '15px', lineHeight: '1.6' }}>
-        <p>
-          {language === 'tr' 
-            ? 'Tüm yapılandırmalar başarıyla tamamlandı. Artık uygulamayı kullanmaya başlayabilirsiniz.' 
-            : 'All configurations have been successfully completed. You can now start using the application.'}
-        </p>
-        
-        {/* Seçimlerin kısa bir özeti (Kullanıcı ne yaptığını görsün) */}
-        <div style={{ 
-          marginTop: '20px', 
-          padding: '12px', 
-          backgroundColor: '#f9f9f9', 
-          borderRadius: '8px',
-          textAlign: 'left',
-          fontSize: '13px'
-        }}>
-          <strong>{language === 'tr' ? 'Özet:' : 'Summary:'}</strong><br/>
-          📍 {language === 'tr' ? 'Kayıt Yolu:' : 'Save Path:'} {configData.savePath}<br/>
-          🌐 {language === 'tr' ? 'Dil:' : 'Language:'} {configData.language.toUpperCase()}
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleStart = async () => {
+        setIsLoading(true); 
+        await onComplete(); 
+    };
+    
+    return (
+        <div className={styles["setup-container"]}>
+            
+            {/* Kutlama Kedisi (260x260px) */}
+            <img 
+                src={getAsset("catConfeti.png")} 
+                alt="Usta Kedi" 
+                className={styles["setup-cat-img"]} 
+            />
+            
+            {/* Başlık: Görseldeki gibi tam ortada */}
+            <h2 
+                className={styles["setup-header"]} 
+                style={{ textAlign: 'center', marginBottom: '15px' }}
+            >
+                {t.youAreReady} 
+            </h2>
+            
+            {/* Açıklamalar ve Dizin Yolu */}
+            <div className={styles["scroll-area"]} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                
+                <p 
+                    className={styles["setup-option-text"]} 
+                    style={{ marginBottom: '10px' }}
+                >
+                    {t.lastInfoText} 
+                </p>
+                
+                {/* Kayıt Yolu (Path): Görseldeki gibi daha küçük, ince ve gri renkli */}
+                <p 
+                    className={styles["setup-main-text"]} 
+                    style={{ 
+                        textAlign: 'center', 
+                        fontSize: '12px', 
+                        color: '#999', 
+                        wordBreak: 'break-all', 
+                        maxWidth: '90%' 
+                    }}
+                >
+                    {configData.savePath}
+                </p>
+            </div>
+
+            {/* Alt Kontrol Alanı: Geri oku solda, Başla butonu sağda */}
+            <div className={styles["footer-action"]}>
+                
+                <button 
+                    onClick={onBack} 
+                    className={`${styles["nav-arrow"]} ${styles["prev"]}`}
+                    disabled={isLoading} 
+                >
+                    <img src={getIcon("left-arrow-grey.svg")} alt="back" />
+                </button>
+
+                <button 
+                    onClick={handleStart} 
+                    className={styles["start-btn"]}
+                    disabled={isLoading} 
+                >
+                    {isLoading ? (language === "tr" ? "Kuruluyor..." : "Setting up...") : t.startButton}
+                </button>
+            </div>
+            
         </div>
-      </div>
-
-      <div className="footer-action" style={{ justifyContent: 'center' }}>
-        <button 
-          onClick={handleFinalize}
-          className="accept-btn"
-          style={{ 
-            padding: '12px 40px', 
-            backgroundColor: '#007AFF', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '10px', 
-            fontSize: '16px',
-            fontWeight: '600',
-            cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(0, 122, 255, 0.3)'
-          }}
-        >
-          {language === 'tr' ? 'Uygulamayı Başlat' : 'Launch Application'}
-        </button>
-      </div>
-    </div>
-  );
+    );
 };

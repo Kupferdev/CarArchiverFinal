@@ -1,6 +1,9 @@
-import db from "../../db";
+import { getDb } from "../../db";
+
 
 export function createCustomerEmailsTable() {
+
+    const db = getDb();
 
     const createCustomerEmailTableSql = `
     CREATE TABLE IF NOT EXISTS Emails (

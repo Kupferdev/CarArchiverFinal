@@ -1,7 +1,10 @@
-import db from "../../db";
+import { getDb } from "../../db";
+
 
 
 export function createCarsTable() {
+
+    const db = getDb();
 
     const createCarTableSql = `
     CREATE TABLE IF NOT EXISTS Cars (

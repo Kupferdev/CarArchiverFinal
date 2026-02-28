@@ -11,6 +11,9 @@ export interface SetupInfo {
     importText: string,
     createNewText: string,
     browseButton: string,
+    youAreReady : string,
+    lastInfoText : string,
+    continueText : string,
     startButton: string
 }
 
@@ -33,6 +36,9 @@ The "Import" option allows you to restore and continue with your old data.`,
     importText: "Select the folder where your data is located: ",
     createNewText: "Select the location where you want to save your data: ",
     browseButton: "Browse",
+    youAreReady: "You're ready🎉",
+    lastInfoText: "Your data will be saved to this location.",
+    continueText: "Continue",
     startButton: "Start"
   },
   {
@@ -53,6 +59,9 @@ Con la opción "Importar", puede restaurar sus datos antiguos y continuar.`,
     importText: "Seleccione la carpeta donde se encuentran sus datos: ",
     createNewText: "Seleccione la ubicación donde desea guardar sus datos: ",
     browseButton: "Examinar",
+    youAreReady: "¡Ya está listo!🎉",
+    lastInfoText: "Tus datos se guardarán en esta ubicación.",
+    continueText: "Continuar",
     startButton: "Comenzar"
   },
   {
@@ -73,6 +82,9 @@ L'option « Importer » vous permet de restaurer vos anciennes données et de co
     importText: "Sélectionnez le dossier où se trouvent vos données : ",
     createNewText: "Sélectionnez l'emplacement où vous souhaitez enregistrer vos données : ",
     browseButton: "Parcourir",
+    youAreReady: "Vous êtes prêt !🎉",
+    lastInfoText: "Vos données seront enregistrées à cet emplacement.",
+    continueText: "Continuer",
     startButton: "Démarrer"
   },
   {
@@ -93,6 +105,9 @@ Mit der Option „Importieren“ können Sie Ihre alten Daten wiederherstellen u
     importText: "Wählen Sie den Ordner aus, in dem sich Ihre Daten befinden: ",
     createNewText: "Wählen Sie den Ort aus, an dem Sie Ihre Daten speichern möchten: ",
     browseButton: "Durchsuchen",
+    youAreReady: "Bereit!🎉",
+    lastInfoText: "Ihre Daten werden an diesem Ort gespeichert.",
+    continueText: "Weiter",
     startButton: "Starten"
   },
   {
@@ -113,6 +128,9 @@ A opção "Importar" permite restaurar seus dados antigos e continuar.`,
     importText: "Selecione a pasta onde seus dados estão localizados: ",
     createNewText: "Selecione o local onde deseja salvar seus dados: ",
     browseButton: "Procurar",
+    youAreReady: "Você está pronto!🎉",
+    lastInfoText: "Seus datos serão salvos neste local.",
+    continueText: "Continuar",
     startButton: "Iniciar"
   },
   {
@@ -133,6 +151,9 @@ A opção "Importar" permite restaurar seus dados antigos e continuar.`,
     importText: "选择您的数据所在的文件夹：",
     createNewText: "选择您想要保存数据的路径：",
     browseButton: "浏览",
+    youAreReady: "您已准备就绪🎉",
+    lastInfoText: "您的数据将保存到此位置。",
+    continueText: "继续",
     startButton: "开始"
   },
   {
@@ -153,6 +174,9 @@ Bilgisayar arızası veya dosya silinmesi durumunda veri kaybı yaşanabilir. G�
     importText: "Verilerinizin bulunduğu klasörü seçin: ",
     createNewText: "Verilerinizi kaydetmek istediğiniz konumu seçin: ",
     browseButton: "Göz at",
+    youAreReady : "Hazırsınız🎉",
+    lastInfoText : "Verileriniz bu konuma kaydedilecek.",
+    continueText : "Devam Et",
     startButton: "Başla"
   },
   {
@@ -173,6 +197,9 @@ Bilgisayar arızası veya dosya silinmesi durumunda veri kaybı yaşanabilir. G�
     importText: "データがあるフォルダーを選択してください：",
     createNewText: "データを保存する場所を選択してください：",
     browseButton: "参照",
+    youAreReady: "準備が整いました🎉",
+    lastInfoText: "データはこの場所に保存されます。",
+    continueText: "続行",
     startButton: "開始"
   },
   {
@@ -193,6 +220,9 @@ Bilgisayar arızası veya dosya silinmesi durumunda veri kaybı yaşanabilir. G�
     importText: "데이터가 위치한 폴더를 선택하세요: ",
     createNewText: "데이터를 저장할 위치를 선택하세요: ",
     browseButton: "찾아보기",
+    youAreReady: "준비가 되었습니다🎉",
+    lastInfoText: "데이터가 이 위치에 저장됩니다.",
+    continueText: "계속",
     startButton: "시작"
   },
   {
@@ -213,6 +243,9 @@ Bilgisayar arızası veya dosya silinmesi durumunda veri kaybı yaşanabilir. G�
     importText: "Выберите папку, в которой находятся ваши данные: ",
     createNewText: "Выберите место для сохранения ваших данных: ",
     browseButton: "Обзор",
+    youAreReady: "Все готово!🎉",
+    lastInfoText: "Ваши данные будут сохранены в этом месте.",
+    continueText: "Продолжить",
     startButton: "Начать"
   },
   {
@@ -233,6 +266,9 @@ Met de optie "Importeren" kunt u uw oude gegevens herstellen en doorgaan.`,
     importText: "Selecteer de map waarin uw gegevens zich bevinden: ",
     createNewText: "Selecteer de locatie waar u uw gegevens wilt opslaan: ",
     browseButton: "Bladeren",
+    youAreReady: "Je bent klaar!🎉",
+    lastInfoText: "Je gegevens worden op deze locatie opgeslagen.",
+    continueText: "Doorgaan",
     startButton: "Starten"
   },
   {
@@ -253,6 +289,9 @@ Kompüter nasazlığı və ya faylların silinməsi halında məlumat itkisi ba�
     importText: "Məlumatlarınızın olduğu qovluğu seçin: ",
     createNewText: "Məlumatlarınızı yadda saxlamaq istədiyiniz yeri seçin: ",
     browseButton: "Seç",
+    youAreReady: "Hazırsınız🎉",
+    lastInfoText: "Məlumatlarınız bu yerə yadda saxlanılacaq.",
+    continueText: "Davam et",
     startButton: "Başla"
   },
   {
@@ -273,6 +312,9 @@ L'opzione "Importa" ti consente di ripristinare i vecchi dati e continuare.`,
     importText: "Seleziona la cartella in cui si trovano i tuoi dati: ",
     createNewText: "Seleziona la posizione in cui desideri salvare i tuoi dati: ",
     browseButton: "Sfoglia",
+    youAreReady: "Sei pronto!🎉",
+    lastInfoText: "I tuoi dati verranno salvati in questa posizione.",
+    continueText: "Continua",
     startButton: "Inizia"
   },
   {
@@ -293,6 +335,9 @@ Opcja „Importuj” pozwala przywrócić stare dane i kontynuować pracę.`,
     importText: "Wybierz folder, w którym znajdują się Twoje dane: ",
     createNewText: "Wybierz lokalizację, w której chcesz zapisać swoje dane: ",
     browseButton: "Przeglądaj",
+    youAreReady: "Wszystko gotowe!🎉",
+    lastInfoText: "Twoje dane zostaną zapisane w tej lokalizacji.",
+    continueText: "Kontynuuj",
     startButton: "Uruchom"
   }
 ];

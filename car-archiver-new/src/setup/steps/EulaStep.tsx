@@ -22,7 +22,6 @@ export const EulaStep = ({ language, onNext, onBack, updateData }: any) => {
   };
 
   return (
-    <div className="setup-container">
       <div className="setup-card">
         {" "}
         {/* İçerik bu kutunun içinde değişecek */}
@@ -84,6 +83,5 @@ export const EulaStep = ({ language, onNext, onBack, updateData }: any) => {
           </button>
         </div>
       </div>
-    </div>
   );
 };

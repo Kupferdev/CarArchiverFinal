@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { InferSelectModel } from "drizzle-orm";
-import { drizzleDb } from "../drizzleDb";
+// 1. DEĞİŞİKLİK: drizzleDb yerine useDb import edildi
+import { useDb } from "../drizzleDb"; 
 import { PhoneNumbers } from "../schemas/customerSchemas/phoneNumbersSchema";
 import { BaseRepository } from "./baseRepository";
 import { IApiResponse, ServiceResponse } from "../../../../models/response.model";
@@ -13,7 +14,8 @@ export class PhoneNumbersRepository extends BaseRepository<typeof PhoneNumbers> 
   // Bir müşteriye ait telefonları listele
   async getByCustomerId(customerId: number): Promise<IApiResponse<InferSelectModel<typeof PhoneNumbers>[]>> {
     try {
-      const result = await drizzleDb
+      // 2. DEĞİŞİKLİK: drizzleDb yerine useDb()
+      const result = await useDb()
         .select()
         .from(PhoneNumbers)
         .where(eq(PhoneNumbers.customerId, customerId));
@@ -31,7 +33,8 @@ export class PhoneNumbersRepository extends BaseRepository<typeof PhoneNumbers> 
   // limit(1) kullandığın için tek bir obje veya undefined döneriz
   async getByPhoneNumber(phoneNumber: string): Promise<IApiResponse<InferSelectModel<typeof PhoneNumbers> | undefined>> {
     try {
-      const result = await drizzleDb
+      // 3. DEĞİŞİKLİK: drizzleDb yerine useDb()
+      const result = await useDb()
         .select()
         .from(PhoneNumbers)
         .where(eq(PhoneNumbers.phoneNumber, phoneNumber))
@@ -55,7 +58,8 @@ export class PhoneNumbersRepository extends BaseRepository<typeof PhoneNumbers> 
   // Ülke koduna göre listeleme (Örn: +90 olanları getir)
   async getByCountryCode(countryCode: string): Promise<IApiResponse<InferSelectModel<typeof PhoneNumbers>[]>> {
     try {
-      const result = await drizzleDb
+      // 4. DEĞİŞİKLİK: drizzleDb yerine useDb()
+      const result = await useDb()
         .select()
         .from(PhoneNumbers)
         .where(eq(PhoneNumbers.countryCode, countryCode));

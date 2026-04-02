@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { InferSelectModel } from "drizzle-orm";
-import { drizzleDb } from "../drizzleDb";
+// 1. DEĞİŞİKLİK: drizzleDb yerine useDb import edildi
+import { useDb } from "../drizzleDb"; 
 import { Parts } from "../schemas/partsSchema";
 import { BaseRepository } from "./baseRepository";
 import { IApiResponse, ServiceResponse } from "../../../../models/response.model";
@@ -12,7 +13,8 @@ export class PartsRepository extends BaseRepository<typeof Parts> {
 
   async getByCarId(carId: number): Promise<IApiResponse<InferSelectModel<typeof Parts>[]>> {
     try {
-      const result = await drizzleDb
+      // 2. DEĞİŞİKLİK: drizzleDb yerine useDb()
+      const result = await useDb()
         .select()
         .from(Parts)
         .where(eq(Parts.carId, carId));
@@ -28,7 +30,8 @@ export class PartsRepository extends BaseRepository<typeof Parts> {
 
   async getByServiceId(serviceId: number): Promise<IApiResponse<InferSelectModel<typeof Parts>[]>> {
     try {
-      const result = await drizzleDb
+      // 3. DEĞİŞİKLİK: drizzleDb yerine useDb()
+      const result = await useDb()
         .select()
         .from(Parts)
         .where(eq(Parts.serviceId, serviceId));
@@ -44,7 +47,8 @@ export class PartsRepository extends BaseRepository<typeof Parts> {
 
   async getByCarAndService(carId: number, serviceId: number): Promise<IApiResponse<InferSelectModel<typeof Parts>[]>> {
     try {
-      const result = await drizzleDb
+      // 4. DEĞİŞİKLİK: drizzleDb yerine useDb()
+      const result = await useDb()
         .select()
         .from(Parts)
         .where(and(eq(Parts.carId, carId), eq(Parts.serviceId, serviceId)));

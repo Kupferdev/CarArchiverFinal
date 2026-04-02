@@ -22,8 +22,8 @@ export function createCustomersTable() {
         console.log("❇️ Customer table created");
     } catch (err) {
         console.log("🆘Customers table not created", (err as Error).message);
+        throw err;
     }
 
-    createCustomerPhoneNumbersTable();
-    createCustomerEmailsTable();
+
 };

@@ -33,6 +33,7 @@ export function createServicesTable() {
         console.log("❇️ Services table created");
     }catch(err){
         console.log("🆘 Services table not created", (err as Error).message);
+        throw err;
     }
 
 }

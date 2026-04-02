@@ -1,6 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { InferSelectModel } from "drizzle-orm";
-import { drizzleDb } from "../drizzleDb";
+// 1. DEĞİŞİKLİK: drizzleDb yerine useDb import edildi
+import { useDb } from "../drizzleDb"; 
 import { Customers } from "../schemas/customerSchemas/customersSchema";
 import { BaseRepository } from "./baseRepository";
 import { IApiResponse, ServiceResponse } from "../../../../models/response.model";
@@ -12,7 +13,8 @@ export class CustomersRepository extends BaseRepository<typeof Customers> {
 
   async getByNatId(nationalId: string): Promise<IApiResponse<InferSelectModel<typeof Customers> | undefined>> {
     try {
-      const result = await drizzleDb
+      // 2. DEĞİŞİKLİK: drizzleDb.select() yerine useDb().select()
+      const result = await useDb()
         .select()
         .from(Customers)
         .where(eq(Customers.nationalId, nationalId));
@@ -45,7 +47,8 @@ export class CustomersRepository extends BaseRepository<typeof Customers> {
         return ServiceResponse.success([], "No search criteria provided.");
       }
 
-      const result = await drizzleDb
+      // 3. DEĞİŞİKLİK: drizzleDb.select() yerine useDb().select()
+      const result = await useDb()
         .select()
         .from(Customers)
         // 'and(...filters)' tüm koşulların sağlanmasını bekler

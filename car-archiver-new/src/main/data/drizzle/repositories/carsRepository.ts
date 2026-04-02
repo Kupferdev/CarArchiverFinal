@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { InferSelectModel } from "drizzle-orm";
-import { drizzleDb } from "../drizzleDb";
+// 1. DEĞİŞİKLİK: drizzleDb yerine useDb import edildi
+import { useDb } from "../drizzleDb"; 
 import { Cars } from "../schemas/carsSchema";
 import { BaseRepository } from "./baseRepository";
 import { IApiResponse, ServiceResponse } from "../../../../models/response.model";
@@ -10,10 +11,10 @@ export class CarsRepository extends BaseRepository<typeof Cars> {
     super(Cars, "carId");
   }
 
-
   async getByCustomerId(customerId: number): Promise<IApiResponse<InferSelectModel<typeof Cars>[]>> {
     try {
-      const result = await drizzleDb
+      // 2. DEĞİŞİKLİK: drizzleDb.select() yerine useDb().select()
+      const result = await useDb()
         .select()
         .from(Cars)
         .where(eq(Cars.customerId, customerId));
@@ -29,7 +30,7 @@ export class CarsRepository extends BaseRepository<typeof Cars> {
 
   async getByBrandId(brandId: number): Promise<IApiResponse<InferSelectModel<typeof Cars>[]>> {
     try {
-      const result = await drizzleDb
+      const result = await useDb()
         .select()
         .from(Cars)
         .where(eq(Cars.brandId, brandId));
@@ -45,7 +46,7 @@ export class CarsRepository extends BaseRepository<typeof Cars> {
 
   async getByYear(year: number): Promise<IApiResponse<InferSelectModel<typeof Cars>[]>> {
     try {
-      const result = await drizzleDb
+      const result = await useDb()
         .select()
         .from(Cars)
         .where(eq(Cars.year, year));
@@ -61,7 +62,7 @@ export class CarsRepository extends BaseRepository<typeof Cars> {
 
   async getByFuelType(fuelType: number): Promise<IApiResponse<InferSelectModel<typeof Cars>[]>> {
     try {
-      const result = await drizzleDb
+      const result = await useDb()
         .select()
         .from(Cars)
         .where(eq(Cars.fuelType, fuelType));
@@ -77,7 +78,7 @@ export class CarsRepository extends BaseRepository<typeof Cars> {
 
   async getByBodyType(bodyType: number): Promise<IApiResponse<InferSelectModel<typeof Cars>[]>> {
     try {
-      const result = await drizzleDb
+      const result = await useDb()
         .select()
         .from(Cars)
         .where(eq(Cars.bodyType, bodyType));
@@ -93,7 +94,7 @@ export class CarsRepository extends BaseRepository<typeof Cars> {
 
   async getByVinNumber(vinNumber: string): Promise<IApiResponse<InferSelectModel<typeof Cars> | undefined>> {
     try {
-      const result = await drizzleDb
+      const result = await useDb()
         .select()
         .from(Cars)
         .where(eq(Cars.vinNumber, vinNumber));
@@ -115,7 +116,7 @@ export class CarsRepository extends BaseRepository<typeof Cars> {
 
   async getByPlateNumber(plateNumber: string): Promise<IApiResponse<InferSelectModel<typeof Cars> | undefined>> {
     try {
-      const result = await drizzleDb
+      const result = await useDb()
         .select()
         .from(Cars)
         .where(eq(Cars.plateNumber, plateNumber));
@@ -135,77 +136,10 @@ export class CarsRepository extends BaseRepository<typeof Cars> {
     }
   }
 
-  /*
   async addOldCustomer(carId: number, oldCustomerIdToAdd: number): Promise<IApiResponse<string>> {
     try {
-      const result = await drizzleDb
-        .select()
-        .from(Cars)
-        .where(eq(Cars.carId, carId));
-
-      const car = result[0];
-
-      if (!car) {
-        return ServiceResponse.fail("Car not found.", "NOT_FOUND") as any;
-      }
-
-      let currentIds: number[] = [];
-      if (car.oldCustomerId && car.oldCustomerId.length > 0) {
-        currentIds = car.oldCustomerId.split(',').map(id => Number(id.trim()));
-      }
-
-      if (!currentIds.includes(oldCustomerIdToAdd)) {
-        currentIds.push(oldCustomerIdToAdd);
-      } else {
-        return ServiceResponse.success("ID already exists in history", "Customer already exists in car history.");
-      }
-
-      const newOldCustomerString = currentIds.join(',');
-
-      await drizzleDb
-        .update(Cars)
-        .set({ oldCustomerId: newOldCustomerString })
-        .where(eq(Cars.carId, carId));
-
-      return ServiceResponse.success("Success", "Old customer added successfully.");
-
-    } catch (err) {
-      return this.handleError(err, "Failed to add old customer.");
-    }
-  }
-
-  async getOldCustomers(carId: number): Promise<IApiResponse<number[]>> {
-    try {
-      const result = await drizzleDb
-        .select()
-        .from(Cars)
-        .where(eq(Cars.carId, carId));
-
-      const car = result[0];
-
-      if (!car) {
-        return ServiceResponse.fail("Car not found.", "NOT_FOUND") as any;
-      }
-
-      const rawString = car.oldCustomerId;
-
-      if (!rawString) {
-        return ServiceResponse.success([], "No old customers found.");
-      }
-
-      const idList = rawString.split(',').map(id => Number(id.trim()));
-
-      return ServiceResponse.success(idList, "Old customers retrieved successfully.");
-
-    } catch (err) {
-      return this.handleError(err, "Failed to get old customers.");
-    }
-  }
-    */
-
-  async addOldCustomer(carId: number, oldCustomerIdToAdd: number): Promise<IApiResponse<string>> {
-    try {
-      const result = await drizzleDb
+      // Okuma işlemi için useDb()
+      const result = await useDb()
         .select()
         .from(Cars)
         .where(eq(Cars.carId, carId));
@@ -217,7 +151,6 @@ export class CarsRepository extends BaseRepository<typeof Cars> {
       }
 
       const currentIds = car.oldCustomerId ?? [];
-
       const idToAddStr = oldCustomerIdToAdd.toString();
 
       if (currentIds.includes(idToAddStr)) {
@@ -226,7 +159,8 @@ export class CarsRepository extends BaseRepository<typeof Cars> {
 
       const updatedList = [...currentIds, idToAddStr];
 
-      await drizzleDb
+      // Güncelleme işlemi için useDb()
+      await useDb()
         .update(Cars)
         .set({ oldCustomerId: updatedList })
         .where(eq(Cars.carId, carId));
@@ -240,7 +174,7 @@ export class CarsRepository extends BaseRepository<typeof Cars> {
 
   async getOldCustomers(carId: number): Promise<IApiResponse<number[]>> {
     try {
-      const result = await drizzleDb
+      const result = await useDb()
         .select()
         .from(Cars)
         .where(eq(Cars.carId, carId));

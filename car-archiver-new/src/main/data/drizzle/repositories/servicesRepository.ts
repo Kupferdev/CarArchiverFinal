@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { InferSelectModel } from "drizzle-orm";
-import { drizzleDb } from "../drizzleDb";
+// 1. DEĞİŞİKLİK: drizzleDb yerine useDb import edildi
+import { useDb } from "../drizzleDb"; 
 import { Services } from "../schemas/servicesSchema";
 import { BaseRepository } from "./baseRepository";
 import { IApiResponse, ServiceResponse } from "../../../../models/response.model";
@@ -12,7 +13,8 @@ export class ServicesRepository extends BaseRepository<typeof Services> {
 
   async getByCarId(carId: number): Promise<IApiResponse<InferSelectModel<typeof Services>[]>> {
     try {
-      const result = await drizzleDb
+      // 2. DEĞİŞİKLİK: drizzleDb yerine useDb()
+      const result = await useDb()
         .select()
         .from(Services)
         .where(eq(Services.carId, carId));
@@ -28,7 +30,8 @@ export class ServicesRepository extends BaseRepository<typeof Services> {
 
   async getByCustomerId(customerId: number): Promise<IApiResponse<InferSelectModel<typeof Services>[]>> {
     try {
-      const result = await drizzleDb
+      // 3. DEĞİŞİKLİK: drizzleDb yerine useDb()
+      const result = await useDb()
         .select()
         .from(Services)
         .where(eq(Services.customerId, customerId));

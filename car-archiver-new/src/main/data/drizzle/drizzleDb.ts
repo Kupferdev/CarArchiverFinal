@@ -1,18 +1,24 @@
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import { drizzle, BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { getDb } from "../db";
 
-// 1. Drizzle'ı başta boş tanımlıyoruz. (Uygulama açılırken patlamaz)
-export let drizzleDb: any = null;
+export let drizzleDb: BetterSQLite3Database | null = null;
 
-// 2. Bu fonksiyonu sadece SQLite hazır olduğunda biz çağıracağız!
 export function initDrizzle() {
-    const db = getDb();
-    
-    if (!db) {
-        throw new Error("Aga SQLite motoru yok, Drizzle'ı bağlayamam!");
+    if (drizzleDb) {
+        console.log("ℹ️ Drizzle ORM is already initialized.");
+        return drizzleDb;
     }
 
-    // 3. Motoru Drizzle'a tam burada veriyoruz.
+    const db = getDb();
+    
     drizzleDb = drizzle(db);
-    console.log("❇️ Drizzle ORM Veritabanına Bağlandı!");
+    console.log("❇️ Drizzle ORM initialized successfully.");
+    return drizzleDb;
+}
+
+export function useDb() {
+    if (!drizzleDb) {
+        throw new Error("Drizzle ORM has not been initialized yet! Please call initDrizzle() first.");
+    }
+    return drizzleDb;
 }

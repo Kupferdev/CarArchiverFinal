@@ -21,6 +21,7 @@ try {
     console.log("❇️ Parts table created");
 } catch (err) {
     console.log("🆘 Parts table not created", (err as Error).message);
+    throw err;
 }
 }
 

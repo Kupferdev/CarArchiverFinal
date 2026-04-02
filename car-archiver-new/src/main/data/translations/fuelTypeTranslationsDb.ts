@@ -1,5 +1,5 @@
 import { drizzle } from "drizzle-orm/singlestore";
-import { drizzleDb } from "../drizzle/drizzleDb";
+import { useDb } from "../drizzle/drizzleDb";
 import { FuelTypes } from "../drizzle/schemas/fuelTypesSchema/fuelTypeSchema";
 import { fuelTypeTranslations } from "../drizzle/schemas/fuelTypesSchema/fuelTypeTranslationsSchema";
 
@@ -95,7 +95,7 @@ const baseFuelTypeTranslations: Array<FuelTypeTranslations> = [
 ];
 
 const baseFuelTypeTranslationsSql = `
-  CREATE TABLE FuelTypeTranslations (
+  CREATE TABLE IF NOT EXISTS FuelTypeTranslations (
   translationId INTEGER PRIMARY KEY AUTOINCREMENT,
   FuelTypeId INTEGER NOT NULL,
   languageCode TEXT NOT NULL,
@@ -107,21 +107,24 @@ const baseFuelTypeTranslationsSql = `
 export async function createFuelTypesTranslationsTable() {
 
     const db = getDb();
+    const orm = useDb();
 
     try {
         db.exec(baseFuelTypeTranslationsSql);
         console.log("❇️ Translations Base FuelType translations table created");
         try {
-            await drizzleDb.insert(fuelTypeTranslations).values(baseFuelTypeTranslations);
+            await orm.insert(fuelTypeTranslations).values(baseFuelTypeTranslations).onConflictDoNothing();
             console.log("❇️ Translations Base FuelType insert success");
 
         } catch (err) {
             console.log("🆘 Translations Base FuelType not insert.", (err as Error).message);
+            throw err;
 
         }
 
     } catch (err) {
         console.log("🆘 Translations Base FuelType translations table not created | Error: ", (err as Error).message);
+        throw err;
 
     }
 

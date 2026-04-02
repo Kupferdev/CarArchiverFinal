@@ -3,13 +3,17 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from 'url';
 
-// İsimleri değiştiriyoruz (Bundler'ın kafası karışmasın diye)
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirPath = path.dirname(currentFilePath);
 
-export let dbInstance: any = null;
+export let dbInstance: Database.Database | null = null;
 
 export function CreateDefaultDb(dbPath: string) {
+    if (dbInstance) {
+        console.log("ℹ️ Database connection is already open.");
+        return dbInstance;
+    }
+
     const dbPathFinal = path.normalize(dbPath); 
 
     try {
@@ -18,22 +22,20 @@ export function CreateDefaultDb(dbPath: string) {
             fs.mkdirSync(folder, { recursive: true });
         }
 
-        // Eğer hala hata veriyorsa, sorun better-sqlite3'ün içindedir.
-        // Ama bu atama ile aşmış olmamız lazım.
-
         dbInstance = new Database(dbPathFinal);
         dbInstance.pragma("foreign_keys = on");
-
         
-        console.log("❇️ SQLite Motoru Ateşlendi: ", dbPathFinal);
+        console.log("❇️ DB Started: ", dbPathFinal);
+        return dbInstance;
     } catch (err) {
-        // HATA MESAJINI DAHA NET GÖRELİM
-        console.error("🆘 DB OLUŞTURMA SIRASINDA PATLADI:", err);
+        console.error("🆘 DB Error:", err);
         throw err; 
     }
-    
 }
 
 export function getDb() {
+    if (!dbInstance) {
+        throw new Error("SQLite engine has not been initialized yet! Please call CreateDefaultDb() first.");
+    }
     return dbInstance;   
 }

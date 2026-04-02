@@ -1,6 +1,5 @@
-import { drizzleDb } from "../../drizzle/drizzleDb";
+import { useDb } from "../../drizzle/drizzleDb";
 import { BodyTypes } from "../../drizzle/schemas/bodyTypesSchema/bodyTypeSchema";
-import { createBodyTypesTranslationsTable } from "../../translations/bodyTypeTranslationsDb";
 
 import { getDb } from "../../db";
 
@@ -21,6 +20,7 @@ const baseBodyTypes: Array<{ bodyTypeName: string }> = [
 export async function createBodyTypesTable() {
 
   const db = getDb();
+  const orm = useDb();
 
   const createBodyTypesTableSql = `
     CREATE TABLE IF NOT EXISTS BodyTypes(
@@ -34,14 +34,14 @@ export async function createBodyTypesTable() {
     db.exec(createBodyTypesTableSql);
     console.log("❇️ BodyTypes table created");
     try {
-      await drizzleDb.insert(BodyTypes).values(baseBodyTypes);
+      await orm.insert(BodyTypes).values(baseBodyTypes).onConflictDoNothing();
       console.log(" ❇️ Base body types added the table.");
-      await createBodyTypesTranslationsTable();
     } catch (err) {
       console.error("🆘 Base body types insert error:", (err as Error).message);
     }
   } catch (err) {
     console.log("🆘 BodyTypes table not created", (err as Error).message);
+    throw err;
   }
 }
 

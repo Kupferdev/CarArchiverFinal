@@ -1,5 +1,5 @@
 import { Brand } from "../../../../shared/types/brand";
-import { drizzleDb } from "../../drizzle/drizzleDb";
+import { useDb } from "../../drizzle/drizzleDb";
 import { Brands } from "../../drizzle/schemas/brandsSchema";
 
 import { getDb } from "../../db";
@@ -127,6 +127,7 @@ const baseCarBrands: Array<Brand> = [
 export async function createBrandsTable(){
 
     const db = getDb();
+    const orm = useDb();
 
     const createBrandsTableSql = `
         CREATE TABLE IF NOT EXISTS Brands(
@@ -139,13 +140,14 @@ export async function createBrandsTable(){
         db.exec(createBrandsTableSql);
         console.log("❇️ Brands table created");
         try{
-            await drizzleDb.insert(Brands).values(baseCarBrands);
+            await orm.insert(Brands).values(baseCarBrands).onConflictDoNothing();
             console.log("❇️ Base Brands insert the table.");
         }catch{
             console.log("🆘 Base Brands not insert the table.")
         }
     }catch(err){
         console.log("🆘 Brans table not created", (err as Error).message);
+        throw err;
     }
 
 }

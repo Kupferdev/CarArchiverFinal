@@ -19,5 +19,6 @@ export function createCustomerPhoneNumbersTable() {
         console.log("❇️ PhoneNumbers table created!");
     } catch (err) {
         console.log("🆘PhoneNumber table not created", (err as Error).message);
+        throw err;
     }
 }

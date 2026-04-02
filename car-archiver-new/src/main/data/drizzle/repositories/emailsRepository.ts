@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { InferSelectModel } from "drizzle-orm";
-import { drizzleDb } from "../drizzleDb";
+// 1. DEĞİŞİKLİK: drizzleDb yerine useDb import edildi
+import { useDb } from "../drizzleDb"; 
 import { Emails } from "../schemas/customerSchemas/emailsSchema";
 import { BaseRepository } from "./baseRepository";
 import { IApiResponse, ServiceResponse } from "../../../../models/response.model";
@@ -10,10 +11,10 @@ export class EmailsRepository extends BaseRepository<typeof Emails> {
     super(Emails, "emailId");
   }
 
-
   async getByCustomerId(customerId: number): Promise<IApiResponse<InferSelectModel<typeof Emails>[]>> {
     try {
-      const result = await drizzleDb
+      // 2. DEĞİŞİKLİK: drizzleDb yerine useDb()
+      const result = await useDb()
         .select()
         .from(Emails)
         .where(eq(Emails.customerId, customerId));
@@ -27,10 +28,10 @@ export class EmailsRepository extends BaseRepository<typeof Emails> {
     }
   }
 
-
   async getByCustomerForEmail(customerEmail: string): Promise<IApiResponse<number | undefined>> {
     try {
-      const result = await drizzleDb
+      // 3. DEĞİŞİKLİK: drizzleDb yerine useDb()
+      const result = await useDb()
         .select({ customerId: Emails.customerId })
         .from(Emails)
         .where(eq(Emails.customerEmail, customerEmail));
@@ -47,10 +48,10 @@ export class EmailsRepository extends BaseRepository<typeof Emails> {
     }
   }
 
-
   async isEmailUsed(email: string): Promise<IApiResponse<boolean>> {
     try {
-      const result = await drizzleDb
+      // 4. DEĞİŞİKLİK: drizzleDb yerine useDb()
+      const result = await useDb()
         .select()
         .from(Emails)
         .where(eq(Emails.customerEmail, email))

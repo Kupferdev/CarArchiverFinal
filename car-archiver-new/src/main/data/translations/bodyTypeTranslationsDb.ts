@@ -1,4 +1,4 @@
-import { drizzleDb } from "../drizzle/drizzleDb";
+import { useDb } from "../drizzle/drizzleDb";
 import { bodyTypeTranslations } from "../drizzle/schemas/bodyTypesSchema/bodyTypeTranslationsSchemas";
 
 import { getDb } from "../db";
@@ -11,7 +11,7 @@ export interface BodyTypeTranslations {
 }
 
   const baseBodyTypeTranslationsSql = `
-  CREATE TABLE BodyTypeTranslations (
+  CREATE TABLE IF NOT EXISTS BodyTypeTranslations (
   translationId INTEGER PRIMARY KEY AUTOINCREMENT,
   bodyTypeId INTEGER NOT NULL,
   languageCode TEXT NOT NULL,
@@ -169,20 +169,23 @@ const baseBodyTypeTranslations: Array<BodyTypeTranslations> = [
 export async function createBodyTypesTranslationsTable() {
 
   const db = getDb();
+  const orm = useDb();
 
   try {
     db.exec(baseBodyTypeTranslationsSql);
     console.log("❇️ Translations Base body translations table created");
     try {
-      await drizzleDb.insert(bodyTypeTranslations).values(baseBodyTypeTranslations);
+      await orm.insert(bodyTypeTranslations).values(baseBodyTypeTranslations).onConflictDoNothing();
       console.log("❇️ Translations Base body types insert success");
 
     } catch (err) {
       console.log("🆘 Translations Base body types not insert.", (err as Error).message);
+      throw err;
     }
 
   } catch (err) {
     console.log("🆘 Translations Base body translations table not created | Error: ", (err as Error).message);
+    throw err;
   }
 
 }

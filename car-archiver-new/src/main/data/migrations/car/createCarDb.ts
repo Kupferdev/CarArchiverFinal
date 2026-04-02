@@ -27,5 +27,6 @@ export function createCarsTable() {
         console.log("❇️ Car table created")
     } catch (err) {
         console.log("🆘 Car table not created", (err as Error).message);
+        throw err;
     }
 }

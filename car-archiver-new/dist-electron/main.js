@@ -15,6 +15,10 @@ const currentFilePath$1 = fileURLToPath(import.meta.url);
 path.dirname(currentFilePath$1);
 let dbInstance = null;
 function CreateDefaultDb(dbPath) {
+  if (dbInstance) {
+    console.log("ℹ️ Database connection is already open.");
+    return dbInstance;
+  }
   const dbPathFinal = path.normalize(dbPath);
   try {
     const folder = path.dirname(dbPathFinal);
@@ -23,13 +27,17 @@ function CreateDefaultDb(dbPath) {
     }
     dbInstance = new Client(dbPathFinal);
     dbInstance.pragma("foreign_keys = on");
-    console.log("❇️ SQLite Motoru Ateşlendi: ", dbPathFinal);
+    console.log("❇️ DB Started: ", dbPathFinal);
+    return dbInstance;
   } catch (err) {
-    console.error("🆘 DB OLUŞTURMA SIRASINDA PATLADI:", err);
+    console.error("🆘 DB Error:", err);
     throw err;
   }
 }
 function getDb() {
+  if (!dbInstance) {
+    throw new Error("SQLite engine has not been initialized yet! Please call CreateDefaultDb() first.");
+  }
   return dbInstance;
 }
 const entityKind = Symbol.for("drizzle:entityKind");
@@ -4825,17 +4833,487 @@ function drizzle(...params) {
 })(drizzle || (drizzle = {}));
 let drizzleDb = null;
 function initDrizzle() {
-  const db = getDb();
-  if (!db) {
-    throw new Error("Aga SQLite motoru yok, Drizzle'ı bağlayamam!");
+  if (drizzleDb) {
+    console.log("ℹ️ Drizzle ORM is already initialized.");
+    return drizzleDb;
   }
+  const db = getDb();
   drizzleDb = drizzle(db);
-  console.log("❇️ Drizzle ORM Veritabanına Bağlandı!");
+  console.log("❇️ Drizzle ORM initialized successfully.");
+  return drizzleDb;
+}
+function useDb() {
+  if (!drizzleDb) {
+    throw new Error("Drizzle ORM has not been initialized yet! Please call initDrizzle() first.");
+  }
+  return drizzleDb;
 }
 const BodyTypes = sqliteTable("BodyTypes", {
   bodyTypeId: integer("bodyTypeId").primaryKey({ autoIncrement: true }),
   bodyTypeName: text("bodyTypeName").notNull().unique()
 });
+const baseBodyTypes = [
+  { bodyTypeName: "Sedan" },
+  { bodyTypeName: "Hatchback" },
+  { bodyTypeName: "SUV" },
+  { bodyTypeName: "Coupe" },
+  { bodyTypeName: "Station Wagon" },
+  { bodyTypeName: "MPV" },
+  { bodyTypeName: "Crossover" },
+  { bodyTypeName: "Pickup" },
+  { bodyTypeName: "Cabrio" }
+];
+async function createBodyTypesTable() {
+  const db = getDb();
+  const orm = useDb();
+  const createBodyTypesTableSql = `
+    CREATE TABLE IF NOT EXISTS BodyTypes(
+    bodyTypeId INTEGER PRIMARY KEY AUTOINCREMENT,
+    bodyTypeName TEXT NOT NULL Unique
+    )
+
+`;
+  try {
+    db.exec(createBodyTypesTableSql);
+    console.log("❇️ BodyTypes table created");
+    try {
+      await orm.insert(BodyTypes).values(baseBodyTypes).onConflictDoNothing();
+      console.log(" ❇️ Base body types added the table.");
+    } catch (err) {
+      console.error("🆘 Base body types insert error:", err.message);
+    }
+  } catch (err) {
+    console.log("🆘 BodyTypes table not created", err.message);
+    throw err;
+  }
+}
+const Brands = sqliteTable("Brands", {
+  brandId: integer("brandId").primaryKey({ autoIncrement: true }),
+  brandName: text("brandName").notNull()
+});
+const baseCarBrands = [
+  { brandName: "Abarth" },
+  { brandName: "Acura" },
+  { brandName: "Aixam" },
+  { brandName: "Alfa Romeo" },
+  { brandName: "Alpine" },
+  { brandName: "Ariel" },
+  { brandName: "Aston Martin" },
+  { brandName: "Audi" },
+  { brandName: "BAC (Briggs Automotive Company)" },
+  { brandName: "Bentley" },
+  { brandName: "BMW" },
+  { brandName: "Bugatti" },
+  { brandName: "Buick" },
+  { brandName: "BYD" },
+  { brandName: "Cadillac" },
+  { brandName: "Caterham" },
+  { brandName: "Changan" },
+  { brandName: "Chery" },
+  { brandName: "Chevrolet" },
+  { brandName: "Chrysler" },
+  { brandName: "Citroën" },
+  { brandName: "Cupra" },
+  { brandName: "Dacia" },
+  { brandName: "Daewoo" },
+  { brandName: "Daihatsu" },
+  { brandName: "Datsun" },
+  { brandName: "DeLorean" },
+  { brandName: "Dodge" },
+  { brandName: "Dongfeng" },
+  { brandName: "DS Automobiles" },
+  { brandName: "Eunos" },
+  { brandName: "FAW" },
+  { brandName: "Ferrari" },
+  { brandName: "Fiat" },
+  { brandName: "Fisker" },
+  { brandName: "Ford" },
+  { brandName: "Geely" },
+  { brandName: "Genesis" },
+  { brandName: "GMC" },
+  { brandName: "Great Wall (GWM)" },
+  { brandName: "Haval" },
+  { brandName: "Holden" },
+  { brandName: "Honda" },
+  { brandName: "Hummer" },
+  { brandName: "Hyundai" },
+  { brandName: "Infiniti" },
+  { brandName: "Isuzu" },
+  { brandName: "Jaguar" },
+  { brandName: "Jeep" },
+  { brandName: "KGM (SsangYong)" },
+  { brandName: "Kia" },
+  { brandName: "Koenigsegg" },
+  { brandName: "Lada" },
+  { brandName: "Lamborghini" },
+  { brandName: "Lancia" },
+  { brandName: "Land Rover" },
+  { brandName: "Lexus" },
+  { brandName: "Li Auto" },
+  { brandName: "Lincoln" },
+  { brandName: "Lotus" },
+  { brandName: "Lucid" },
+  { brandName: "Lynk & Co" },
+  { brandName: "Mahindra" },
+  { brandName: "Maserati" },
+  { brandName: "Maybach" },
+  { brandName: "Mazda" },
+  { brandName: "McLaren" },
+  { brandName: "Mercedes-Benz" },
+  { brandName: "MG" },
+  { brandName: "Mini" },
+  { brandName: "Mitsubishi" },
+  { brandName: "Morgan" },
+  { brandName: "Nio" },
+  { brandName: "Nissan" },
+  { brandName: "Oldsmobile" },
+  { brandName: "Opel" },
+  { brandName: "Pagani" },
+  { brandName: "Perodua" },
+  { brandName: "Peugeot" },
+  { brandName: "Pininfarina" },
+  { brandName: "Plymouth" },
+  { brandName: "Polestar" },
+  { brandName: "Pontiac" },
+  { brandName: "Porsche" },
+  { brandName: "Proton" },
+  { brandName: "Ram" },
+  { brandName: "Renault" },
+  { brandName: "Rimac" },
+  { brandName: "Rivian" },
+  { brandName: "Rolls-Royce" },
+  { brandName: "Saab" },
+  { brandName: "Saturn" },
+  { brandName: "Scania" },
+  { brandName: "Scion" },
+  { brandName: "SEAT" },
+  { brandName: "Skoda" },
+  { brandName: "Smart" },
+  { brandName: "Spyker" },
+  { brandName: "Subaru" },
+  { brandName: "Suzuki" },
+  { brandName: "Tata Motors" },
+  { brandName: "Tesla" },
+  { brandName: "Toyota" },
+  { brandName: "Vanderhall" },
+  { brandName: "Vauxhall" },
+  { brandName: "VinFast" },
+  { brandName: "Volkswagen" },
+  { brandName: "Volvo" },
+  { brandName: "Wiesmann" },
+  { brandName: "Wuling" },
+  { brandName: "XPeng" },
+  { brandName: "Zagato" },
+  { brandName: "Zeekr" },
+  { brandName: "Zenvo" }
+];
+async function createBrandsTable() {
+  const db = getDb();
+  const orm = useDb();
+  const createBrandsTableSql = `
+        CREATE TABLE IF NOT EXISTS Brands(
+        brandId INTEGER PRIMARY KEY AUTOINCREMENT,
+        brandName TEXT NOT NULL
+        )
+    `;
+  try {
+    db.exec(createBrandsTableSql);
+    console.log("❇️ Brands table created");
+    try {
+      await orm.insert(Brands).values(baseCarBrands).onConflictDoNothing();
+      console.log("❇️ Base Brands insert the table.");
+    } catch {
+      console.log("🆘 Base Brands not insert the table.");
+    }
+  } catch (err) {
+    console.log("🆘 Brans table not created", err.message);
+    throw err;
+  }
+}
+function createCarsTable() {
+  const db = getDb();
+  const createCarTableSql = `
+    CREATE TABLE IF NOT EXISTS Cars (
+    carId INTEGER PRIMARY KEY AUTOINCREMENT,
+    customerId INTEGER,
+    oldCustomerId JSON NULL,
+    brandId INTEGER NULL,
+    modelId INTEGER NULL,
+    year INTEGER NULL,
+    vinNumber TEXT NULL,
+    plateNumber TEXT NULL,
+    km REAL NULL,
+    fuelType INTEGER NULL,
+    bodyType INTEGER NULL
+    )
+`;
+  try {
+    db.exec(createCarTableSql);
+    console.log("❇️ Car table created");
+  } catch (err) {
+    console.log("🆘 Car table not created", err.message);
+    throw err;
+  }
+}
+function createCustomerEmailsTable() {
+  const db = getDb();
+  const createCustomerEmailTableSql = `
+    CREATE TABLE IF NOT EXISTS Emails (
+        emailId INTEGER PRIMARY KEY AUTOINCREMENT,
+        customerId INTEGER NOT NULL,
+        customerEmail TEXT NOT NULL
+    )
+`;
+  try {
+    db.exec(createCustomerEmailTableSql);
+    console.log("❇️ Email table created");
+  } catch (err) {
+    console.log("🆘Email table not created", err.message);
+    throw err;
+  }
+}
+function createCustomerPhoneNumbersTable() {
+  const db = getDb();
+  const createPhoneNumbersTableSql = `
+    CREATE TABLE IF NOT EXISTS PhoneNumbers(
+        phoneNumberId INTEGER PRIMARY KEY AUTOINCREMENT,
+        customerId  INTEGER NOT NULL,
+        countryCode TEXT NOT NULL,
+        phoneNumber TEXT NOT NULL
+        );
+`;
+  try {
+    db.exec(createPhoneNumbersTableSql);
+    console.log("❇️ PhoneNumbers table created!");
+  } catch (err) {
+    console.log("🆘PhoneNumber table not created", err.message);
+    throw err;
+  }
+}
+function createCustomersTable() {
+  const db = getDb();
+  const createCustomersTableSql = `
+    CREATE TABLE IF NOT EXISTS Customers (
+        customerId INTEGER PRIMARY KEY AUTOINCREMENT,
+        nationalId TEXT NULL,
+        firstName  TEXT NOT NULL,
+        lastName   TEXT NULL,
+        taxNumber  TEXT NULL
+    );
+`;
+  try {
+    db.exec(createCustomersTableSql);
+    console.log("❇️ Customer table created");
+  } catch (err) {
+    console.log("🆘Customers table not created", err.message);
+    throw err;
+  }
+  createCustomerPhoneNumbersTable();
+  createCustomerEmailsTable();
+}
+const FuelTypes = sqliteTable("FuelTypes", {
+  fuelTypeId: integer("fuelTypeId").primaryKey({ autoIncrement: true }),
+  fuelTypeName: text("fuelTypeName").notNull().unique()
+});
+const baseFuelTypes = [
+  { fuelTypeName: "Benzin" },
+  { fuelTypeName: "Dizel" },
+  { fuelTypeName: "LPG" },
+  { fuelTypeName: "Elektrik" },
+  { fuelTypeName: "Hibrit" }
+];
+async function createFuelTypesTable() {
+  const db = getDb();
+  const orm = useDb();
+  const createFuelTypesTableSql = `
+    CREATE TABLE IF NOT EXISTS FuelTypes(
+        fuelTypeId INTEGER PRIMARY KEY AUTOINCREMENT,
+        fuelTypeName TEXT NOT NULL Unique
+    )
+
+`;
+  try {
+    db.exec(createFuelTypesTableSql);
+    console.log("❇️ FuelTypes table created");
+    try {
+      await orm.insert(FuelTypes).values(baseFuelTypes).onConflictDoNothing();
+      ;
+      console.log(" ❇️ Base Fuel types added the table.");
+    } catch (err) {
+      console.error("🆘 Base Fuel types insert error:", err.message);
+      throw err;
+    }
+  } catch (err) {
+    console.log("🆘 FuelTypes table not created", err.message);
+    throw err;
+  }
+}
+function createPartsTable() {
+  const db = getDb();
+  const createPartTableSql = `
+    CREATE TABLE IF NOT EXISTS Parts(
+        partId INTEGER PRIMARY KEY AUTOINCREMENT,
+        carId INTEGER NOT NULL,
+        serviceId INTEGER NOT NULL,
+        partName TEXT NOT NULL,
+        partTax REAL NULL,
+        partPrice REAL NULL
+    );
+`;
+  try {
+    db.exec(createPartTableSql);
+    console.log("❇️ Parts table created");
+  } catch (err) {
+    console.log("🆘 Parts table not created", err.message);
+    throw err;
+  }
+}
+function createServicesTable() {
+  const db = getDb();
+  const createServicesTableSql = `
+        CREATE TABLE IF NOT EXISTS Services(
+            serviceId INTEGER PRIMARY KEY AUTOINCREMENT,
+            carId INTEGER NOT NULL,
+            customerId INTEGER NULL,
+            applicationDate DATETIME NULL,
+            appointmentDate DATETIME NULL,
+            jobDuration DATETIME NULL,
+            deliveryDate DATETIME NULL,
+            km REAL NULL,
+            complaints TEXT NOT NULL,
+            extraRequests TEXT NULL,
+            faults JSON NULL,
+            hasDamageOnReceive BOOLEAN NOT NULL,
+            damageonReceive JSON NULL,
+            hasDamageDuringRepair BOOLEAN NULL,
+            damageDuringRepair JSON NULL,
+            laborCharge REAL NULL,
+            totalCharge REAL NULL
+        )
+    `;
+  try {
+    db.exec(createServicesTableSql);
+    console.log("❇️ Services table created");
+  } catch (err) {
+    console.log("🆘 Services table not created", err.message);
+    throw err;
+  }
+}
+const fuelTypeTranslations = sqliteTable("FuelTypeTranslations", {
+  translationId: integer("translationId").primaryKey({ autoIncrement: true }),
+  fuelTypeId: integer("fuelTypeId").references(() => FuelTypes.fuelTypeId),
+  languageCode: text("languageCode").notNull(),
+  translatedName: text("translatedName").notNull()
+});
+const baseFuelTypeTranslations = [
+  // Benzin (Gasoline/Petrol) (fuelTypeId: 1)
+  { fuelTypeId: 1, languageCode: "en", translatedName: "Gasoline" },
+  { fuelTypeId: 1, languageCode: "es", translatedName: "Gasolina" },
+  { fuelTypeId: 1, languageCode: "fr", translatedName: "Essence" },
+  { fuelTypeId: 1, languageCode: "de", translatedName: "Benzin" },
+  { fuelTypeId: 1, languageCode: "pt", translatedName: "Gasolina" },
+  { fuelTypeId: 1, languageCode: "zh", translatedName: "汽油" },
+  { fuelTypeId: 1, languageCode: "ja", translatedName: "ガソリン" },
+  { fuelTypeId: 1, languageCode: "tr", translatedName: "Benzin" },
+  { fuelTypeId: 1, languageCode: "ko", translatedName: "휘발유" },
+  { fuelTypeId: 1, languageCode: "ru", translatedName: "Бензин" },
+  { fuelTypeId: 1, languageCode: "nl", translatedName: "Benzine" },
+  { fuelTypeId: 1, languageCode: "az", translatedName: "Benzin" },
+  { fuelTypeId: 1, languageCode: "it", translatedName: "Benzina" },
+  { fuelTypeId: 1, languageCode: "pl", translatedName: "Benzyna" },
+  // Dizel (Diesel) (fuelTypeId: 2)
+  { fuelTypeId: 2, languageCode: "en", translatedName: "Diesel" },
+  { fuelTypeId: 2, languageCode: "es", translatedName: "Diésel" },
+  { fuelTypeId: 2, languageCode: "fr", translatedName: "Diesel" },
+  { fuelTypeId: 2, languageCode: "de", translatedName: "Diesel" },
+  { fuelTypeId: 2, languageCode: "pt", translatedName: "Diesel" },
+  { fuelTypeId: 2, languageCode: "zh", translatedName: "柴油" },
+  { fuelTypeId: 2, languageCode: "ja", translatedName: "ディーゼル" },
+  { fuelTypeId: 2, languageCode: "tr", translatedName: "Dizel" },
+  { fuelTypeId: 2, languageCode: "ko", translatedName: "디젤" },
+  { fuelTypeId: 2, languageCode: "ru", translatedName: "Дизель" },
+  { fuelTypeId: 2, languageCode: "nl", translatedName: "Diesel" },
+  { fuelTypeId: 2, languageCode: "az", translatedName: "Dizel" },
+  { fuelTypeId: 2, languageCode: "it", translatedName: "Diesel" },
+  { fuelTypeId: 2, languageCode: "pl", translatedName: "Diesel" },
+  // LPG (fuelTypeId: 3)
+  { fuelTypeId: 3, languageCode: "en", translatedName: "LPG" },
+  { fuelTypeId: 3, languageCode: "es", translatedName: "GLP" },
+  // Gas Licuado de Petróleo
+  { fuelTypeId: 3, languageCode: "fr", translatedName: "GPL" },
+  // Gaz de Pétrole Liquéfié
+  { fuelTypeId: 3, languageCode: "de", translatedName: "Autogas (LPG)" },
+  { fuelTypeId: 3, languageCode: "pt", translatedName: "GPL" },
+  // Gás Liquefeito de Petróleo
+  { fuelTypeId: 3, languageCode: "zh", translatedName: "液化石油气" },
+  { fuelTypeId: 3, languageCode: "ja", translatedName: "LPG" },
+  { fuelTypeId: 3, languageCode: "tr", translatedName: "LPG" },
+  { fuelTypeId: 3, languageCode: "ko", translatedName: "LPG" },
+  { fuelTypeId: 3, languageCode: "ru", translatedName: "СНГ" },
+  // Сжиженный нефтяной газ
+  { fuelTypeId: 3, languageCode: "nl", translatedName: "LPG" },
+  { fuelTypeId: 3, languageCode: "az", translatedName: "LPG" },
+  { fuelTypeId: 3, languageCode: "it", translatedName: "GPL" },
+  // Gas di Petrolio Liquefatti
+  { fuelTypeId: 3, languageCode: "pl", translatedName: "LPG" },
+  // Elektrik (Electric) (fuelTypeId: 4)
+  { fuelTypeId: 4, languageCode: "en", translatedName: "Electric" },
+  { fuelTypeId: 4, languageCode: "es", translatedName: "Eléctrico" },
+  { fuelTypeId: 4, languageCode: "fr", translatedName: "Électrique" },
+  { fuelTypeId: 4, languageCode: "de", translatedName: "Elektro" },
+  { fuelTypeId: 4, languageCode: "pt", translatedName: "Elétrico" },
+  { fuelTypeId: 4, languageCode: "zh", translatedName: "电动" },
+  { fuelTypeId: 4, languageCode: "ja", translatedName: "電気" },
+  { fuelTypeId: 4, languageCode: "tr", translatedName: "Elektrik" },
+  { fuelTypeId: 4, languageCode: "ko", translatedName: "전기" },
+  { fuelTypeId: 4, languageCode: "ru", translatedName: "Электро" },
+  { fuelTypeId: 4, languageCode: "nl", translatedName: "Elektrisch" },
+  { fuelTypeId: 4, languageCode: "az", translatedName: "Elektrik" },
+  { fuelTypeId: 4, languageCode: "it", translatedName: "Elettrica" },
+  { fuelTypeId: 4, languageCode: "pl", translatedName: "Elektryczny" },
+  // Hibrit (Hybrid) (fuelTypeId: 5)
+  { fuelTypeId: 5, languageCode: "en", translatedName: "Hybrid" },
+  { fuelTypeId: 5, languageCode: "es", translatedName: "Híbrido" },
+  { fuelTypeId: 5, languageCode: "fr", translatedName: "Hybride" },
+  { fuelTypeId: 5, languageCode: "de", translatedName: "Hybrid" },
+  { fuelTypeId: 5, languageCode: "pt", translatedName: "Híbrido" },
+  { fuelTypeId: 5, languageCode: "zh", translatedName: "混合动力" },
+  { fuelTypeId: 5, languageCode: "ja", translatedName: "ハイブリッド" },
+  { fuelTypeId: 5, languageCode: "tr", translatedName: "Hibrit" },
+  { fuelTypeId: 5, languageCode: "ko", translatedName: "하이브리드" },
+  { fuelTypeId: 5, languageCode: "ru", translatedName: "Гибрид" },
+  { fuelTypeId: 5, languageCode: "nl", translatedName: "Hybride" },
+  { fuelTypeId: 5, languageCode: "az", translatedName: "Hibrid" },
+  { fuelTypeId: 5, languageCode: "it", translatedName: "Ibrida" },
+  { fuelTypeId: 5, languageCode: "pl", translatedName: "Hybryda" }
+];
+const baseFuelTypeTranslationsSql = `
+  CREATE TABLE IF NOT EXISTS FuelTypeTranslations (
+  translationId INTEGER PRIMARY KEY AUTOINCREMENT,
+  FuelTypeId INTEGER NOT NULL,
+  languageCode TEXT NOT NULL,
+  translatedName TEXT NOT NULL,
+  FOREIGN KEY (fuelTypeId) REFERENCES FuelTypes(fuelTypeId)
+);
+`;
+async function createFuelTypesTranslationsTable() {
+  const db = getDb();
+  const orm = useDb();
+  try {
+    db.exec(baseFuelTypeTranslationsSql);
+    console.log("❇️ Translations Base FuelType translations table created");
+    try {
+      await orm.insert(fuelTypeTranslations).values(baseFuelTypeTranslations).onConflictDoNothing();
+      console.log("❇️ Translations Base FuelType insert success");
+    } catch (err) {
+      console.log("🆘 Translations Base FuelType not insert.", err.message);
+      throw err;
+    }
+  } catch (err) {
+    console.log("🆘 Translations Base FuelType translations table not created | Error: ", err.message);
+    throw err;
+  }
+}
 const bodyTypeTranslations = sqliteTable("BodyTypeTranslations", {
   translationId: integer("translationId").primaryKey({ autoIncrement: true }),
   bodyTypeId: integer("bodyTypeId").references(() => BodyTypes.bodyTypeId),
@@ -4843,7 +5321,7 @@ const bodyTypeTranslations = sqliteTable("BodyTypeTranslations", {
   translatedName: text("translatedName").notNull()
 });
 const baseBodyTypeTranslationsSql = `
-  CREATE TABLE BodyTypeTranslations (
+  CREATE TABLE IF NOT EXISTS BodyTypeTranslations (
   translationId INTEGER PRIMARY KEY AUTOINCREMENT,
   bodyTypeId INTEGER NOT NULL,
   languageCode TEXT NOT NULL,
@@ -4990,474 +5468,41 @@ const baseBodyTypeTranslations = [
 ];
 async function createBodyTypesTranslationsTable() {
   const db = getDb();
+  const orm = useDb();
   try {
     db.exec(baseBodyTypeTranslationsSql);
     console.log("❇️ Translations Base body translations table created");
     try {
-      await drizzleDb.insert(bodyTypeTranslations).values(baseBodyTypeTranslations);
+      await orm.insert(bodyTypeTranslations).values(baseBodyTypeTranslations).onConflictDoNothing();
       console.log("❇️ Translations Base body types insert success");
     } catch (err) {
       console.log("🆘 Translations Base body types not insert.", err.message);
+      throw err;
     }
   } catch (err) {
     console.log("🆘 Translations Base body translations table not created | Error: ", err.message);
-  }
-}
-const baseBodyTypes = [
-  { bodyTypeName: "Sedan" },
-  { bodyTypeName: "Hatchback" },
-  { bodyTypeName: "SUV" },
-  { bodyTypeName: "Coupe" },
-  { bodyTypeName: "Station Wagon" },
-  { bodyTypeName: "MPV" },
-  { bodyTypeName: "Crossover" },
-  { bodyTypeName: "Pickup" },
-  { bodyTypeName: "Cabrio" }
-];
-async function createBodyTypesTable() {
-  const db = getDb();
-  const createBodyTypesTableSql = `
-    CREATE TABLE IF NOT EXISTS BodyTypes(
-    bodyTypeId INTEGER PRIMARY KEY AUTOINCREMENT,
-    bodyTypeName TEXT NOT NULL Unique
-    )
-
-`;
-  try {
-    db.exec(createBodyTypesTableSql);
-    console.log("❇️ BodyTypes table created");
-    try {
-      await drizzleDb.insert(BodyTypes).values(baseBodyTypes);
-      console.log(" ❇️ Base body types added the table.");
-      await createBodyTypesTranslationsTable();
-    } catch (err) {
-      console.error("🆘 Base body types insert error:", err.message);
-    }
-  } catch (err) {
-    console.log("🆘 BodyTypes table not created", err.message);
-  }
-}
-const Brands = sqliteTable("Brands", {
-  brandId: integer("brandId").primaryKey({ autoIncrement: true }),
-  brandName: text("brandName").notNull()
-});
-const baseCarBrands = [
-  { brandName: "Abarth" },
-  { brandName: "Acura" },
-  { brandName: "Aixam" },
-  { brandName: "Alfa Romeo" },
-  { brandName: "Alpine" },
-  { brandName: "Ariel" },
-  { brandName: "Aston Martin" },
-  { brandName: "Audi" },
-  { brandName: "BAC (Briggs Automotive Company)" },
-  { brandName: "Bentley" },
-  { brandName: "BMW" },
-  { brandName: "Bugatti" },
-  { brandName: "Buick" },
-  { brandName: "BYD" },
-  { brandName: "Cadillac" },
-  { brandName: "Caterham" },
-  { brandName: "Changan" },
-  { brandName: "Chery" },
-  { brandName: "Chevrolet" },
-  { brandName: "Chrysler" },
-  { brandName: "Citroën" },
-  { brandName: "Cupra" },
-  { brandName: "Dacia" },
-  { brandName: "Daewoo" },
-  { brandName: "Daihatsu" },
-  { brandName: "Datsun" },
-  { brandName: "DeLorean" },
-  { brandName: "Dodge" },
-  { brandName: "Dongfeng" },
-  { brandName: "DS Automobiles" },
-  { brandName: "Eunos" },
-  { brandName: "FAW" },
-  { brandName: "Ferrari" },
-  { brandName: "Fiat" },
-  { brandName: "Fisker" },
-  { brandName: "Ford" },
-  { brandName: "Geely" },
-  { brandName: "Genesis" },
-  { brandName: "GMC" },
-  { brandName: "Great Wall (GWM)" },
-  { brandName: "Haval" },
-  { brandName: "Holden" },
-  { brandName: "Honda" },
-  { brandName: "Hummer" },
-  { brandName: "Hyundai" },
-  { brandName: "Infiniti" },
-  { brandName: "Isuzu" },
-  { brandName: "Jaguar" },
-  { brandName: "Jeep" },
-  { brandName: "KGM (SsangYong)" },
-  { brandName: "Kia" },
-  { brandName: "Koenigsegg" },
-  { brandName: "Lada" },
-  { brandName: "Lamborghini" },
-  { brandName: "Lancia" },
-  { brandName: "Land Rover" },
-  { brandName: "Lexus" },
-  { brandName: "Li Auto" },
-  { brandName: "Lincoln" },
-  { brandName: "Lotus" },
-  { brandName: "Lucid" },
-  { brandName: "Lynk & Co" },
-  { brandName: "Mahindra" },
-  { brandName: "Maserati" },
-  { brandName: "Maybach" },
-  { brandName: "Mazda" },
-  { brandName: "McLaren" },
-  { brandName: "Mercedes-Benz" },
-  { brandName: "MG" },
-  { brandName: "Mini" },
-  { brandName: "Mitsubishi" },
-  { brandName: "Morgan" },
-  { brandName: "Nio" },
-  { brandName: "Nissan" },
-  { brandName: "Oldsmobile" },
-  { brandName: "Opel" },
-  { brandName: "Pagani" },
-  { brandName: "Perodua" },
-  { brandName: "Peugeot" },
-  { brandName: "Pininfarina" },
-  { brandName: "Plymouth" },
-  { brandName: "Polestar" },
-  { brandName: "Pontiac" },
-  { brandName: "Porsche" },
-  { brandName: "Proton" },
-  { brandName: "Ram" },
-  { brandName: "Renault" },
-  { brandName: "Rimac" },
-  { brandName: "Rivian" },
-  { brandName: "Rolls-Royce" },
-  { brandName: "Saab" },
-  { brandName: "Saturn" },
-  { brandName: "Scania" },
-  { brandName: "Scion" },
-  { brandName: "SEAT" },
-  { brandName: "Skoda" },
-  { brandName: "Smart" },
-  { brandName: "Spyker" },
-  { brandName: "Subaru" },
-  { brandName: "Suzuki" },
-  { brandName: "Tata Motors" },
-  { brandName: "Tesla" },
-  { brandName: "Toyota" },
-  { brandName: "Vanderhall" },
-  { brandName: "Vauxhall" },
-  { brandName: "VinFast" },
-  { brandName: "Volkswagen" },
-  { brandName: "Volvo" },
-  { brandName: "Wiesmann" },
-  { brandName: "Wuling" },
-  { brandName: "XPeng" },
-  { brandName: "Zagato" },
-  { brandName: "Zeekr" },
-  { brandName: "Zenvo" }
-];
-async function createBrandsTable() {
-  const db = getDb();
-  const createBrandsTableSql = `
-        CREATE TABLE IF NOT EXISTS Brands(
-        brandId INTEGER PRIMARY KEY AUTOINCREMENT,
-        brandName TEXT NOT NULL
-        )
-    `;
-  try {
-    db.exec(createBrandsTableSql);
-    console.log("❇️ Brands table created");
-    try {
-      await drizzleDb.insert(Brands).values(baseCarBrands);
-      console.log("❇️ Base Brands insert the table.");
-    } catch {
-      console.log("🆘 Base Brands not insert the table.");
-    }
-  } catch (err) {
-    console.log("🆘 Brans table not created", err.message);
-  }
-}
-function createCarsTable() {
-  const db = getDb();
-  const createCarTableSql = `
-    CREATE TABLE IF NOT EXISTS Cars (
-    carId INTEGER PRIMARY KEY AUTOINCREMENT,
-    customerId INTEGER,
-    oldCustomerId JSON NULL,
-    brandId INTEGER NULL,
-    modelId INTEGER NULL,
-    year INTEGER NULL,
-    vinNumber TEXT NULL,
-    plateNumber TEXT NULL,
-    km REAL NULL,
-    fuelType INTEGER NULL,
-    bodyType INTEGER NULL
-    )
-`;
-  try {
-    db.exec(createCarTableSql);
-    console.log("❇️ Car table created");
-  } catch (err) {
-    console.log("🆘 Car table not created", err.message);
-  }
-}
-function createCustomerEmailsTable() {
-  const db = getDb();
-  const createCustomerEmailTableSql = `
-    CREATE TABLE IF NOT EXISTS Emails (
-        emailId INTEGER PRIMARY KEY AUTOINCREMENT,
-        customerId INTEGER NOT NULL,
-        customerEmail TEXT NOT NULL
-    )
-`;
-  try {
-    db.exec(createCustomerEmailTableSql);
-    console.log("❇️ Email table created");
-  } catch (err) {
-    console.log("🆘Email table not created", err.message);
-  }
-}
-function createCustomerPhoneNumbersTable() {
-  const db = getDb();
-  const createPhoneNumbersTableSql = `
-    CREATE TABLE IF NOT EXISTS PhoneNumbers(
-        phoneNumberId INTEGER PRIMARY KEY AUTOINCREMENT,
-        customerId  INTEGER NOT NULL,
-        countryCode TEXT NOT NULL,
-        phoneNumber TEXT NOT NULL
-        );
-`;
-  try {
-    db.exec(createPhoneNumbersTableSql);
-    console.log("❇️ PhoneNumbers table created!");
-  } catch (err) {
-    console.log("🆘PhoneNumber table not created", err.message);
-  }
-}
-function createCustomersTable() {
-  const db = getDb();
-  const createCustomersTableSql = `
-    CREATE TABLE IF NOT EXISTS Customers (
-        customerId INTEGER PRIMARY KEY AUTOINCREMENT,
-        nationalId TEXT NULL,
-        firstName  TEXT NOT NULL,
-        lastName   TEXT NULL,
-        taxNumber  TEXT NULL
-    );
-`;
-  try {
-    db.exec(createCustomersTableSql);
-    console.log("❇️ Customer table created");
-  } catch (err) {
-    console.log("🆘Customers table not created", err.message);
-  }
-  createCustomerPhoneNumbersTable();
-  createCustomerEmailsTable();
-}
-const FuelTypes = sqliteTable("FuelTypes", {
-  fuelTypeId: integer("fuelTypeId").primaryKey({ autoIncrement: true }),
-  fuelTypeName: text("fuelTypeName").notNull().unique()
-});
-const fuelTypeTranslations = sqliteTable("FuelTypeTranslations", {
-  translationId: integer("translationId").primaryKey({ autoIncrement: true }),
-  fuelTypeId: integer("fuelTypeId").references(() => FuelTypes.fuelTypeId),
-  languageCode: text("languageCode").notNull(),
-  translatedName: text("translatedName").notNull()
-});
-const baseFuelTypeTranslations = [
-  // Benzin (Gasoline/Petrol) (fuelTypeId: 1)
-  { fuelTypeId: 1, languageCode: "en", translatedName: "Gasoline" },
-  { fuelTypeId: 1, languageCode: "es", translatedName: "Gasolina" },
-  { fuelTypeId: 1, languageCode: "fr", translatedName: "Essence" },
-  { fuelTypeId: 1, languageCode: "de", translatedName: "Benzin" },
-  { fuelTypeId: 1, languageCode: "pt", translatedName: "Gasolina" },
-  { fuelTypeId: 1, languageCode: "zh", translatedName: "汽油" },
-  { fuelTypeId: 1, languageCode: "ja", translatedName: "ガソリン" },
-  { fuelTypeId: 1, languageCode: "tr", translatedName: "Benzin" },
-  { fuelTypeId: 1, languageCode: "ko", translatedName: "휘발유" },
-  { fuelTypeId: 1, languageCode: "ru", translatedName: "Бензин" },
-  { fuelTypeId: 1, languageCode: "nl", translatedName: "Benzine" },
-  { fuelTypeId: 1, languageCode: "az", translatedName: "Benzin" },
-  { fuelTypeId: 1, languageCode: "it", translatedName: "Benzina" },
-  { fuelTypeId: 1, languageCode: "pl", translatedName: "Benzyna" },
-  // Dizel (Diesel) (fuelTypeId: 2)
-  { fuelTypeId: 2, languageCode: "en", translatedName: "Diesel" },
-  { fuelTypeId: 2, languageCode: "es", translatedName: "Diésel" },
-  { fuelTypeId: 2, languageCode: "fr", translatedName: "Diesel" },
-  { fuelTypeId: 2, languageCode: "de", translatedName: "Diesel" },
-  { fuelTypeId: 2, languageCode: "pt", translatedName: "Diesel" },
-  { fuelTypeId: 2, languageCode: "zh", translatedName: "柴油" },
-  { fuelTypeId: 2, languageCode: "ja", translatedName: "ディーゼル" },
-  { fuelTypeId: 2, languageCode: "tr", translatedName: "Dizel" },
-  { fuelTypeId: 2, languageCode: "ko", translatedName: "디젤" },
-  { fuelTypeId: 2, languageCode: "ru", translatedName: "Дизель" },
-  { fuelTypeId: 2, languageCode: "nl", translatedName: "Diesel" },
-  { fuelTypeId: 2, languageCode: "az", translatedName: "Dizel" },
-  { fuelTypeId: 2, languageCode: "it", translatedName: "Diesel" },
-  { fuelTypeId: 2, languageCode: "pl", translatedName: "Diesel" },
-  // LPG (fuelTypeId: 3)
-  { fuelTypeId: 3, languageCode: "en", translatedName: "LPG" },
-  { fuelTypeId: 3, languageCode: "es", translatedName: "GLP" },
-  // Gas Licuado de Petróleo
-  { fuelTypeId: 3, languageCode: "fr", translatedName: "GPL" },
-  // Gaz de Pétrole Liquéfié
-  { fuelTypeId: 3, languageCode: "de", translatedName: "Autogas (LPG)" },
-  { fuelTypeId: 3, languageCode: "pt", translatedName: "GPL" },
-  // Gás Liquefeito de Petróleo
-  { fuelTypeId: 3, languageCode: "zh", translatedName: "液化石油气" },
-  { fuelTypeId: 3, languageCode: "ja", translatedName: "LPG" },
-  { fuelTypeId: 3, languageCode: "tr", translatedName: "LPG" },
-  { fuelTypeId: 3, languageCode: "ko", translatedName: "LPG" },
-  { fuelTypeId: 3, languageCode: "ru", translatedName: "СНГ" },
-  // Сжиженный нефтяной газ
-  { fuelTypeId: 3, languageCode: "nl", translatedName: "LPG" },
-  { fuelTypeId: 3, languageCode: "az", translatedName: "LPG" },
-  { fuelTypeId: 3, languageCode: "it", translatedName: "GPL" },
-  // Gas di Petrolio Liquefatti
-  { fuelTypeId: 3, languageCode: "pl", translatedName: "LPG" },
-  // Elektrik (Electric) (fuelTypeId: 4)
-  { fuelTypeId: 4, languageCode: "en", translatedName: "Electric" },
-  { fuelTypeId: 4, languageCode: "es", translatedName: "Eléctrico" },
-  { fuelTypeId: 4, languageCode: "fr", translatedName: "Électrique" },
-  { fuelTypeId: 4, languageCode: "de", translatedName: "Elektro" },
-  { fuelTypeId: 4, languageCode: "pt", translatedName: "Elétrico" },
-  { fuelTypeId: 4, languageCode: "zh", translatedName: "电动" },
-  { fuelTypeId: 4, languageCode: "ja", translatedName: "電気" },
-  { fuelTypeId: 4, languageCode: "tr", translatedName: "Elektrik" },
-  { fuelTypeId: 4, languageCode: "ko", translatedName: "전기" },
-  { fuelTypeId: 4, languageCode: "ru", translatedName: "Электро" },
-  { fuelTypeId: 4, languageCode: "nl", translatedName: "Elektrisch" },
-  { fuelTypeId: 4, languageCode: "az", translatedName: "Elektrik" },
-  { fuelTypeId: 4, languageCode: "it", translatedName: "Elettrica" },
-  { fuelTypeId: 4, languageCode: "pl", translatedName: "Elektryczny" },
-  // Hibrit (Hybrid) (fuelTypeId: 5)
-  { fuelTypeId: 5, languageCode: "en", translatedName: "Hybrid" },
-  { fuelTypeId: 5, languageCode: "es", translatedName: "Híbrido" },
-  { fuelTypeId: 5, languageCode: "fr", translatedName: "Hybride" },
-  { fuelTypeId: 5, languageCode: "de", translatedName: "Hybrid" },
-  { fuelTypeId: 5, languageCode: "pt", translatedName: "Híbrido" },
-  { fuelTypeId: 5, languageCode: "zh", translatedName: "混合动力" },
-  { fuelTypeId: 5, languageCode: "ja", translatedName: "ハイブリッド" },
-  { fuelTypeId: 5, languageCode: "tr", translatedName: "Hibrit" },
-  { fuelTypeId: 5, languageCode: "ko", translatedName: "하이브리드" },
-  { fuelTypeId: 5, languageCode: "ru", translatedName: "Гибрид" },
-  { fuelTypeId: 5, languageCode: "nl", translatedName: "Hybride" },
-  { fuelTypeId: 5, languageCode: "az", translatedName: "Hibrid" },
-  { fuelTypeId: 5, languageCode: "it", translatedName: "Ibrida" },
-  { fuelTypeId: 5, languageCode: "pl", translatedName: "Hybryda" }
-];
-const baseFuelTypeTranslationsSql = `
-  CREATE TABLE FuelTypeTranslations (
-  translationId INTEGER PRIMARY KEY AUTOINCREMENT,
-  FuelTypeId INTEGER NOT NULL,
-  languageCode TEXT NOT NULL,
-  translatedName TEXT NOT NULL,
-  FOREIGN KEY (fuelTypeId) REFERENCES FuelTypes(fuelTypeId)
-);
-`;
-async function createFuelTypesTranslationsTable() {
-  const db = getDb();
-  try {
-    db.exec(baseFuelTypeTranslationsSql);
-    console.log("❇️ Translations Base FuelType translations table created");
-    try {
-      await drizzleDb.insert(fuelTypeTranslations).values(baseFuelTypeTranslations);
-      console.log("❇️ Translations Base FuelType insert success");
-    } catch (err) {
-      console.log("🆘 Translations Base FuelType not insert.", err.message);
-    }
-  } catch (err) {
-    console.log("🆘 Translations Base FuelType translations table not created | Error: ", err.message);
-  }
-}
-const baseFuelTypes = [
-  { fuelTypeName: "Benzin" },
-  { fuelTypeName: "Dizel" },
-  { fuelTypeName: "LPG" },
-  { fuelTypeName: "Elektrik" },
-  { fuelTypeName: "Hibrit" }
-];
-async function createFuelTypesTable() {
-  const db = getDb();
-  const createFuelTypesTableSql = `
-    CREATE TABLE IF NOT EXISTS FuelTypes(
-        fuelTypeId INTEGER PRIMARY KEY AUTOINCREMENT,
-        fuelTypeName TEXT NOT NULL Unique
-    )
-
-`;
-  try {
-    db.exec(createFuelTypesTableSql);
-    console.log("❇️ FuelTypes table created");
-    try {
-      await drizzleDb.insert(FuelTypes).values(baseFuelTypes);
-      console.log(" ❇️ Base Fuel types added the table.");
-      createFuelTypesTranslationsTable();
-    } catch (err) {
-      console.log("🆘 Base Fuel types insert error."), err.message;
-    }
-  } catch (err) {
-    console.log("🆘 FuelTypes table not created", err.message);
-  }
-}
-function createPartsTable() {
-  const db = getDb();
-  const createPartTableSql = `
-    CREATE TABLE IF NOT EXISTS Parts(
-        partId INTEGER PRIMARY KEY AUTOINCREMENT,
-        carId INTEGER NOT NULL,
-        serviceId INTEGER NOT NULL,
-        partName TEXT NOT NULL,
-        partTax REAL NULL,
-        partPrice REAL NULL
-    );
-`;
-  try {
-    db.exec(createPartTableSql);
-    console.log("❇️ Parts table created");
-  } catch (err) {
-    console.log("🆘 Parts table not created", err.message);
-  }
-}
-function createServicesTable() {
-  const db = getDb();
-  const createServicesTableSql = `
-        CREATE TABLE IF NOT EXISTS Services(
-            serviceId INTEGER PRIMARY KEY AUTOINCREMENT,
-            carId INTEGER NOT NULL,
-            customerId INTEGER NULL,
-            applicationDate DATETIME NULL,
-            appointmentDate DATETIME NULL,
-            jobDuration DATETIME NULL,
-            deliveryDate DATETIME NULL,
-            km REAL NULL,
-            complaints TEXT NOT NULL,
-            extraRequests TEXT NULL,
-            faults JSON NULL,
-            hasDamageOnReceive BOOLEAN NOT NULL,
-            damageonReceive JSON NULL,
-            hasDamageDuringRepair BOOLEAN NULL,
-            damageDuringRepair JSON NULL,
-            laborCharge REAL NULL,
-            totalCharge REAL NULL
-        )
-    `;
-  try {
-    db.exec(createServicesTableSql);
-    console.log("❇️ Services table created");
-  } catch (err) {
-    console.log("🆘 Services table not created", err.message);
+    throw err;
   }
 }
 async function CreateDefaultDbTables() {
-  await createBodyTypesTable();
-  await createBrandsTable();
-  await createCarsTable();
-  await createCustomersTable();
-  await createFuelTypesTable();
-  await createPartsTable();
-  await createServicesTable();
+  try {
+    console.log("⏳ Starting table creation process in hierarchical order...");
+    createCustomersTable();
+    createBrandsTable();
+    createFuelTypesTable();
+    createBodyTypesTable();
+    createCarsTable();
+    createFuelTypesTranslationsTable();
+    createBodyTypesTranslationsTable();
+    createCustomerPhoneNumbersTable();
+    createCustomerEmailsTable();
+    await createServicesTable();
+    await createPartsTable();
+    console.log("❇️ All database tables verified and linked successfully.");
+  } catch (error) {
+    console.error("🆘 Setup aborted! Dependency order error:", error.message);
+    throw error;
+  }
 }
 const userDataPath = app.getPath("userData");
 const configPath = path.join(userDataPath, "config.json");

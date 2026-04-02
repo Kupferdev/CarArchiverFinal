@@ -18,5 +18,6 @@ export function createCustomerEmailsTable() {
         console.log("❇️ Email table created");
     } catch (err) {
         console.log("🆘Email table not created", (err as Error).message);
+        throw err;
     }
 }

@@ -23,7 +23,9 @@ export function createServicesTable() {
             hasDamageDuringRepair BOOLEAN NULL,
             damageDuringRepair JSON NULL,
             laborCharge REAL NULL,
-            totalCharge REAL NULL
+            totalCharge REAL NULL,
+            targetDeliveryDate DATETIME NULL,
+            isDelivered BOOLEAN NULL
         )
     `;
 

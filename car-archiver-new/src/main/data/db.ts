@@ -14,7 +14,7 @@ export function CreateDefaultDb(dbPath: string) {
         return dbInstance;
     }
 
-    const dbPathFinal = path.normalize(dbPath); 
+    const dbPathFinal = path.normalize(dbPath);
 
     try {
         const folder = path.dirname(dbPathFinal);
@@ -23,13 +23,15 @@ export function CreateDefaultDb(dbPath: string) {
         }
 
         dbInstance = new Database(dbPathFinal);
+        dbInstance.pragma("journal_mode = WAL");
+        dbInstance.pragma("synchronous = NORMAL");
         dbInstance.pragma("foreign_keys = on");
-        
+
         console.log("❇️ DB Started: ", dbPathFinal);
         return dbInstance;
     } catch (err) {
         console.error("🆘 DB Error:", err);
-        throw err; 
+        throw err;
     }
 }
 
@@ -37,5 +39,5 @@ export function getDb() {
     if (!dbInstance) {
         throw new Error("SQLite engine has not been initialized yet! Please call CreateDefaultDb() first.");
     }
-    return dbInstance;   
+    return dbInstance;
 }

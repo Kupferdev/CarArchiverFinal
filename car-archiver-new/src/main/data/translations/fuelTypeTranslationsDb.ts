@@ -1,6 +1,4 @@
-import { drizzle } from "drizzle-orm/singlestore";
 import { useDb } from "../drizzle/drizzleDb";
-import { FuelTypes } from "../drizzle/schemas/fuelTypesSchema/fuelTypeSchema";
 import { fuelTypeTranslations } from "../drizzle/schemas/fuelTypesSchema/fuelTypeTranslationsSchema";
 
 import { getDb } from "../db";

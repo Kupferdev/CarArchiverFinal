@@ -1,0 +1,82 @@
+.cardsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  width: 100%;
+}
+
+.navCard {
+  background: var(--bg-card);
+  border: 0.5px solid var(--border-color);
+  border-radius: 14px;
+  padding: 22px;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 200px;
+  box-shadow: var(--shadow-sm);
+}
+
+.navCard:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-blue);
+  transform: translateY(-1px);
+}
+
+.navCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.navCardTitle {
+  color: var(--text-main);
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.navCardIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.navCardIcon.blue { background: var(--accent-blue-bg); color: var(--accent-blue); }
+.navCardIcon.teal { background: var(--accent-teal-bg); color: var(--accent-teal); }
+.navCardIcon.amber { background: var(--accent-amber-bg); color: var(--accent-amber); }
+
+.navCardStat {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.navCardCount {
+  color: var(--text-main);
+  font-size: 28px;
+  font-weight: 300;
+  margin-top: auto;
+}
+
+.navCardCount span {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+@media (max-width: 1024px) {
+  .cardsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .cardsGrid {
+    grid-template-columns: 1fr;
+  }
+}

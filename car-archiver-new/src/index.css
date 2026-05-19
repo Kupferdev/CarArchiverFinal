@@ -1,15 +1,71 @@
+:root {
+  /* Karanlık Tema (Varsayılan) */
+  --bg-main: #1c2340;
+  --bg-panel: #151b35;
+  --bg-card: rgba(255, 255, 255, 0.05);
+  --bg-hover: rgba(255, 255, 255, 0.09);
+  --border-color: rgba(255, 255, 255, 0.07);
+  --text-main: #e8eaff;
+  --text-muted: rgba(255, 255, 255, 0.4);
+  
+  --accent-blue: #7b8fff;
+  --accent-blue-bg: rgba(123, 143, 255, 0.15);
+  --accent-teal: #2dd4b8;
+  --accent-teal-bg: rgba(45, 212, 180, 0.12);
+  --accent-amber: #fbbf24;
+  --accent-amber-bg: rgba(251, 191, 36, 0.12);
+  
+  --shadow-sm: none;
+}
 
-/* index.css veya App.css içindeki global ayarların SADECE bu olmalı */
+[data-theme="light"] {
+  /* Açık Tema */
+  --bg-main: #f3f4f6;
+  --bg-panel: #ffffff;
+  --bg-card: #ffffff;
+  --bg-hover: #f9fafb;
+  --border-color: #e5e7eb;
+  --text-main: #111827;
+  --text-muted: #6b7280;
+  
+  --accent-blue: #4f46e5;
+  --accent-blue-bg: rgba(79, 70, 229, 0.1);
+  --accent-teal: #0d9488;
+  --accent-teal-bg: rgba(13, 148, 136, 0.1);
+  --accent-amber: #d97706;
+  --accent-amber-bg: rgba(217, 119, 6, 0.1);
+  
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
 * {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body, html, #root {
-  margin: 0;
-  padding: 0;
   width: 100vw;
   height: 100vh;
-  max-width: none; /* İŞTE SİHİRLİ KOD: Vite'in sınırını kaldırır */
-  overflow: hidden; /* İstenmeyen kaydırma çubuklarını engeller */
-  font-family: 'Inter', sans-serif;
+  max-width: none;
+  overflow: hidden;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+}
+
+/* Genel scrollbar tasarımı (Masaüstü hissiyatı için) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }

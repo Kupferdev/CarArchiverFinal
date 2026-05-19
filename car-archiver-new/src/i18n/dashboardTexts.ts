@@ -1,0 +1,330 @@
+export interface DashboardInfo {
+  id: number;
+  languageCode: string;
+
+  // Topbar
+  searchPlaceholder: string;
+
+  // Tabbar
+  tabCars: string;
+
+  // Main Content (Cards)
+  cardServiceRecordsTitle: string;
+  cardServiceRecordsStat: string;
+  cardServiceRecordsUnit: string;
+
+  cardCustomersTitle: string;
+  cardCustomersStat: string;
+  cardCustomersUnit: string;
+
+  cardCarsTitle: string;
+  cardCarsStat: string;
+  cardCarsUnit: string;
+
+  // Right Panel
+  rightPanelUpcoming: string;
+  rightPanelSeeAll: string;
+  rightPanelApproaching: string;
+
+  // FAB Menu
+  fabNewService: string;
+  fabNewCustomer: string;
+  fabNewCar: string;
+}
+
+export const DashboardInfoTexts: Array<DashboardInfo> = [
+  {
+    id: 1,
+    languageCode: "en",
+    searchPlaceholder: "Search by plate, customer name or VIN...",
+    tabCars: "Cars",
+    cardServiceRecordsTitle: "Service records",
+    cardServiceRecordsStat: "Total records",
+    cardServiceRecordsUnit: "services",
+    cardCustomersTitle: "Customers",
+    cardCustomersStat: "Registered customers",
+    cardCustomersUnit: "people",
+    cardCarsTitle: "Cars",
+    cardCarsStat: "Registered cars",
+    cardCarsUnit: "vehicles",
+    rightPanelUpcoming: "Upcoming appointments",
+    rightPanelSeeAll: "see all →",
+    rightPanelApproaching: "Approaching delivery",
+    fabNewService: "New service record",
+    fabNewCustomer: "New customer",
+    fabNewCar: "New car"
+  },
+  {
+    id: 2,
+    languageCode: "es",
+    searchPlaceholder: "Buscar por matrícula, nombre del cliente o VIN...",
+    tabCars: "Coches",
+    cardServiceRecordsTitle: "Registros de servicio",
+    cardServiceRecordsStat: "Registros totales",
+    cardServiceRecordsUnit: "servicios",
+    cardCustomersTitle: "Clientes",
+    cardCustomersStat: "Clientes registrados",
+    cardCustomersUnit: "personas",
+    cardCarsTitle: "Coches",
+    cardCarsStat: "Coches registrados",
+    cardCarsUnit: "vehículos",
+    rightPanelUpcoming: "Próximas citas",
+    rightPanelSeeAll: "ver todo →",
+    rightPanelApproaching: "Entrega próxima",
+    fabNewService: "Nuevo registro de servicio",
+    fabNewCustomer: "Nuevo cliente",
+    fabNewCar: "Nuevo coche"
+  },
+  {
+    id: 3,
+    languageCode: "fr",
+    searchPlaceholder: "Rechercher par plaque, nom de client ou VIN...",
+    tabCars: "Voitures",
+    cardServiceRecordsTitle: "Carnets d'entretien",
+    cardServiceRecordsStat: "Total des enregistrements",
+    cardServiceRecordsUnit: "services",
+    cardCustomersTitle: "Clients",
+    cardCustomersStat: "Clients enregistrés",
+    cardCustomersUnit: "personnes",
+    cardCarsTitle: "Voitures",
+    cardCarsStat: "Voitures enregistrées",
+    cardCarsUnit: "véhicules",
+    rightPanelUpcoming: "Prochains rendez-vous",
+    rightPanelSeeAll: "tout voir →",
+    rightPanelApproaching: "Livraison imminente",
+    fabNewService: "Nouvel enregistrement de service",
+    fabNewCustomer: "Nouveau client",
+    fabNewCar: "Nouvelle voiture"
+  },
+  {
+    id: 4,
+    languageCode: "de",
+    searchPlaceholder: "Suche nach Kennzeichen, Kundenname oder Fahrgestellnummer...",
+    tabCars: "Autos",
+    cardServiceRecordsTitle: "Serviceberichte",
+    cardServiceRecordsStat: "Gesamteinträge",
+    cardServiceRecordsUnit: "Services",
+    cardCustomersTitle: "Kunden",
+    cardCustomersStat: "Registrierte Kunden",
+    cardCustomersUnit: "Personen",
+    cardCarsTitle: "Autos",
+    cardCarsStat: "Registrierte Autos",
+    cardCarsUnit: "Fahrzeuge",
+    rightPanelUpcoming: "Anstehende Termine",
+    rightPanelSeeAll: "alle ansehen →",
+    rightPanelApproaching: "Bevorstehende Lieferung",
+    fabNewService: "Neuer Servicebericht",
+    fabNewCustomer: "Neuer Kunde",
+    fabNewCar: "Neues Auto"
+  },
+  {
+    id: 5,
+    languageCode: "pt",
+    searchPlaceholder: "Pesquise por placa, nome do cliente ou VIN...",
+    tabCars: "Carros",
+    cardServiceRecordsTitle: "Registros de serviço",
+    cardServiceRecordsStat: "Total de registros",
+    cardServiceRecordsUnit: "serviços",
+    cardCustomersTitle: "Clientes",
+    cardCustomersStat: "Clientes registrados",
+    cardCustomersUnit: "pessoas",
+    cardCarsTitle: "Carros",
+    cardCarsStat: "Carros registrados",
+    cardCarsUnit: "veículos",
+    rightPanelUpcoming: "Próximas consultas",
+    rightPanelSeeAll: "ver tudo →",
+    rightPanelApproaching: "Entrega próxima",
+    fabNewService: "Novo registro de serviço",
+    fabNewCustomer: "Novo cliente",
+    fabNewCar: "Novo carro"
+  },
+  {
+    id: 6,
+    languageCode: "zh",
+    searchPlaceholder: "按车牌、客户名称或车辆识别码搜索...",
+    tabCars: "汽车",
+    cardServiceRecordsTitle: "服务记录",
+    cardServiceRecordsStat: "总记录数",
+    cardServiceRecordsUnit: "次服务",
+    cardCustomersTitle: "客户",
+    cardCustomersStat: "注册客户",
+    cardCustomersUnit: "人",
+    cardCarsTitle: "汽车",
+    cardCarsStat: "注册汽车",
+    cardCarsUnit: "辆车",
+    rightPanelUpcoming: "即将到来的预约",
+    rightPanelSeeAll: "查看全部 →",
+    rightPanelApproaching: "即将交付",
+    fabNewService: "新服务记录",
+    fabNewCustomer: "新客户",
+    fabNewCar: "新车"
+  },
+  {
+    id: 7,
+    languageCode: "tr",
+    searchPlaceholder: "Plaka, müşteri adı veya VIN ile ara...",
+    tabCars: "Arabalar",
+    cardServiceRecordsTitle: "Servis kayıtları",
+    cardServiceRecordsStat: "Toplam kayıt",
+    cardServiceRecordsUnit: "servis",
+    cardCustomersTitle: "Müşteriler",
+    cardCustomersStat: "Kayıtlı müşteri",
+    cardCustomersUnit: "kişi",
+    cardCarsTitle: "Arabalar",
+    cardCarsStat: "Kayıtlı araç",
+    cardCarsUnit: "araç",
+    rightPanelUpcoming: "Gelecek randevular",
+    rightPanelSeeAll: "tümü →",
+    rightPanelApproaching: "Teslim yaklaşan",
+    fabNewService: "Yeni servis kaydı",
+    fabNewCustomer: "Yeni müşteri",
+    fabNewCar: "Yeni araç"
+  },
+  {
+    id: 8,
+    languageCode: "ja",
+    searchPlaceholder: "ナンバープレート、顧客名、またはVINで検索...",
+    tabCars: "車",
+    cardServiceRecordsTitle: "サービス記録",
+    cardServiceRecordsStat: "総記録数",
+    cardServiceRecordsUnit: "サービス",
+    cardCustomersTitle: "顧客",
+    cardCustomersStat: "登録顧客",
+    cardCustomersUnit: "人",
+    cardCarsTitle: "車",
+    cardCarsStat: "登録車両",
+    cardCarsUnit: "台の車",
+    rightPanelUpcoming: "今後の予約",
+    rightPanelSeeAll: "すべて見る →",
+    rightPanelApproaching: "納期が近い",
+    fabNewService: "新しいサービス記録",
+    fabNewCustomer: "新しい顧客",
+    fabNewCar: "新しい車"
+  },
+  {
+    id: 9,
+    languageCode: "ko",
+    searchPlaceholder: "번호판, 고객 이름 또는 차대 번호로 검색...",
+    tabCars: "자동차",
+    cardServiceRecordsTitle: "서비스 기록",
+    cardServiceRecordsStat: "전체 기록",
+    cardServiceRecordsUnit: "건의 서비스",
+    cardCustomersTitle: "고객",
+    cardCustomersStat: "등록된 고객",
+    cardCustomersUnit: "명",
+    cardCarsTitle: "자동차",
+    cardCarsStat: "등록된 자동차",
+    cardCarsUnit: "대의 차량",
+    rightPanelUpcoming: "다가오는 예약",
+    rightPanelSeeAll: "모두 보기 →",
+    rightPanelApproaching: "배송 임박",
+    fabNewService: "새 서비스 기록",
+    fabNewCustomer: "새 고객",
+    fabNewCar: "새 자동차"
+  },
+  {
+    id: 10,
+    languageCode: "ru",
+    searchPlaceholder: "Поиск по номеру, имени клиента или VIN...",
+    tabCars: "Автомобили",
+    cardServiceRecordsTitle: "Записи об обслуживании",
+    cardServiceRecordsStat: "Всего записей",
+    cardServiceRecordsUnit: "услуг",
+    cardCustomersTitle: "Клиенты",
+    cardCustomersStat: "Зарегистрированные клиенты",
+    cardCustomersUnit: "человек",
+    cardCarsTitle: "Автомобили",
+    cardCarsStat: "Зарегистрированные автомобили",
+    cardCarsUnit: "транспортных средств",
+    rightPanelUpcoming: "Предстоящие встречи",
+    rightPanelSeeAll: "смотреть все →",
+    rightPanelApproaching: "Скорая выдача",
+    fabNewService: "Новая запись об обслуживании",
+    fabNewCustomer: "Новый клиент",
+    fabNewCar: "Новый автомобиль"
+  },
+  {
+    id: 11,
+    languageCode: "nl",
+    searchPlaceholder: "Zoeken op kenteken, klantnaam of VIN...",
+    tabCars: "Auto's",
+    cardServiceRecordsTitle: "Servicegegevens",
+    cardServiceRecordsStat: "Totaal aantal records",
+    cardServiceRecordsUnit: "services",
+    cardCustomersTitle: "Klanten",
+    cardCustomersStat: "Geregistreerde klanten",
+    cardCustomersUnit: "personen",
+    cardCarsTitle: "Auto's",
+    cardCarsStat: "Geregistreerde auto's",
+    cardCarsUnit: "voertuigen",
+    rightPanelUpcoming: "Aankomende afspraken",
+    rightPanelSeeAll: "bekijk alles →",
+    rightPanelApproaching: "Naderende levering",
+    fabNewService: "Nieuw service record",
+    fabNewCustomer: "Nieuwe klant",
+    fabNewCar: "Nieuwe auto"
+  },
+  {
+    id: 12,
+    languageCode: "az",
+    searchPlaceholder: "Nömrə, müştəri adı və ya VIN ilə axtarış...",
+    tabCars: "Avtomobillər",
+    cardServiceRecordsTitle: "Servis qeydləri",
+    cardServiceRecordsStat: "Ümumi qeyd",
+    cardServiceRecordsUnit: "servis",
+    cardCustomersTitle: "Müştərilər",
+    cardCustomersStat: "Qeydiyyatda olan müştəri",
+    cardCustomersUnit: "nəfər",
+    cardCarsTitle: "Avtomobillər",
+    cardCarsStat: "Qeydiyyatda olan avtomobil",
+    cardCarsUnit: "avtomobil",
+    rightPanelUpcoming: "Gələcək görüşlər",
+    rightPanelSeeAll: "hamısı →",
+    rightPanelApproaching: "Təslimatı yaxınlaşan",
+    fabNewService: "Yeni servis qeydi",
+    fabNewCustomer: "Yeni müştəri",
+    fabNewCar: "Yeni avtomobil"
+  },
+  {
+    id: 13,
+    languageCode: "it",
+    searchPlaceholder: "Cerca per targa, nome del cliente o VIN...",
+    tabCars: "Auto",
+    cardServiceRecordsTitle: "Record di servizio",
+    cardServiceRecordsStat: "Record totali",
+    cardServiceRecordsUnit: "servizi",
+    cardCustomersTitle: "Clienti",
+    cardCustomersStat: "Clienti registrati",
+    cardCustomersUnit: "persone",
+    cardCarsTitle: "Auto",
+    cardCarsStat: "Auto registrate",
+    cardCarsUnit: "veicoli",
+    rightPanelUpcoming: "Prossimi appuntamenti",
+    rightPanelSeeAll: "vedi tutto →",
+    rightPanelApproaching: "Consegna imminente",
+    fabNewService: "Nuovo record di servizio",
+    fabNewCustomer: "Nuovo cliente",
+    fabNewCar: "Nuova auto"
+  },
+  {
+    id: 14,
+    languageCode: "pl",
+    searchPlaceholder: "Szukaj po rejestracji, nazwisku klienta lub VIN...",
+    tabCars: "Samochody",
+    cardServiceRecordsTitle: "Rejestry serwisowe",
+    cardServiceRecordsStat: "Całkowita liczba rekordów",
+    cardServiceRecordsUnit: "usług",
+    cardCustomersTitle: "Klienci",
+    cardCustomersStat: "Zarejestrowani klienci",
+    cardCustomersUnit: "osób",
+    cardCarsTitle: "Samochody",
+    cardCarsStat: "Zarejestrowane samochody",
+    cardCarsUnit: "pojazdów",
+    rightPanelUpcoming: "Nadchodzące wizyty",
+    rightPanelSeeAll: "zobacz wszystko →",
+    rightPanelApproaching: "Zbliżająca się dostawa",
+    fabNewService: "Nowy rejestr serwisowy",
+    fabNewCustomer: "Nowy klient",
+    fabNewCar: "Nowy samochód"
+  }
+];

@@ -19,4 +19,6 @@ export interface Service {
     laborCharge?: number, //iscilik
     totalCharge?: number;
 
+    targetDeliveryDate? : Date; //hedeflenen teslim tarihi
+    isDelivered? : boolean; //teslim edildi mi
 }

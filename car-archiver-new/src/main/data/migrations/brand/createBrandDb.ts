@@ -1,10 +1,7 @@
 import { Brand } from "../../../../shared/types/brand";
 import { useDb } from "../../drizzle/drizzleDb";
 import { Brands } from "../../drizzle/schemas/brandsSchema";
-
 import { getDb } from "../../db";
-
-
 
 const baseCarBrands: Array<Brand> = [
   { brandName: "Abarth" },
@@ -120,38 +117,28 @@ const baseCarBrands: Array<Brand> = [
   { brandName: "XPeng" },
   { brandName: "Zagato" },
   { brandName: "Zeekr" },
-  { brandName: "Zenvo" }
+  { brandName: "Zenvo" },
 ];
 
+export async function createBrandsTable() {
+  const db = getDb();
+  const orm = useDb();
 
-export async function createBrandsTable(){
+  const createBrandsTableSql = `
+    CREATE TABLE IF NOT EXISTS Brands(
+      brandId   INTEGER PRIMARY KEY AUTOINCREMENT,
+      brandName TEXT    NOT NULL UNIQUE
+    )
+  `;
 
-    const db = getDb();
-    const orm = useDb();
+  try {
+    db.exec(createBrandsTableSql);
+    console.log("❇️ Brands table created.");
 
-    const createBrandsTableSql = `
-        CREATE TABLE IF NOT EXISTS Brands(
-        brandId INTEGER PRIMARY KEY AUTOINCREMENT,
-        brandName TEXT NOT NULL
-        )
-    `;
-
-    try{
-        db.exec(createBrandsTableSql);
-        console.log("❇️ Brands table created");
-        try{
-            await orm.insert(Brands).values(baseCarBrands).onConflictDoNothing();
-            console.log("❇️ Base Brands insert the table.");
-        }catch{
-            console.log("🆘 Base Brands not insert the table.")
-        }
-    }catch(err){
-        console.log("🆘 Brans table not created", (err as Error).message);
-        throw err;
-    }
-
+    await orm.insert(Brands).values(baseCarBrands).onConflictDoNothing();
+    console.log("❇️ Base brands seeded.");
+  } catch (err) {
+    console.error("🆘 Brands table creation failed:", (err as Error).message);
+    throw err;
+  }
 }
-
-
-
-

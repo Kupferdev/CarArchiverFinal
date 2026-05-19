@@ -1,8 +1,7 @@
 import { eq, getTableColumns, desc, sql } from "drizzle-orm";
 import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
-// 1. KRİTİK DEĞİŞİKLİK: Doğrudan değişken yerine fonksiyonu alıyoruz
-import { useDb } from "../drizzleDb"; 
+import { useDb } from "../drizzleDb";
 import { IApiResponse, ServiceResponse } from "../../../../models/response.model";
 
 export interface PaginationParams {
@@ -12,7 +11,7 @@ export interface PaginationParams {
 
 export class BaseRepository<TTable extends SQLiteTable<any>> {
   protected table: TTable;
-  protected idColumn: string; // Tip güvenliği için string olarak tutmak daha esnek
+  protected idColumn: string;
 
   constructor(table: TTable, idColumn: string) {
     this.table = table;
@@ -23,21 +22,18 @@ export class BaseRepository<TTable extends SQLiteTable<any>> {
     console.error("❌ Database Error:", error);
 
     if (error.code === "SQLITE_CONSTRAINT_UNIQUE") {
-       return ServiceResponse.fail("This record already exists.", "UNIQUE_CONSTRAINT") as any;
+      return ServiceResponse.fail("This record already exists.", "UNIQUE_CONSTRAINT") as any;
     }
 
     if (error.message?.includes("not been initialized")) {
-        return ServiceResponse.error(error, "Database connection is not ready.") as any;
+      return ServiceResponse.error(error, "Database connection is not ready.") as any;
     }
 
     return ServiceResponse.error(error, defaultMessage) as any;
   }
 
-  // --- CRUD ---
-
   async create(data: InferInsertModel<TTable>): Promise<IApiResponse<InferSelectModel<TTable>>> {
     try {
-      // useDb() çağrısı burada güvenliği sağlar
       const result = await useDb()
         .insert(this.table)
         .values(data as any)
@@ -45,44 +41,45 @@ export class BaseRepository<TTable extends SQLiteTable<any>> {
 
       return ServiceResponse.success(result[0] as unknown as InferSelectModel<TTable>, "Created successfully.");
     } catch (err) {
-      return this.handleError(err, "Failed to create record");
+      return this.handleError(err, "Failed to create record.");
     }
   }
 
   async getAll(options?: PaginationParams): Promise<IApiResponse<InferSelectModel<TTable>[]>> {
     try {
       const db = useDb();
-      // Sorguyu dinamik olarak oluşturabilmek için $dynamic() kullanıyoruz
       let query = db.select().from(this.table).$dynamic();
-      
+
+      const columns = getTableColumns(this.table);
+      const orderByCol = columns[this.idColumn];
+
+      if (orderByCol) {
+        query = query.orderBy(desc(orderByCol));
+      }
+
       if (options?.page && options?.pageSize) {
         const limit = options.pageSize;
         const offset = (options.page - 1) * limit;
-        query.limit(limit).offset(offset);
-      }
-      
-      const columns = getTableColumns(this.table);
-      const orderByCol = columns[this.idColumn]; 
-      
-      if(orderByCol) {
-          query.orderBy(desc(orderByCol));
+        query = query.limit(limit).offset(offset);
+
+        const countResult = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(this.table);
+        const totalRecords = Number(countResult[0].count);
+
+        const result = await query;
+        return ServiceResponse.successPaginated(
+          result as unknown as InferSelectModel<TTable>[],
+          totalRecords,
+          options.page,
+          options.pageSize
+        );
       }
 
       const result = await query;
-      
-      if (options?.page && options?.pageSize) {
-         // Buraya ileride gerçek count sorgusu eklenebilir
-         return ServiceResponse.successPaginated(
-             result as unknown as InferSelectModel<TTable>[], 
-             result.length, 
-             options.page, 
-             options.pageSize
-         );
-      }
-
-      return ServiceResponse.success(result as unknown as InferSelectModel<TTable>[], "Fetched records.");
+      return ServiceResponse.success(result as unknown as InferSelectModel<TTable>[], "Records fetched.");
     } catch (err) {
-      return this.handleError(err, "Failed to fetch records");
+      return this.handleError(err, "Failed to fetch records.");
     }
   }
 
@@ -91,20 +88,20 @@ export class BaseRepository<TTable extends SQLiteTable<any>> {
       const columns = getTableColumns(this.table);
       const idCol = columns[this.idColumn];
 
-      if (!idCol) throw new Error(`Invalid ID Column definition: ${this.idColumn}`);
+      if (!idCol) throw new Error(`Invalid ID column: ${this.idColumn}`);
 
       const result = await useDb()
         .select()
         .from(this.table)
         .where(eq(idCol, id as any));
-      
+
       if (result[0]) {
         return ServiceResponse.success(result[0] as unknown as InferSelectModel<TTable>, "Record found.");
       }
-      
+
       return ServiceResponse.fail("Record not found.", "NOT_FOUND") as any;
     } catch (err) {
-      return this.handleError(err, "Failed to fetch record");
+      return this.handleError(err, "Failed to fetch record.");
     }
   }
 
@@ -123,9 +120,9 @@ export class BaseRepository<TTable extends SQLiteTable<any>> {
         return ServiceResponse.success(result[0] as unknown as InferSelectModel<TTable>, "Updated successfully.");
       }
 
-      return ServiceResponse.fail("Record not found to update.", "NOT_FOUND") as any;
+      return ServiceResponse.fail("Record not found.", "NOT_FOUND") as any;
     } catch (err) {
-      return this.handleError(err, "Failed to update record");
+      return this.handleError(err, "Failed to update record.");
     }
   }
 
@@ -138,14 +135,14 @@ export class BaseRepository<TTable extends SQLiteTable<any>> {
         .delete(this.table)
         .where(eq(idCol, id as any))
         .returning();
-      
+
       if (result.length > 0) {
-         return ServiceResponse.success(undefined, "Deleted successfully.");
+        return ServiceResponse.success(undefined, "Deleted successfully.");
       }
 
-      return ServiceResponse.fail("Record not found to delete.", "NOT_FOUND") as any;
+      return ServiceResponse.fail("Record not found.", "NOT_FOUND") as any;
     } catch (err) {
-      return this.handleError(err, "Failed to delete record");
+      return this.handleError(err, "Failed to delete record.");
     }
   }
 }

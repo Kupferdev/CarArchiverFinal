@@ -10,39 +10,29 @@ import { createCustomerEmailsTable } from "./migrations/customer/createCustomerE
 import { createFuelTypesTranslationsTable } from "../data/translations/fuelTypeTranslationsDb";
 import { createBodyTypesTranslationsTable } from "../data/translations/bodyTypeTranslationsDb";
 
-
-
 export async function CreateDefaultDbTables() {
     try {
-        console.log("⏳ Starting table creation process in hierarchical order...");
+        console.log("⏳ Starting table creation process...");
 
-        // --- LEVEL 1: Independent Tables (Kökler) ---
-        // Bunlar kimseye muhtaç değil, önce bunları kuralım.
-        createCustomersTable();
-        createBrandsTable();
-        createFuelTypesTable();
-        createBodyTypesTable();
+        await createCustomersTable();
+        await createBrandsTable();
+        await createFuelTypesTable();
+        await createBodyTypesTable();
 
-        // --- LEVEL 2: Intermediate Tables (Gövde) ---
-        // Cars tablosu Brands ve Customers'a ihtiyaç duyar.
-        createCarsTable();
+        await createCarsTable();
 
-        //Translations
-        createFuelTypesTranslationsTable();
-        createBodyTypesTranslationsTable();
+        await createFuelTypesTranslationsTable();
+        await createBodyTypesTranslationsTable();
 
-        // Müşteriye bağlı iletişim bilgileri
-        createCustomerPhoneNumbersTable();
-        createCustomerEmailsTable();
+        await createCustomerPhoneNumbersTable();
+        await createCustomerEmailsTable();
 
-        // --- LEVEL 3: Dependent Tables (Dallar) ---
-        // Services arabaya, Parts ise hem arabaya hem servise bağlıdır.
         await createServicesTable();
         await createPartsTable();
 
-        console.log("❇️ All database tables verified and linked successfully.");
+        console.log("❇️ All database tables created successfully.");
     } catch (error: any) {
-        console.error("🆘 Setup aborted! Dependency order error:", error.message);
+        console.error("🆘 Setup aborted:", error.message);
         throw error;
     }
 }

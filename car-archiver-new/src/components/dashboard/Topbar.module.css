@@ -1,0 +1,95 @@
+.topbar {
+  background: var(--bg-panel);
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.appIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--accent-blue-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.searchWrap {
+  flex: 1;
+  max-width: 480px;
+  position: relative;
+}
+
+.searchInput {
+  width: 100%;
+  background: var(--bg-card);
+  border: 0.5px solid var(--border-color);
+  border-radius: 8px;
+  padding: 6px 12px 6px 34px;
+  color: var(--text-main);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.searchInput:focus {
+  border-color: var(--accent-blue);
+  background: var(--bg-hover);
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+}
+
+.searchIcon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}
+
+.clock {
+  margin-left: auto;
+  text-align: right;
+}
+
+.clockTime {
+  color: var(--text-main);
+  font-size: 22px;
+  font-weight: 300;
+  letter-spacing: 1px;
+  line-height: 1;
+}
+
+.clockDate {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+/* Responsive Kurallar */
+@media (max-width: 1024px) {
+  .searchWrap {
+    max-width: 300px;
+  }
+}
+
+@media (max-width: 768px) {
+  .topbar {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 10px;
+  }
+  .searchWrap {
+    order: 3;
+    max-width: 100%;
+    margin-top: 10px;
+  }
+}

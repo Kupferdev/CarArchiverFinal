@@ -1,0 +1,73 @@
+.tabbar {
+  background: var(--bg-panel);
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border-color);
+  height: 38px;
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.tabHome {
+  width: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  flex-shrink: 0;
+}
+
+.tabHomeActive {
+  color: var(--accent-blue);
+  border-bottom-color: var(--accent-blue);
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12px;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  position: relative;
+}
+
+.tabActive {
+  color: var(--text-main);
+  border-bottom-color: var(--accent-blue);
+}
+
+.tab:hover:not(.tabActive) {
+  color: var(--text-main);
+}
+
+.tabIcon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.tabClose {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-left: 2px;
+}
+
+.tabClose:hover {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}

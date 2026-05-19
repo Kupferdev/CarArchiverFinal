@@ -26,6 +26,8 @@ function CreateDefaultDb(dbPath) {
       fs.mkdirSync(folder, { recursive: true });
     }
     dbInstance = new Client(dbPathFinal);
+    dbInstance.pragma("journal_mode = WAL");
+    dbInstance.pragma("synchronous = NORMAL");
     dbInstance.pragma("foreign_keys = on");
     console.log("❇️ DB Started: ", dbPathFinal);
     return dbInstance;
@@ -5011,22 +5013,18 @@ async function createBrandsTable() {
   const db = getDb();
   const orm = useDb();
   const createBrandsTableSql = `
-        CREATE TABLE IF NOT EXISTS Brands(
-        brandId INTEGER PRIMARY KEY AUTOINCREMENT,
-        brandName TEXT NOT NULL
-        )
-    `;
+    CREATE TABLE IF NOT EXISTS Brands(
+      brandId   INTEGER PRIMARY KEY AUTOINCREMENT,
+      brandName TEXT    NOT NULL UNIQUE
+    )
+  `;
   try {
     db.exec(createBrandsTableSql);
-    console.log("❇️ Brands table created");
-    try {
-      await orm.insert(Brands).values(baseCarBrands).onConflictDoNothing();
-      console.log("❇️ Base Brands insert the table.");
-    } catch {
-      console.log("🆘 Base Brands not insert the table.");
-    }
+    console.log("❇️ Brands table created.");
+    await orm.insert(Brands).values(baseCarBrands).onConflictDoNothing();
+    console.log("❇️ Base brands seeded.");
   } catch (err) {
-    console.log("🆘 Brans table not created", err.message);
+    console.error("🆘 Brands table creation failed:", err.message);
     throw err;
   }
 }
@@ -5055,41 +5053,6 @@ function createCarsTable() {
     throw err;
   }
 }
-function createCustomerEmailsTable() {
-  const db = getDb();
-  const createCustomerEmailTableSql = `
-    CREATE TABLE IF NOT EXISTS Emails (
-        emailId INTEGER PRIMARY KEY AUTOINCREMENT,
-        customerId INTEGER NOT NULL,
-        customerEmail TEXT NOT NULL
-    )
-`;
-  try {
-    db.exec(createCustomerEmailTableSql);
-    console.log("❇️ Email table created");
-  } catch (err) {
-    console.log("🆘Email table not created", err.message);
-    throw err;
-  }
-}
-function createCustomerPhoneNumbersTable() {
-  const db = getDb();
-  const createPhoneNumbersTableSql = `
-    CREATE TABLE IF NOT EXISTS PhoneNumbers(
-        phoneNumberId INTEGER PRIMARY KEY AUTOINCREMENT,
-        customerId  INTEGER NOT NULL,
-        countryCode TEXT NOT NULL,
-        phoneNumber TEXT NOT NULL
-        );
-`;
-  try {
-    db.exec(createPhoneNumbersTableSql);
-    console.log("❇️ PhoneNumbers table created!");
-  } catch (err) {
-    console.log("🆘PhoneNumber table not created", err.message);
-    throw err;
-  }
-}
 function createCustomersTable() {
   const db = getDb();
   const createCustomersTableSql = `
@@ -5108,8 +5071,6 @@ function createCustomersTable() {
     console.log("🆘Customers table not created", err.message);
     throw err;
   }
-  createCustomerPhoneNumbersTable();
-  createCustomerEmailsTable();
 }
 const FuelTypes = sqliteTable("FuelTypes", {
   fuelTypeId: integer("fuelTypeId").primaryKey({ autoIncrement: true }),
@@ -5188,7 +5149,9 @@ function createServicesTable() {
             hasDamageDuringRepair BOOLEAN NULL,
             damageDuringRepair JSON NULL,
             laborCharge REAL NULL,
-            totalCharge REAL NULL
+            totalCharge REAL NULL,
+            targetDeliveryDate DATETIME NULL,
+            isDelivered BOOLEAN NULL
         )
     `;
   try {
@@ -5196,6 +5159,41 @@ function createServicesTable() {
     console.log("❇️ Services table created");
   } catch (err) {
     console.log("🆘 Services table not created", err.message);
+    throw err;
+  }
+}
+function createCustomerPhoneNumbersTable() {
+  const db = getDb();
+  const createPhoneNumbersTableSql = `
+    CREATE TABLE IF NOT EXISTS PhoneNumbers(
+        phoneNumberId INTEGER PRIMARY KEY AUTOINCREMENT,
+        customerId  INTEGER NOT NULL,
+        countryCode TEXT NOT NULL,
+        phoneNumber TEXT NOT NULL
+        );
+`;
+  try {
+    db.exec(createPhoneNumbersTableSql);
+    console.log("❇️ PhoneNumbers table created!");
+  } catch (err) {
+    console.log("🆘PhoneNumber table not created", err.message);
+    throw err;
+  }
+}
+function createCustomerEmailsTable() {
+  const db = getDb();
+  const createCustomerEmailTableSql = `
+    CREATE TABLE IF NOT EXISTS Emails (
+        emailId INTEGER PRIMARY KEY AUTOINCREMENT,
+        customerId INTEGER NOT NULL,
+        customerEmail TEXT NOT NULL
+    )
+`;
+  try {
+    db.exec(createCustomerEmailTableSql);
+    console.log("❇️ Email table created");
+  } catch (err) {
+    console.log("🆘Email table not created", err.message);
     throw err;
   }
 }
@@ -5486,21 +5484,21 @@ async function createBodyTypesTranslationsTable() {
 }
 async function CreateDefaultDbTables() {
   try {
-    console.log("⏳ Starting table creation process in hierarchical order...");
-    createCustomersTable();
-    createBrandsTable();
-    createFuelTypesTable();
-    createBodyTypesTable();
-    createCarsTable();
-    createFuelTypesTranslationsTable();
-    createBodyTypesTranslationsTable();
-    createCustomerPhoneNumbersTable();
-    createCustomerEmailsTable();
+    console.log("⏳ Starting table creation process...");
+    await createCustomersTable();
+    await createBrandsTable();
+    await createFuelTypesTable();
+    await createBodyTypesTable();
+    await createCarsTable();
+    await createFuelTypesTranslationsTable();
+    await createBodyTypesTranslationsTable();
+    await createCustomerPhoneNumbersTable();
+    await createCustomerEmailsTable();
     await createServicesTable();
     await createPartsTable();
-    console.log("❇️ All database tables verified and linked successfully.");
+    console.log("❇️ All database tables created successfully.");
   } catch (error) {
-    console.error("🆘 Setup aborted! Dependency order error:", error.message);
+    console.error("🆘 Setup aborted:", error.message);
     throw error;
   }
 }
@@ -5526,28 +5524,34 @@ function registerIpcHandlers() {
   });
   ipcMain.handle("setup-new-data-structure", async (_event, selectedRoot) => {
     try {
-      if (selectedRoot.endsWith(".sqlite")) {
-        return selectedRoot;
-      }
       const mainFolderName = "CarServiceArchiver";
       const mainPath = path.join(selectedRoot, mainFolderName);
       const dbPath = path.join(mainPath, "data_carArcihiver.sqlite");
       const mediaPath = path.join(mainPath, "media");
+      if (!fs.existsSync(mainPath)) {
+        fs.mkdirSync(mainPath, { recursive: true });
+        console.log("📁 Main folder created:", mainPath);
+      }
+      if (!fs.existsSync(mediaPath)) {
+        fs.mkdirSync(mediaPath, { recursive: true });
+        console.log("📁 Media folder created:", mediaPath);
+      }
       if (process.platform === "win32") {
         exec(`attrib +h +i "${mediaPath}"`, (error) => {
           if (error) {
-            console.error("⚠️ Media klasörü gizlenemedi:", error);
+            console.error("⚠️ Media folder could not be hidden:", error);
           } else {
-            console.log("🥷 Media klasörü Windows'tan gizlendi!");
+            console.log("🥷 Media folder hidden from Windows Explorer.");
           }
         });
       }
       CreateDefaultDb(dbPath);
       initDrizzle();
       await CreateDefaultDbTables();
+      console.log("❇️ Setup completed successfully. DB path:", dbPath);
       return dbPath;
     } catch (error) {
-      console.error("🆘 SETUP PATLADI:", error.message);
+      console.error("🆘 Setup failed:", error.message);
       return null;
     }
   });
@@ -5556,10 +5560,10 @@ function registerIpcHandlers() {
       const userDataPath2 = app.getPath("userData");
       const configPath2 = path.join(userDataPath2, "config.json");
       fs.writeFileSync(configPath2, JSON.stringify(configData, null, 2), "utf-8");
-      console.log("❇️ Config dosyası başarıyla kaydedildi: ", configPath2);
+      console.log("❇️ Config file saved successfully:", configPath2);
       return true;
     } catch (error) {
-      console.error("🆘 Config kaydedilirken hata oluştu:", error.message);
+      console.error("🆘 Failed to save config:", error.message);
       return false;
     }
   });

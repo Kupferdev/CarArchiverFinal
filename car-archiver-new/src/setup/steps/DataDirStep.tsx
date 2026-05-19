@@ -33,11 +33,7 @@ export const DataDirStep = ({ language, onNext, onBack, updateData }: any) => {
         setPath(dbFile);
         setError("");
       } else {
-        setError(
-          language === "tr"
-            ? "Hata: data_carArcihiver.sqlite bulunamadı!"
-            : "Error: .sqlite file not found!",
-        );
+        setError("Error: data_carArcihiver.sqlite not found in selected folder.");
         setPath("");
       }
     } else {
@@ -47,22 +43,11 @@ export const DataDirStep = ({ language, onNext, onBack, updateData }: any) => {
   };
 
   const handleFinalStart = async () => {
-    let finalDbPath = path;
-
-    if (setupMode === "create") {
-      finalDbPath = await (window as any).electron.ipcRenderer.invoke(
-        "setup-new-data-structure",
-        path,
-      );
-    }
-
-    if (finalDbPath) {
-      updateData({
-        savePath: finalDbPath,
-        isNewUser: setupMode === "create",
-      });
-      onNext();
-    }
+    updateData({
+      savePath: path,
+      isNewUser: setupMode === "create",
+    });
+    onNext();
   };
 
   return (

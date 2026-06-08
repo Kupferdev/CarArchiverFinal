@@ -5502,6 +5502,417 @@ async function CreateDefaultDbTables() {
     throw error;
   }
 }
+class ServiceResponse {
+  // Başarılı Tekil Veri
+  static success(data, message = "Operation successful") {
+    return {
+      success: true,
+      status: "success",
+      message,
+      data
+    };
+  }
+  // Başarılı Liste (Sayfalamalı)
+  static successPaginated(data, totalRecords, page, pageSize, message = "List fetched successfully") {
+    return {
+      success: true,
+      status: "success",
+      message,
+      data,
+      meta: {
+        page,
+        pageSize,
+        totalRecords,
+        totalPages: Math.ceil(totalRecords / pageSize)
+      }
+    };
+  }
+  // İş Kuralı Hatası (Örn: "Stok yetersiz")
+  static fail(message, code) {
+    return {
+      success: false,
+      status: "fail",
+      message,
+      code
+    };
+  }
+  // Sistem Hatası (Try-Catch blokları için)
+  static error(error, message = "An unexpected error occurred") {
+    console.error("System Error:", error);
+    return {
+      success: false,
+      status: "error",
+      message: message + (error.message ? `: ${error.message}` : ""),
+      data: null
+      // Error detayını güvenlik için data'ya koymuyoruz, logluyoruz.
+    };
+  }
+  // Validasyon Hatası (Formlar için)
+  static validationError(errors, message = "Validation failed") {
+    return {
+      success: false,
+      status: "validation_error",
+      message,
+      validationErrors: errors
+    };
+  }
+}
+class BaseRepository {
+  constructor(table, idColumn) {
+    __publicField(this, "table");
+    __publicField(this, "idColumn");
+    this.table = table;
+    this.idColumn = idColumn;
+  }
+  handleError(error, defaultMessage) {
+    var _a2;
+    console.error("❌ Database Error:", error);
+    if (error.code === "SQLITE_CONSTRAINT_UNIQUE") {
+      return ServiceResponse.fail("This record already exists.", "UNIQUE_CONSTRAINT");
+    }
+    if ((_a2 = error.message) == null ? void 0 : _a2.includes("not been initialized")) {
+      return ServiceResponse.error(error, "Database connection is not ready.");
+    }
+    return ServiceResponse.error(error, defaultMessage);
+  }
+  async create(data) {
+    try {
+      const result = await useDb().insert(this.table).values(data).returning();
+      return ServiceResponse.success(result[0], "Created successfully.");
+    } catch (err) {
+      return this.handleError(err, "Failed to create record.");
+    }
+  }
+  async getAll(options) {
+    try {
+      const db = useDb();
+      let query = db.select().from(this.table).$dynamic();
+      const columns = getTableColumns(this.table);
+      const orderByCol = columns[this.idColumn];
+      if (orderByCol) {
+        query = query.orderBy(desc(orderByCol));
+      }
+      if ((options == null ? void 0 : options.page) && (options == null ? void 0 : options.pageSize)) {
+        const limit = options.pageSize;
+        const offset = (options.page - 1) * limit;
+        query = query.limit(limit).offset(offset);
+        const countResult = await db.select({ count: sql`count(*)` }).from(this.table);
+        const totalRecords = Number(countResult[0].count);
+        const result2 = await query;
+        return ServiceResponse.successPaginated(
+          result2,
+          totalRecords,
+          options.page,
+          options.pageSize
+        );
+      }
+      const result = await query;
+      return ServiceResponse.success(result, "Records fetched.");
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch records.");
+    }
+  }
+  async getById(id) {
+    try {
+      const columns = getTableColumns(this.table);
+      const idCol = columns[this.idColumn];
+      if (!idCol) throw new Error(`Invalid ID column: ${this.idColumn}`);
+      const result = await useDb().select().from(this.table).where(eq(idCol, id));
+      if (result[0]) {
+        return ServiceResponse.success(result[0], "Record found.");
+      }
+      return ServiceResponse.fail("Record not found.", "NOT_FOUND");
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch record.");
+    }
+  }
+  async update(id, data) {
+    try {
+      const columns = getTableColumns(this.table);
+      const idCol = columns[this.idColumn];
+      const result = await useDb().update(this.table).set(data).where(eq(idCol, id)).returning();
+      if (result[0]) {
+        return ServiceResponse.success(result[0], "Updated successfully.");
+      }
+      return ServiceResponse.fail("Record not found.", "NOT_FOUND");
+    } catch (err) {
+      return this.handleError(err, "Failed to update record.");
+    }
+  }
+  async delete(id) {
+    try {
+      const columns = getTableColumns(this.table);
+      const idCol = columns[this.idColumn];
+      const result = await useDb().delete(this.table).where(eq(idCol, id)).returning();
+      if (result.length > 0) {
+        return ServiceResponse.success(void 0, "Deleted successfully.");
+      }
+      return ServiceResponse.fail("Record not found.", "NOT_FOUND");
+    } catch (err) {
+      return this.handleError(err, "Failed to delete record.");
+    }
+  }
+  async count() {
+    try {
+      const result = await useDb().select({ count: sql`count(*)` }).from(this.table);
+      const total = Number(result[0].count);
+      return ServiceResponse.success(total, "Count fetched successfully.");
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch count.");
+    }
+  }
+}
+const Cars = sqliteTable("Cars", {
+  carId: integer("carId").primaryKey({ autoIncrement: true }),
+  customerId: integer("customerId"),
+  oldCustomerId: text("oldCustomerId", { mode: "json" }).$type().default([]),
+  brandId: integer("brandId"),
+  modelId: integer("modelId"),
+  year: integer("year"),
+  vinNumber: text("vinNumber"),
+  plateNumber: text("plateNumber"),
+  km: real("km"),
+  fuelType: integer("fuelType"),
+  bodyType: integer("bodyType")
+});
+class CarsRepository extends BaseRepository {
+  constructor() {
+    super(Cars, "carId");
+  }
+  async getByCustomerId(customerId) {
+    try {
+      const result = await useDb().select().from(Cars).where(eq(Cars.customerId, customerId));
+      return ServiceResponse.success(
+        result,
+        "Customer's cars fetched successfully."
+      );
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch cars by customer.");
+    }
+  }
+  async getByBrandId(brandId) {
+    try {
+      const result = await useDb().select().from(Cars).where(eq(Cars.brandId, brandId));
+      return ServiceResponse.success(
+        result,
+        "Cars fetched by brand."
+      );
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch cars by brand.");
+    }
+  }
+  async getByYear(year) {
+    try {
+      const result = await useDb().select().from(Cars).where(eq(Cars.year, year));
+      return ServiceResponse.success(
+        result,
+        `Cars from year ${year} fetched.`
+      );
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch cars by year.");
+    }
+  }
+  async getByFuelType(fuelType) {
+    try {
+      const result = await useDb().select().from(Cars).where(eq(Cars.fuelType, fuelType));
+      return ServiceResponse.success(
+        result,
+        "Cars fetched by fuel type."
+      );
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch cars by fuel type.");
+    }
+  }
+  async getByBodyType(bodyType) {
+    try {
+      const result = await useDb().select().from(Cars).where(eq(Cars.bodyType, bodyType));
+      return ServiceResponse.success(
+        result,
+        "Cars fetched by body type."
+      );
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch cars by body type.");
+    }
+  }
+  async getByVinNumber(vinNumber) {
+    try {
+      const result = await useDb().select().from(Cars).where(eq(Cars.vinNumber, vinNumber));
+      const car = result[0];
+      if (car) {
+        return ServiceResponse.success(
+          car,
+          "Car found by VIN."
+        );
+      }
+      return ServiceResponse.fail("No car found with this VIN number.", "NOT_FOUND");
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch car by VIN.");
+    }
+  }
+  async getByPlateNumber(plateNumber) {
+    try {
+      const result = await useDb().select().from(Cars).where(eq(Cars.plateNumber, plateNumber));
+      const car = result[0];
+      if (car) {
+        return ServiceResponse.success(
+          car,
+          "Car found by Plate Number."
+        );
+      }
+      return ServiceResponse.fail("No car found with this Plate Number.", "NOT_FOUND");
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch car by Plate Number.");
+    }
+  }
+  async addOldCustomer(carId, oldCustomerIdToAdd) {
+    try {
+      const result = await useDb().select().from(Cars).where(eq(Cars.carId, carId));
+      const car = result[0];
+      if (!car) {
+        return ServiceResponse.fail("Car not found.", "NOT_FOUND");
+      }
+      const currentIds = car.oldCustomerId ?? [];
+      const idToAddStr = oldCustomerIdToAdd.toString();
+      if (currentIds.includes(idToAddStr)) {
+        return ServiceResponse.success("ID already exists in history", "Customer already exists in car history.");
+      }
+      const updatedList = [...currentIds, idToAddStr];
+      await useDb().update(Cars).set({ oldCustomerId: updatedList }).where(eq(Cars.carId, carId));
+      return ServiceResponse.success("Success", "Old customer added successfully.");
+    } catch (err) {
+      return this.handleError(err, "Failed to add old customer.");
+    }
+  }
+  async getOldCustomers(carId) {
+    try {
+      const result = await useDb().select().from(Cars).where(eq(Cars.carId, carId));
+      const car = result[0];
+      if (!car) {
+        return ServiceResponse.fail("Car not found.", "NOT_FOUND");
+      }
+      const currentIds = car.oldCustomerId ?? [];
+      if (currentIds.length === 0) {
+        return ServiceResponse.success([], "No old customers found.");
+      }
+      const idList = currentIds.map((id) => Number(id));
+      return ServiceResponse.success(idList, "Old customers retrieved successfully.");
+    } catch (err) {
+      return this.handleError(err, "Failed to get old customers.");
+    }
+  }
+}
+const Customers = sqliteTable("Customers", {
+  customerId: integer("customerId").primaryKey({ autoIncrement: true }),
+  nationalId: text("nationalId"),
+  firstName: text("firstName").notNull(),
+  lastName: text("lastName"),
+  taxNumber: text("taxNumber")
+});
+class CustomersRepository extends BaseRepository {
+  constructor() {
+    super(Customers, "customerId");
+  }
+  async getByNatId(nationalId) {
+    try {
+      const result = await useDb().select().from(Customers).where(eq(Customers.nationalId, nationalId));
+      const customer = result[0];
+      if (customer) {
+        return ServiceResponse.success(
+          customer,
+          "Customer found by National ID."
+        );
+      }
+      return ServiceResponse.fail("Customer not found with this National ID.", "NOT_FOUND");
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch customer by National ID.");
+    }
+  }
+  // İsim ve/veya Soyisime göre dinamik arama
+  async getByNameSurname(firstName, lastName) {
+    try {
+      const filters = [];
+      if (firstName) filters.push(eq(Customers.firstName, firstName));
+      if (lastName) filters.push(eq(Customers.lastName, lastName));
+      if (filters.length === 0) {
+        return ServiceResponse.success([], "No search criteria provided.");
+      }
+      const result = await useDb().select().from(Customers).where(and(...filters));
+      return ServiceResponse.success(
+        result,
+        result.length > 0 ? "Customers found." : "No customers found matching criteria."
+      );
+    } catch (err) {
+      return this.handleError(err, "Failed to search customers.");
+    }
+  }
+}
+sqliteTable("Emails", {
+  emailId: integer("emailId").primaryKey({ autoIncrement: true }),
+  customerId: integer("customerId").notNull(),
+  customerEmail: text("customerEmail").notNull()
+});
+sqliteTable("PhoneNumbers", {
+  phoneNumberId: integer("phoneNumberId").primaryKey({ autoIncrement: true }),
+  customerId: integer("customerId").notNull(),
+  countryCode: text("countryCode").notNull(),
+  phoneNumber: text("phoneNumber").notNull()
+});
+sqliteTable("Parts", {
+  partId: integer("partId").primaryKey({ autoIncrement: true }),
+  carId: integer("carId").notNull(),
+  serviceId: integer("serviceId").notNull(),
+  partName: text("partName").notNull(),
+  partTax: real("partTax"),
+  partPrice: real("partPrice")
+});
+const Services = sqliteTable("Services", {
+  serviceId: integer("serviceId").primaryKey({ autoIncrement: true }),
+  carId: integer("carId").notNull(),
+  customerId: integer("customerId"),
+  applicationDate: integer("applicationDate", { mode: "timestamp" }),
+  appointmentDate: integer("appointmentDate", { mode: "timestamp" }),
+  jobDuration: integer("jobDuration", { mode: "timestamp" }),
+  deliveryDate: integer("deliveryDate", { mode: "timestamp" }),
+  km: real("km"),
+  complaints: text("complaints").notNull(),
+  extraRequests: text("extraRequests"),
+  faults: text("faults", { mode: "json" }).$type().default([]),
+  hasDamageOnReceive: integer("hasDamageOnReceive", { mode: "boolean" }).notNull().default(false),
+  damageOnReceive: text("damageOnReceive", { mode: "json" }).$type().default([]),
+  hasDamageDuringRepair: integer("hasDamageDuringRepair", { mode: "boolean" }).default(false),
+  damageDuringRepair: text("damageDuringRepair", { mode: "json" }).$type().default([]),
+  laborCharge: real("laborCharge"),
+  totalCharge: real("totalCharge"),
+  targetDeliveryDate: integer("target_delivery_date", { mode: "timestamp" }),
+  isDelivered: integer("is_delivered", { mode: "boolean" }).default(false)
+});
+class ServicesRepository extends BaseRepository {
+  constructor() {
+    super(Services, "serviceId");
+  }
+  async getByCarId(carId) {
+    try {
+      const result = await useDb().select().from(Services).where(eq(Services.carId, carId));
+      return ServiceResponse.success(
+        result,
+        "Service history for the car fetched successfully."
+      );
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch service history by car.");
+    }
+  }
+  async getByCustomerId(customerId) {
+    try {
+      const result = await useDb().select().from(Services).where(eq(Services.customerId, customerId));
+      return ServiceResponse.success(
+        result,
+        "Service history for the customer fetched successfully."
+      );
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch service history by customer.");
+    }
+  }
+}
 const userDataPath = app.getPath("userData");
 const configPath = path.join(userDataPath, "config.json");
 function registerIpcHandlers() {
@@ -5565,6 +5976,38 @@ function registerIpcHandlers() {
     } catch (error) {
       console.error("🆘 Failed to save config:", error.message);
       return false;
+    }
+  });
+  ipcMain.handle("get-config", async () => {
+    try {
+      if (fs.existsSync(configPath)) {
+        const rawData = fs.readFileSync(configPath, "utf-8");
+        return JSON.parse(rawData);
+      }
+      return null;
+    } catch (error) {
+      console.error("🆘 Config okuma hatası:", error.message);
+      return null;
+    }
+  });
+  ipcMain.handle("get-dashboard-stats", async () => {
+    try {
+      const customersRepo = new CustomersRepository();
+      const carsRepo = new CarsRepository();
+      const servicesRepo = new ServicesRepository();
+      const [customersRes, carsRes, servicesRes] = await Promise.all([
+        customersRepo.count(),
+        carsRepo.count(),
+        servicesRepo.count()
+      ]);
+      return {
+        customers: customersRes.success ? customersRes.data : 0,
+        cars: carsRes.success ? carsRes.data : 0,
+        services: servicesRes.success ? servicesRes.data : 0
+      };
+    } catch (error) {
+      console.error("🆘 İstatistik okuma hatası:", error.message);
+      return { services: 0, customers: 0, cars: 0 };
     }
   });
 }

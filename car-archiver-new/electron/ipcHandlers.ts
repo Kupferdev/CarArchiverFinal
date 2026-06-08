@@ -6,6 +6,10 @@ import { CreateDefaultDbTables } from '../src/main/data/setup';
 import { initDrizzle } from '../src/main/data/drizzle/drizzleDb';
 import { exec } from 'child_process';
 
+import { CustomersRepository } from '../src/main/data/drizzle/repositories';
+import { CarsRepository } from '../src/main/data/drizzle/repositories';
+import { ServicesRepository } from '../src/main/data/drizzle/repositories';
+
 const userDataPath = app.getPath('userData');
 const configPath = path.join(userDataPath, 'config.json');
 
@@ -92,6 +96,47 @@ export function registerIpcHandlers() {
     } catch (error: any) {
       console.error('🆘 Failed to save config:', error.message);
       return false;
+    }
+  });
+
+  // 6. Get Config (BUNU YENİ EKLİYORUZ)
+  ipcMain.handle('get-config', async () => {
+    try {
+      if (fs.existsSync(configPath)) {
+        const rawData = fs.readFileSync(configPath, 'utf-8');
+        return JSON.parse(rawData);
+      }
+      return null;
+    } catch (error: any) {
+      console.error('🆘 Config okuma hatası:', error.message);
+      return null;
+    }
+  });
+
+  // 7. Get Dashboard Stats
+  ipcMain.handle('get-dashboard-stats', async () => {
+    try {
+      // Repository'leri ayağa kaldırıyoruz
+      const customersRepo = new CustomersRepository();
+      const carsRepo = new CarsRepository();
+      const servicesRepo = new ServicesRepository();
+
+      // Üç sorguyu aynı anda başlatarak performansı artırıyoruz (Promise.all)
+      const [customersRes, carsRes, servicesRes] = await Promise.all([
+        customersRepo.count(),
+        carsRepo.count(),
+        servicesRepo.count()
+      ]);
+
+      // Eğer sorgular başarılıysa veriyi al, başarısızsa 0 dön
+      return {
+        customers: customersRes.success ? customersRes.data : 0,
+        cars: carsRes.success ? carsRes.data : 0,
+        services: servicesRes.success ? servicesRes.data : 0
+      };
+    } catch (error: any) {
+      console.error('🆘 İstatistik okuma hatası:', error.message);
+      return { services: 0, customers: 0, cars: 0 };
     }
   });
 

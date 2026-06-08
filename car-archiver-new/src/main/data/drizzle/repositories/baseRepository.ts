@@ -145,4 +145,19 @@ export class BaseRepository<TTable extends SQLiteTable<any>> {
       return this.handleError(err, "Failed to delete record.");
     }
   }
+
+  async count(): Promise<IApiResponse<number>> {
+    try {
+      const result = await useDb()
+        .select({ count: sql<number>`count(*)` })
+        .from(this.table);
+        
+      const total = Number(result[0].count);
+      
+      return ServiceResponse.success(total, "Count fetched successfully.");
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch count.");
+    }
+  }
+
 }

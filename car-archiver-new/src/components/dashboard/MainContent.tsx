@@ -1,14 +1,21 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './MainContent.module.css';
+import { useDashboardStats } from '../../hooks/useDashboardStats';
+import { useTabStore } from '../../store/tabStore';
 
 const MainContent: React.FC = () => {
   const { t } = useTranslation();
+  const { stats } = useDashboardStats();
+  const { openTab } = useTabStore();
 
   return (
     <div className={styles.cardsGrid}>
       {/* 1. KART: Servis Kayıtları */}
-      <div className={styles.navCard}>
+      <div 
+        className={styles.navCard} 
+        onClick={() => openTab({ type: 'service', title: t('cardServiceRecordsTitle') })}
+      >
         <div className={styles.navCardHeader}>
           <div className={styles.navCardTitle}>{t('cardServiceRecordsTitle')}</div>
           <div className={`${styles.navCardIcon} ${styles.blue}`}>
@@ -20,11 +27,14 @@ const MainContent: React.FC = () => {
           </div>
         </div>
         <div className={styles.navCardStat}>{t('cardServiceRecordsStat')}</div>
-        <div className={styles.navCardCount}>247 <span>{t('cardServiceRecordsUnit')}</span></div>
+        <div className={styles.navCardCount}>{stats.services} <span>{t('cardServiceRecordsUnit')}</span></div>
       </div>
 
       {/* 2. KART: Müşteriler */}
-      <div className={styles.navCard}>
+      <div 
+        className={styles.navCard}
+        onClick={() => openTab({ type: 'customer', title: t('cardCustomersTitle') })}
+      >
         <div className={styles.navCardHeader}>
           <div className={styles.navCardTitle}>{t('cardCustomersTitle')}</div>
           <div className={`${styles.navCardIcon} ${styles.teal}`}>
@@ -37,11 +47,14 @@ const MainContent: React.FC = () => {
           </div>
         </div>
         <div className={styles.navCardStat}>{t('cardCustomersStat')}</div>
-        <div className={styles.navCardCount}>312 <span>{t('cardCustomersUnit')}</span></div>
+        <div className={styles.navCardCount}>{stats.customers} <span>{t('cardCustomersUnit')}</span></div>
       </div>
 
       {/* 3. KART: Arabalar */}
-      <div className={styles.navCard}>
+      <div 
+        className={styles.navCard}
+        onClick={() => openTab({ type: 'car', title: t('cardCarsTitle') })}
+      >
         <div className={styles.navCardHeader}>
           <div className={styles.navCardTitle}>{t('cardCarsTitle')}</div>
           <div className={`${styles.navCardIcon} ${styles.amber}`}>
@@ -54,7 +67,7 @@ const MainContent: React.FC = () => {
           </div>
         </div>
         <div className={styles.navCardStat}>{t('cardCarsStat')}</div>
-        <div className={styles.navCardCount}>148 <span>{t('cardCarsUnit')}</span></div>
+        <div className={styles.navCardCount}>{stats.cars} <span>{t('cardCarsUnit')}</span></div>
       </div>
     </div>
   );

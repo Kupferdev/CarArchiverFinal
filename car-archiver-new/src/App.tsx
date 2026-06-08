@@ -17,13 +17,15 @@ function App() {
       // Eğer ilk açılış değilse, yani config.json halihazırda varsa
       if (isFirstRun === false) {
         try {
-          // Electron ana sürecinden (main process) config dosyasını çekiyoruz
-          // ipcHandlers.ts içindeki konfigürasyon getirme fonksiyonunun adıyla eşleşmeli
-          const config = await window.Electron.ipcRenderer.invoke('get-config'); 
+          // DÜZELTME 1: "Electron" yerine "electron" (Küçük harf)
+          const config = await (window as any).electron.ipcRenderer.invoke('get-config'); 
           
-          if (config && config.languageCode) {
-            // i18n dilini config.json'dan gelen kodla (en, tr, es vb.) değiştiriyoruz
-            await i18n.changeLanguage(config.languageCode);
+          if (config) {
+            // DÜZELTME 2: İster languageCode ister language diye kaydetmiş ol, ikisini de yakalar
+            const savedLang = config.languageCode || config.language;
+            if (savedLang) {
+              await i18n.changeLanguage(savedLang);
+            }
           }
         } catch (error) {
           console.error('Kayıtlı dil yüklenirken hata oluştu:', error);

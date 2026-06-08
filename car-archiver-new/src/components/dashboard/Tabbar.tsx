@@ -1,31 +1,55 @@
 import React from 'react';
 import styles from './Tabbar.module.css';
+import { useTabStore } from '../../store/tabStore';
 
 const Tabbar: React.FC = () => {
+  const { tabs, activeTabId, setActiveTab, closeTab } = useTabStore();
+
   return (
     <div className={styles.tabbar}>
-      <div className={`${styles.tabHome} ${styles.tabHomeActive}`}>
+      {/* 1. Sabit Ana Sayfa (Home) Sekmesi */}
+      <div 
+        className={`${styles.tabHome} ${activeTabId === 'home' ? styles.tabHomeActive : ''}`}
+        onClick={() => setActiveTab('home')}
+      >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M2 7L8 2L14 7V14H10V10H6V14H2V7Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
         </svg>
       </div>
-      <div className={`${styles.tab} ${styles.tabActive}`}>
-        <svg className={styles.tabIcon} viewBox="0 0 16 16" fill="none">
-          <rect x="1" y="3" width="9" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
-          <path d="M4 6h5M4 9h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-          <rect x="7" y="1" width="8" height="6" rx="1.5" fill="var(--bg-main)" stroke="currentColor" strokeWidth="1.3"/>
-        </svg>
-        Arabalar
-        <div className={styles.tabClose}>✕</div>
-      </div>
-      <div className={styles.tab}>
-        <svg className={styles.tabIcon} viewBox="0 0 16 16" fill="none">
-          <circle cx="6" cy="5" r="3" stroke="currentColor" strokeWidth="1.3"/>
-          <path d="M1 14c0-3 2-5 5-5s5 2 5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-        </svg>
-        Enver Ali
-        <div className={styles.tabClose}>✕</div>
-      </div>
+
+      {/* 2. Dinamik Olarak Açılan Sekmeler */}
+      {tabs.map((tab) => (
+        <div 
+          key={tab.id} 
+          className={`${styles.tab} ${activeTabId === tab.id ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab(tab.id)}
+        >
+          {/* Sekme tipine göre ikon */}
+          <svg className={styles.tabIcon} viewBox="0 0 16 16" fill="none">
+            {tab.type === 'car' && (
+              <path d="M3 11L5 6h10l2 5v3H3v-3z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+            )}
+            {tab.type === 'customer' && (
+              <circle cx="8" cy="7" r="3.5" stroke="currentColor" strokeWidth="1.4"/>
+            )}
+            {tab.type === 'service' && (
+              <path d="M5 7h6M5 10h4M5 13h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            )}
+          </svg>
+          
+          {tab.title}
+          
+          <div 
+            className={styles.tabClose} 
+            onClick={(e) => {
+              e.stopPropagation(); // Kapatma butonuna tıklayınca sekmenin aktif olmasını engeller
+              closeTab(tab.id);
+            }}
+          >
+            ✕
+          </div>
+        </div>
+      ))}
     </div>
   );
 };

@@ -11,7 +11,6 @@ import path from "path";
 import Client from "better-sqlite3";
 import { fileURLToPath } from "url";
 import { exec } from "child_process";
-import fs$1 from "node:fs";
 const currentFilePath$1 = fileURLToPath(import.meta.url);
 path.dirname(currentFilePath$1);
 let dbInstance = null;
@@ -6058,20 +6057,18 @@ app.on("activate", () => {
     createWindow();
   }
 });
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   registerIpcHandlers();
   try {
     const configPath2 = path$1.join(app.getPath("userData"), "config.json");
-    if (fs$1.existsSync(configPath2)) {
-      const configRaw = fs$1.readFileSync(configPath2, "utf-8");
+    if (fs.existsSync(configPath2)) {
+      const configRaw = fs.readFileSync(configPath2, "utf-8");
       const config = JSON.parse(configRaw);
       const finalDbPath = config.savePath;
       if (finalDbPath) {
         CreateDefaultDb(finalDbPath);
         initDrizzle();
-        console.log("🟢 Veritabanı başarıyla bağlandı:", finalDbPath);
-      } else {
-        console.log("⚠️ Config okundu ama 'savePath' bulunamadı!");
+        console.log("🟢 Veritabanı bağlandı:", finalDbPath);
       }
     }
   } catch (error) {

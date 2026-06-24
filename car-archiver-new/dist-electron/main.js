@@ -11,6 +11,7 @@ import path from "path";
 import Client from "better-sqlite3";
 import { fileURLToPath } from "url";
 import { exec } from "child_process";
+import fs$1 from "node:fs";
 const currentFilePath$1 = fileURLToPath(import.meta.url);
 path.dirname(currentFilePath$1);
 let dbInstance = null;
@@ -6010,6 +6011,16 @@ function registerIpcHandlers() {
       return { services: 0, customers: 0, cars: 0 };
     }
   });
+  ipcMain.handle("get-all-customers", async () => {
+    try {
+      const customersRepo = new CustomersRepository();
+      const response = await customersRepo.getAll();
+      return response.success ? response.data : [];
+    } catch (error) {
+      console.error("🆘 Müşteriler çekilirken hata:", error.message);
+      return [];
+    }
+  });
 }
 createRequire(import.meta.url);
 const currentFilePath = fileURLToPath$1(import.meta.url);
@@ -6049,6 +6060,23 @@ app.on("activate", () => {
 });
 app.whenReady().then(() => {
   registerIpcHandlers();
+  try {
+    const configPath2 = path$1.join(app.getPath("userData"), "config.json");
+    if (fs$1.existsSync(configPath2)) {
+      const configRaw = fs$1.readFileSync(configPath2, "utf-8");
+      const config = JSON.parse(configRaw);
+      const finalDbPath = config.savePath;
+      if (finalDbPath) {
+        CreateDefaultDb(finalDbPath);
+        initDrizzle();
+        console.log("🟢 Veritabanı başarıyla bağlandı:", finalDbPath);
+      } else {
+        console.log("⚠️ Config okundu ama 'savePath' bulunamadı!");
+      }
+    }
+  } catch (error) {
+    console.error("🔴 Veritabanı başlatılırken hata oluştu:", error);
+  }
   createWindow();
 });
 export {

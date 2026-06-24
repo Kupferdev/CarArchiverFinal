@@ -140,4 +140,18 @@ export function registerIpcHandlers() {
     }
   });
 
+  // 8. Get All Customers
+  ipcMain.handle('get-all-customers', async () => {
+    try {
+      const customersRepo = new CustomersRepository();
+      const response = await customersRepo.getAll();
+      
+      // Yanıt başarılıysa veriyi (array), değilse boş dizi dön
+      return response.success ? response.data : [];
+    } catch (error: any) {
+      console.error('🆘 Müşteriler çekilirken hata:', error.message);
+      return [];
+    }
+  });
+
 }

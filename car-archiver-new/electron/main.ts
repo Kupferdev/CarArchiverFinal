@@ -3,6 +3,10 @@ import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { registerIpcHandlers } from './ipcHandlers'
+import fs from 'node:fs';
+import { getConfig } from '../src/main/helpers/config/configManager';
+import { CreateDefaultDb } from '../src/main/data/db';
+import { initDrizzle } from '../src/main/data/drizzle/drizzleDb';
 
 const require = createRequire(import.meta.url)
 //const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -71,6 +75,30 @@ app.on('activate', () => {
 })
 
 app.whenReady().then(() => {
-  registerIpcHandlers(); // Tüm köprüleri burada kuruyoruz
+  registerIpcHandlers(); // IPC köprülerini kur
+
+  try {
+    const configPath = path.join(app.getPath('userData'), 'config.json');
+    
+    if (fs.existsSync(configPath)) {
+      const configRaw = fs.readFileSync(configPath, 'utf-8');
+      const config = JSON.parse(configRaw);
+      
+      // Çıktıdan gördüğümüz üzere yol "savePath" anahtarında tutuluyor
+      const finalDbPath = config.savePath;
+
+      if (finalDbPath) {
+        // savePath zaten doğrudan .sqlite dosyasını gösterdiği için ekleme yapmadan veriyoruz
+        CreateDefaultDb(finalDbPath); // 1. Motoru çalıştır
+        initDrizzle();                // 2. ORM'i bağla
+        console.log("🟢 Veritabanı başarıyla bağlandı:", finalDbPath);
+      } else {
+        console.log("⚠️ Config okundu ama 'savePath' bulunamadı!");
+      }
+    }
+  } catch (error) {
+    console.error("🔴 Veritabanı başlatılırken hata oluştu:", error);
+  }
+
   createWindow();
 });

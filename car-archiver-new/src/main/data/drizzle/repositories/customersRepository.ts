@@ -1,10 +1,18 @@
 import { eq, and } from "drizzle-orm";
 import { InferSelectModel } from "drizzle-orm";
+
+
+
 // 1. DEĞİŞİKLİK: drizzleDb yerine useDb import edildi
 import { useDb } from "../drizzleDb"; 
 import { Customers } from "../schemas/customerSchemas/customersSchema";
+import { Cars } from '../schemas/carsSchema';
+import { Services } from '../schemas/servicesSchema';
 import { BaseRepository } from "./baseRepository";
 import { IApiResponse, ServiceResponse } from "../../../../models/response.model";
+
+import { PhoneNumbers } from "../schemas/customerSchemas/phoneNumbersSchema";
+import { Emails } from "../schemas/customerSchemas/emailsSchema";
 
 export class CustomersRepository extends BaseRepository<typeof Customers> {
   constructor() {
@@ -63,4 +71,62 @@ export class CustomersRepository extends BaseRepository<typeof Customers> {
       return this.handleError(err, "Failed to search customers.");
     }
   }
+
+// Müşteri Profili (Müşteri Bilgisi + Arabalar + Servisler + İletişim)
+  async getFullProfile(customerId: number) {
+    try {
+      const db = useDb();
+
+      const customerData = await db.select().from(Customers).where(eq(Customers.customerId, customerId));
+      const carsList = await db.select().from(Cars).where(eq(Cars.customerId, customerId));
+      const servicesList = await db.select().from(Services).where(eq(Services.customerId, customerId));
+      
+      // EKSİK OLAN KISIM: Telefon ve E-postaları çekiyoruz
+      const phonesList = await db.select().from(PhoneNumbers).where(eq(PhoneNumbers.customerId, customerId));
+      const emailsList = await db.select().from(Emails).where(eq(Emails.customerId, customerId));
+
+      return { 
+        success: true, 
+        data: { 
+          customer: customerData[0], 
+          cars: carsList, 
+          services: servicesList,
+          phones: phonesList, // Yüklemeye dahil edildi
+          emails: emailsList  // Yüklemeye dahil edildi
+        } 
+      };
+    } catch (err) {
+      console.error("Profil verisi çekilirken hata oluştu:", err);
+      return { success: false, data: null, message: "Profil yüklenemedi." };
+    }
+  }
+
+// Tüm müşterileri telefon ve e-postalarıyla birlikte liste için çeken metot
+  async getAllCustomersWithDetails() {
+    try {
+      const db = useDb();
+      const allCustomers = await db.select().from(Customers);
+      
+      const result = [];
+      for (const c of allCustomers) {
+        const phones = await db.select().from(PhoneNumbers).where(eq(PhoneNumbers.customerId, c.customerId));
+        const emails = await db.select().from(Emails).where(eq(Emails.customerId, c.customerId));
+        
+        result.push({
+          id: c.customerId,
+          fullName: `${c.firstName} ${c.lastName || ''}`.trim(),
+          nationalId: c.nationalId || '',
+          taxNumber: c.taxNumber || '',
+          // Arayüzün (UI) beklediği DTO formatına dönüştürüyoruz
+          phones: phones.map((p: any) => ({ countryCode: p.countryCode, number: p.phoneNumber })),
+          emails: emails.map((e: any) => ({ address: e.customerEmail }))
+        });
+      }
+      return { success: true, data: result };
+    } catch (err: any) {
+      console.error("🆘 Detaylı müşteri listesi çekilirken hata:", err);
+      return { success: false, message: err.message, data: [] };
+    }
+  }
+
 }

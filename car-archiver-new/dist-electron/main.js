@@ -5808,6 +5808,38 @@ const Customers = sqliteTable("Customers", {
   lastName: text("lastName"),
   taxNumber: text("taxNumber")
 });
+const Services = sqliteTable("Services", {
+  serviceId: integer("serviceId").primaryKey({ autoIncrement: true }),
+  carId: integer("carId").notNull(),
+  customerId: integer("customerId"),
+  applicationDate: integer("applicationDate", { mode: "timestamp" }),
+  appointmentDate: integer("appointmentDate", { mode: "timestamp" }),
+  jobDuration: integer("jobDuration", { mode: "timestamp" }),
+  deliveryDate: integer("deliveryDate", { mode: "timestamp" }),
+  km: real("km"),
+  complaints: text("complaints").notNull(),
+  extraRequests: text("extraRequests"),
+  faults: text("faults", { mode: "json" }).$type().default([]),
+  hasDamageOnReceive: integer("hasDamageOnReceive", { mode: "boolean" }).notNull().default(false),
+  damageOnReceive: text("damageOnReceive", { mode: "json" }).$type().default([]),
+  hasDamageDuringRepair: integer("hasDamageDuringRepair", { mode: "boolean" }).default(false),
+  damageDuringRepair: text("damageDuringRepair", { mode: "json" }).$type().default([]),
+  laborCharge: real("laborCharge"),
+  totalCharge: real("totalCharge"),
+  targetDeliveryDate: integer("targetDeliveryDate", { mode: "timestamp" }),
+  isDelivered: integer("isDelivered", { mode: "boolean" }).default(false)
+});
+const PhoneNumbers = sqliteTable("PhoneNumbers", {
+  phoneNumberId: integer("phoneNumberId").primaryKey({ autoIncrement: true }),
+  customerId: integer("customerId").notNull(),
+  countryCode: text("countryCode").notNull(),
+  phoneNumber: text("phoneNumber").notNull()
+});
+const Emails = sqliteTable("Emails", {
+  emailId: integer("emailId").primaryKey({ autoIncrement: true }),
+  customerId: integer("customerId").notNull(),
+  customerEmail: text("customerEmail").notNull()
+});
 class CustomersRepository extends BaseRepository {
   constructor() {
     super(Customers, "customerId");
@@ -5845,18 +5877,142 @@ class CustomersRepository extends BaseRepository {
       return this.handleError(err, "Failed to search customers.");
     }
   }
+  // Müşteri Profili (Müşteri Bilgisi + Arabalar + Servisler + İletişim)
+  async getFullProfile(customerId) {
+    try {
+      const db = useDb();
+      const customerData = await db.select().from(Customers).where(eq(Customers.customerId, customerId));
+      const carsList = await db.select().from(Cars).where(eq(Cars.customerId, customerId));
+      const servicesList = await db.select().from(Services).where(eq(Services.customerId, customerId));
+      const phonesList = await db.select().from(PhoneNumbers).where(eq(PhoneNumbers.customerId, customerId));
+      const emailsList = await db.select().from(Emails).where(eq(Emails.customerId, customerId));
+      return {
+        success: true,
+        data: {
+          customer: customerData[0],
+          cars: carsList,
+          services: servicesList,
+          phones: phonesList,
+          // Yüklemeye dahil edildi
+          emails: emailsList
+          // Yüklemeye dahil edildi
+        }
+      };
+    } catch (err) {
+      console.error("Profil verisi çekilirken hata oluştu:", err);
+      return { success: false, data: null, message: "Profil yüklenemedi." };
+    }
+  }
+  // Tüm müşterileri telefon ve e-postalarıyla birlikte liste için çeken metot
+  async getAllCustomersWithDetails() {
+    try {
+      const db = useDb();
+      const allCustomers = await db.select().from(Customers);
+      const result = [];
+      for (const c of allCustomers) {
+        const phones = await db.select().from(PhoneNumbers).where(eq(PhoneNumbers.customerId, c.customerId));
+        const emails = await db.select().from(Emails).where(eq(Emails.customerId, c.customerId));
+        result.push({
+          id: c.customerId,
+          fullName: `${c.firstName} ${c.lastName || ""}`.trim(),
+          nationalId: c.nationalId || "",
+          taxNumber: c.taxNumber || "",
+          // Arayüzün (UI) beklediği DTO formatına dönüştürüyoruz
+          phones: phones.map((p) => ({ countryCode: p.countryCode, number: p.phoneNumber })),
+          emails: emails.map((e) => ({ address: e.customerEmail }))
+        });
+      }
+      return { success: true, data: result };
+    } catch (err) {
+      console.error("🆘 Detaylı müşteri listesi çekilirken hata:", err);
+      return { success: false, message: err.message, data: [] };
+    }
+  }
 }
-sqliteTable("Emails", {
-  emailId: integer("emailId").primaryKey({ autoIncrement: true }),
-  customerId: integer("customerId").notNull(),
-  customerEmail: text("customerEmail").notNull()
-});
-sqliteTable("PhoneNumbers", {
-  phoneNumberId: integer("phoneNumberId").primaryKey({ autoIncrement: true }),
-  customerId: integer("customerId").notNull(),
-  countryCode: text("countryCode").notNull(),
-  phoneNumber: text("phoneNumber").notNull()
-});
+class EmailsRepository extends BaseRepository {
+  constructor() {
+    super(Emails, "emailId");
+  }
+  async getByCustomerId(customerId) {
+    try {
+      const result = await useDb().select().from(Emails).where(eq(Emails.customerId, customerId));
+      return ServiceResponse.success(
+        result,
+        "Customer emails fetched successfully."
+      );
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch customer emails.");
+    }
+  }
+  async getByCustomerForEmail(customerEmail) {
+    var _a2;
+    try {
+      const result = await useDb().select({ customerId: Emails.customerId }).from(Emails).where(eq(Emails.customerEmail, customerEmail));
+      const id = (_a2 = result[0]) == null ? void 0 : _a2.customerId;
+      if (id) {
+        return ServiceResponse.success(id, "Customer found.");
+      }
+      return ServiceResponse.fail("No customer found with this email.", "NOT_FOUND");
+    } catch (err) {
+      return this.handleError(err, "Failed to find customer by email.");
+    }
+  }
+  async isEmailUsed(email) {
+    try {
+      const result = await useDb().select().from(Emails).where(eq(Emails.customerEmail, email)).limit(1);
+      const isUsed = result.length > 0;
+      return ServiceResponse.success(isUsed, isUsed ? "Email is currently in use." : "Email is available.");
+    } catch (err) {
+      return this.handleError(err, "Failed to check email availability.");
+    }
+  }
+}
+class PhoneNumbersRepository extends BaseRepository {
+  constructor() {
+    super(PhoneNumbers, "phoneNumberId");
+  }
+  // Bir müşteriye ait telefonları listele
+  async getByCustomerId(customerId) {
+    try {
+      const result = await useDb().select().from(PhoneNumbers).where(eq(PhoneNumbers.customerId, customerId));
+      return ServiceResponse.success(
+        result,
+        "Customer phone numbers fetched successfully."
+      );
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch phone numbers by customer.");
+    }
+  }
+  // Telefon numarasına göre tekil arama
+  // limit(1) kullandığın için tek bir obje veya undefined döneriz
+  async getByPhoneNumber(phoneNumber) {
+    try {
+      const result = await useDb().select().from(PhoneNumbers).where(eq(PhoneNumbers.phoneNumber, phoneNumber)).limit(1);
+      const phoneRecord = result[0];
+      if (phoneRecord) {
+        return ServiceResponse.success(
+          phoneRecord,
+          "Phone number found."
+        );
+      }
+      return ServiceResponse.fail("Phone number not found.", "NOT_FOUND");
+    } catch (err) {
+      return this.handleError(err, "Failed to search by phone number.");
+    }
+  }
+  // Ülke koduna göre listeleme (Örn: +90 olanları getir)
+  async getByCountryCode(countryCode) {
+    try {
+      const result = await useDb().select().from(PhoneNumbers).where(eq(PhoneNumbers.countryCode, countryCode));
+      return ServiceResponse.success(
+        result,
+        `Phone numbers fetched for country code ${countryCode}.`
+      );
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch phone numbers by country code.");
+    }
+  }
+}
 sqliteTable("Parts", {
   partId: integer("partId").primaryKey({ autoIncrement: true }),
   carId: integer("carId").notNull(),
@@ -5864,27 +6020,6 @@ sqliteTable("Parts", {
   partName: text("partName").notNull(),
   partTax: real("partTax"),
   partPrice: real("partPrice")
-});
-const Services = sqliteTable("Services", {
-  serviceId: integer("serviceId").primaryKey({ autoIncrement: true }),
-  carId: integer("carId").notNull(),
-  customerId: integer("customerId"),
-  applicationDate: integer("applicationDate", { mode: "timestamp" }),
-  appointmentDate: integer("appointmentDate", { mode: "timestamp" }),
-  jobDuration: integer("jobDuration", { mode: "timestamp" }),
-  deliveryDate: integer("deliveryDate", { mode: "timestamp" }),
-  km: real("km"),
-  complaints: text("complaints").notNull(),
-  extraRequests: text("extraRequests"),
-  faults: text("faults", { mode: "json" }).$type().default([]),
-  hasDamageOnReceive: integer("hasDamageOnReceive", { mode: "boolean" }).notNull().default(false),
-  damageOnReceive: text("damageOnReceive", { mode: "json" }).$type().default([]),
-  hasDamageDuringRepair: integer("hasDamageDuringRepair", { mode: "boolean" }).default(false),
-  damageDuringRepair: text("damageDuringRepair", { mode: "json" }).$type().default([]),
-  laborCharge: real("laborCharge"),
-  totalCharge: real("totalCharge"),
-  targetDeliveryDate: integer("target_delivery_date", { mode: "timestamp" }),
-  isDelivered: integer("is_delivered", { mode: "boolean" }).default(false)
 });
 class ServicesRepository extends BaseRepository {
   constructor() {
@@ -5911,6 +6046,82 @@ class ServicesRepository extends BaseRepository {
     } catch (err) {
       return this.handleError(err, "Failed to fetch service history by customer.");
     }
+  }
+}
+class CustomerService {
+  constructor(customerRepository, phoneNumberRepository, emailRepository) {
+    __publicField(this, "customerRepository");
+    __publicField(this, "phoneNumberRepository");
+    __publicField(this, "emailRepository");
+    this.customerRepository = customerRepository;
+    this.phoneNumberRepository = phoneNumberRepository;
+    this.emailRepository = emailRepository;
+  }
+  async createCustomer(customer, phoneNumber, email) {
+    const response = await this.customerRepository.create(customer);
+    if (!response.success || !response.data) {
+      console.error("New customer not created! Message:", response.message);
+      return ServiceResponse.fail("Customer create failed.");
+    }
+    const customerId = response.data.customerId;
+    if (phoneNumber && phoneNumber.length > 0) {
+      for (const pn of phoneNumber) {
+        await this.phoneNumberRepository.create({ ...pn, customerId });
+      }
+      console.log("❇️ New customer phone numbers added.");
+    }
+    if (email && email.length > 0) {
+      for (const em of email) {
+        await this.emailRepository.create({ ...em, customerId });
+      }
+      console.log("❇️ New customer emails added.");
+    }
+    return ServiceResponse.success(customerId, "Müşteri başarıyla oluşturuldu.");
+  }
+  async updateCustomer(customerId, customer) {
+    if (!customerId) {
+      throw new Error("CustomerId not found");
+    }
+    const result = await this.customerRepository.update(customerId, customer);
+    if (!result.success) {
+      return ServiceResponse.fail(result.message, "Customer update failed.");
+    }
+    return ServiceResponse.success(result, `Customer ${result.message}`);
+  }
+  async deleteCustomer(customerId) {
+    if (!customerId) {
+      throw new Error("CustomerId value is null");
+    }
+    const result = await this.customerRepository.delete(customerId);
+    if (!result.success) {
+      return ServiceResponse.fail(result.message, "Customer delete failed.");
+    }
+    return ServiceResponse.success(result.message, "Customer deleted.");
+  }
+  async getAllCustomer() {
+    const result = await this.customerRepository.getAll();
+    if (!result.success) {
+      return ServiceResponse.fail(result.message || "Failed to fetch customers.");
+    }
+    const customers = result.data;
+    if (!customers || customers.length === 0) {
+      return ServiceResponse.success([], "No customers found.");
+    }
+    return ServiceResponse.success(customers, "Customers retrieved successfully.");
+  }
+  async getByNatId(nationalId) {
+    const result = await this.customerRepository.getByNatId(nationalId);
+    if (!result.success) {
+      return ServiceResponse.fail(result.message);
+    }
+    return ServiceResponse.success(result, result.message);
+  }
+  async getByNameSurname(firstName, lastName) {
+    const result = await this.customerRepository.getByNameSurname(firstName, lastName);
+    if (!result.success) {
+      return ServiceResponse.fail(result.message);
+    }
+    return ServiceResponse.success(result, result.message);
   }
 }
 const userDataPath = app.getPath("userData");
@@ -6013,11 +6224,50 @@ function registerIpcHandlers() {
   ipcMain.handle("get-all-customers", async () => {
     try {
       const customersRepo = new CustomersRepository();
-      const response = await customersRepo.getAll();
-      return response.success ? response.data : [];
+      const response = await customersRepo.getAllCustomersWithDetails();
+      if (response.success && response.data) {
+        return response.data;
+      }
+      return [];
     } catch (error) {
       console.error("🆘 Müşteriler çekilirken hata:", error.message);
       return [];
+    }
+  });
+  ipcMain.handle("add-customer", async (_event, payload) => {
+    try {
+      const customersRepo = new CustomersRepository();
+      const phoneNumbersRepo = new PhoneNumbersRepository();
+      const emailsRepo = new EmailsRepository();
+      const customerService = new CustomerService(customersRepo, phoneNumbersRepo, emailsRepo);
+      const customerBase = {
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        nationalId: payload.nationalId,
+        taxNumber: payload.taxNumber
+      };
+      const phoneNumbers = (payload.phones || []).map((p) => ({
+        countryCode: p.countryCode,
+        phoneNumber: p.number
+      }));
+      const emails = (payload.emails || []).map((e) => ({
+        customerEmail: e.address
+      }));
+      const response = await customerService.createCustomer(customerBase, phoneNumbers, emails);
+      return response;
+    } catch (error) {
+      console.error("🆘 Müşteri eklenirken hata:", error.message);
+      return { success: false, message: error.message };
+    }
+  });
+  ipcMain.handle("get-customer-profile", async (_event, customerId) => {
+    try {
+      const customersRepo = new CustomersRepository();
+      const response = await customersRepo.getFullProfile(customerId);
+      return response;
+    } catch (error) {
+      console.error("🆘 Müşteri profili alınırken hata:", error.message);
+      return { success: false, data: null };
     }
   });
 }

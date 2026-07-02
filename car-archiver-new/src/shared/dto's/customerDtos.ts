@@ -27,9 +27,8 @@ export interface CreateCustomerRequest {
 export interface CustomerViewDto {
   id: number;
   fullName: string;
-  nationalId: string;
-  
-  // UI'ya da dizi olarak dönüyoruz
-  emails: EmailInput[];
-  phones: PhoneInput[];
+  nationalId?: string; // Bu satırı ekle
+  taxNumber?: string;  // Havada kalan arkadaşı buraya ekle
+  phones?: { countryCode: string; number: string }[];
+  emails?: { address: string }[];
 }

@@ -7,6 +7,8 @@ import { CreateDefaultDb } from '../src/main/data/db';
 import { initDrizzle } from '../src/main/data/drizzle/drizzleDb';
 import fs from 'fs';
 
+import { seedCustomers } from '../src/test/customer/populateCustomers';
+
 const require = createRequire(import.meta.url)
 //const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -95,5 +97,6 @@ app.whenReady().then(async () => { // BURAYA async EKLENDİ
     console.error("🔴 Veritabanı başlatılırken hata oluştu:", error);
   }
 
+  //await seedCustomers(38);
   createWindow();
 });

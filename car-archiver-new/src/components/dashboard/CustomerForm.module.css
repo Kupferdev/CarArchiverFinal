@@ -1,0 +1,137 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 0.5px solid var(--border-color);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 600px;
+  box-shadow: var(--shadow-sm);
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-main);
+  margin-bottom: 20px;
+}
+
+.formGroup {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.input {
+  padding: 10px 12px;
+  background: var(--bg-panel);
+  border: 0.5px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-main);
+  font-size: 14px;
+  outline: none;
+  transition: border 0.2s ease;
+}
+
+.input:focus {
+  border-color: var(--accent-blue);
+}
+
+.submitBtn {
+  margin-top: 10px;
+  padding: 12px;
+  background: var(--accent-blue);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.submitBtn:hover {
+  opacity: 0.9;
+}
+
+.message {
+  margin-top: 15px;
+  font-size: 13px;
+  text-align: center;
+}
+.success { color: #10b981; }
+.error { color: #ef4444; }
+
+/* Dinamik Alanlar (Telefon / Email) */
+.dynamicRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.dynamicRow .input {
+  flex: 1;
+}
+
+.shortInput {
+  width: 80px;
+  flex: none !important;
+  text-align: center;
+}
+
+.iconBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.iconBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.iconBtn.danger:hover {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+.addBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--accent-blue);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-top: 4px;
+}
+
+.addBtn:hover {
+  text-decoration: underline;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 16px 0 8px 0;
+  padding-bottom: 4px;
+  border-bottom: 0.5px solid var(--border-color);
+}

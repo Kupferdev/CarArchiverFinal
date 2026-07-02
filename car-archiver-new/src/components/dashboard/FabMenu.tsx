@@ -1,14 +1,27 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useTabStore } from '../../store/tabStore';
 import styles from './FabMenu.module.css';
 
 const FabMenu: React.FC = () => {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
+  const { openTab } = useTabStore();
 
   return (
     <div className={styles.fabWrap}>
       <div className={`${styles.fabMenu} ${isOpen ? styles.open : ''}`}>
-        <div className={styles.fabItem}>
-          <div className={styles.fabLabel}>Yeni servis kaydı</div>
+        
+        {/* 1. YENİ SERVİS KAYDI BUTONU */}
+        <div 
+          className={styles.fabItem}
+          onClick={() => {
+            // Servis ekleme sayfasını yaptığımızda burası o formu açacak
+            openTab({ type: 'service', title: t('fabNewService') || 'Yeni servis kaydı', entityId: 999 });
+            setIsOpen(false); // Menüyü kapat
+          }}
+        >
+          <div className={styles.fabLabel}>{t('fabNewService') || 'Yeni servis kaydı'}</div>
           <button className={`${styles.fabDot} ${styles.blue}`}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <rect x="2" y="2" width="9" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
@@ -16,8 +29,17 @@ const FabMenu: React.FC = () => {
             </svg>
           </button>
         </div>
-        <div className={styles.fabItem}>
-          <div className={styles.fabLabel}>Yeni müşteri</div>
+
+        {/* 2. YENİ MÜŞTERİ BUTONU */}
+        <div 
+          className={styles.fabItem}
+          onClick={() => {
+            // entityId: 999 bizim "Yeni Ekleme Formu" anahtarımız
+            openTab({ type: 'customer', title: t('fabNewCustomer') || 'Yeni müşteri', entityId: 999 });
+            setIsOpen(false); // Menüyü kapat
+          }}
+        >
+          <div className={styles.fabLabel}>{t('fabNewCustomer') || 'Yeni müşteri'}</div>
           <button className={`${styles.fabDot} ${styles.teal}`}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <circle cx="7" cy="5" r="3" stroke="currentColor" strokeWidth="1.3"/>
@@ -25,7 +47,10 @@ const FabMenu: React.FC = () => {
             </svg>
           </button>
         </div>
+
       </div>
+      
+      {/* ANA FAB (ARTI / ÇARPI) BUTONU */}
       <button className={styles.fab} onClick={() => setIsOpen(!isOpen)}>
         {isOpen ? (
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">

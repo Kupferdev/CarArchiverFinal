@@ -7,6 +7,7 @@ export interface Tab {
   type: TabType;
   title: string;
   entityId?: number;
+  isProfile?: boolean;
 }
 
 interface TabStore {

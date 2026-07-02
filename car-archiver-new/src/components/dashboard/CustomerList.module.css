@@ -9,14 +9,6 @@
   box-shadow: var(--shadow-sm);
 }
 
-.header {
-  padding: 16px 20px;
-  border-bottom: 0.5px solid var(--border-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
 .title {
   font-size: 16px;
   font-weight: 500;
@@ -67,4 +59,50 @@
   text-align: center;
   color: var(--text-muted);
   font-size: 14px;
+}
+
+.actionBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  transition: all 0.2s;
+  display: inline-flex;
+  margin-right: 4px;
+}
+.actionBtn:hover {
+  background: var(--bg-hover);
+  color: var(--accent-blue);
+}
+.actionsCell {
+  text-align: right;
+}
+
+/* Eski .header'ı silebilirsin, artık her şeyi toolbar yapıyor */
+.toolbar {
+  padding: 16px 20px;
+  border-bottom: 0.5px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  /* margin-bottom sildik, tabloyla tam yapışık ve alt çizgili ayrılmış olacak */
+}
+
+.searchInput {
+  padding: 8px 16px; /* Yüksekliği biraz kıstık, başlıkla daha iyi hizalansın */
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-panel); /* Arka planı karttan ayırıp panel rengi yaptık (derinlik için) */
+  color: var(--text-main);
+  width: 320px;
+  font-size: 13px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.searchInput:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }

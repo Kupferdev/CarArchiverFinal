@@ -1,12 +1,16 @@
-import { CustomersRepository, EmailsRepository, PhoneNumbersRepository } from "../../main/data/drizzle/repositories";
+import { CustomersRepository } from "../../main/data/drizzle/repositories/customersRepository";
+import { EmailsRepository } from "../../main/data/drizzle/repositories/emailsRepository";
+import { PhoneNumbersRepository } from "../../main/data/drizzle/repositories/phoneNumbersRepository";
 import { CustomerService } from "../../services/customerService";
 import { faker } from "@faker-js/faker";
 import type { Customer } from "../../shared/types/customer/customer";
 import type { PhoneNumber } from "../../shared/types/customer/phoneNumber";
 import type { Email } from "../../shared/types/customer/email";
 
-
-async function populateCustomers(count = 100) {
+// Artık doğrudan Electron'un içinden çağrılacak saf fonksiyon
+export async function seedCustomers(count = 20) { // Test için 20 idealdir, istersen 100 yap
+  console.log(`⏳ Electron üzerinden ${count} adet müşteri basılıyor...`);
+  
   const service = new CustomerService(
     new CustomersRepository(),
     new PhoneNumbersRepository(),
@@ -21,32 +25,21 @@ async function populateCustomers(count = 100) {
       taxNumber: faker.string.numeric({ length: 10 })
     };
 
-    const phoneNumbers: PhoneNumber[] = Array.from(
-      { length: faker.number.int({ min: 1, max: 2 }) },
-      () => ({
-        countryCode: "+90",
-        phoneNumber: faker.phone.number() // artık mask parametresi yok
-      })
-    );
+    const phoneNumbers: PhoneNumber[] = [{
+      countryCode: "+90",
+      phoneNumber: faker.phone.number() 
+    }];
 
-    const emails: Email[] = Array.from(
-      { length: faker.number.int({ min: 1, max: 2 }) },
-      () => ({
-        customerEmail: faker.internet.email({
-          firstName: customer.firstName,
-          lastName: customer.lastName,
-        })
+    const emails: Email[] = [{
+      customerEmail: faker.internet.email({
+        firstName: customer.firstName,
+        lastName: customer.lastName,
       })
-    );
+    }];
 
     await service.createCustomer(customer, phoneNumbers, emails);
-    console.log(`✅ ${i + 1}. müşteri eklendi: ${customer.firstName} ${customer.lastName}`);
+    console.log(`✅ Müşteri Eklendi: ${customer.firstName} ${customer.lastName}`);
   }
 
-  console.log(`\n🔥 ${count} müşteri başarıyla eklendi!`);
+  console.log(`\n🔥 Veri basma işlemi tamamlandı!`);
 }
-
-populateCustomers().catch((err) => {
-  console.error("Populate hata:", err);
-  process.exit(1);
-});

@@ -26,6 +26,6 @@ export const Services = sqliteTable("Services", {
   laborCharge: real("laborCharge"),
   totalCharge: real("totalCharge"),
 
-  targetDeliveryDate: integer("target_delivery_date", { mode: "timestamp" }),
-  isDelivered: integer("is_delivered", { mode: "boolean" }).default(false),
+  targetDeliveryDate: integer("targetDeliveryDate", { mode: "timestamp" }),
+  isDelivered: integer("isDelivered", { mode: "boolean" }).default(false),
 });

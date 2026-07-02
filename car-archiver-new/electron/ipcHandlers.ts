@@ -10,6 +10,10 @@ import { CustomersRepository } from '../src/main/data/drizzle/repositories';
 import { CarsRepository } from '../src/main/data/drizzle/repositories';
 import { ServicesRepository } from '../src/main/data/drizzle/repositories';
 
+import { CustomerService } from "../src/services/customerService";
+import { PhoneNumbersRepository } from "../src/main/data/drizzle/repositories/phoneNumbersRepository";
+import { EmailsRepository } from "../src/main/data/drizzle/repositories/emailsRepository";
+
 const userDataPath = app.getPath('userData');
 const configPath = path.join(userDataPath, 'config.json');
 
@@ -140,17 +144,67 @@ export function registerIpcHandlers() {
     }
   });
 
-  // 8. Get All Customers
+// 8. Get All Customers (Telefon ve E-postalar Dahil)
   ipcMain.handle('get-all-customers', async () => {
     try {
       const customersRepo = new CustomersRepository();
-      const response = await customersRepo.getAll();
-      
-      // Yanıt başarılıysa veriyi (array), değilse boş dizi dön
-      return response.success ? response.data : [];
+      const response = await customersRepo.getAllCustomersWithDetails();
+      if (response.success && response.data) {
+        return response.data;
+      }
+      return [];
     } catch (error: any) {
       console.error('🆘 Müşteriler çekilirken hata:', error.message);
       return [];
+    }
+  });
+
+// 9. Add New Customer (Üç Tabloya Birden İlişkili Kayıt)
+  ipcMain.handle('add-customer', async (_event, payload: any) => {
+    try {
+      const customersRepo = new CustomersRepository();
+      const phoneNumbersRepo = new PhoneNumbersRepository();
+      const emailsRepo = new EmailsRepository();
+      
+      // Esas iş mantığının döndüğü servisi ayağa kaldırıyoruz
+      const customerService = new CustomerService(customersRepo, phoneNumbersRepo, emailsRepo);
+
+      // Arayüzden gelen DTO verilerini veritabanı modellerine eşliyoruz
+      const customerBase = {
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        nationalId: payload.nationalId,
+        taxNumber: payload.taxNumber
+      };
+
+      const phoneNumbers = (payload.phones || []).map((p: any) => ({
+        countryCode: p.countryCode,
+        phoneNumber: p.number
+      }));
+
+      const emails = (payload.emails || []).map((e: any) => ({
+        customerEmail: e.address
+      }));
+
+      // Servis katmanı üzerinden transaction güvenliğiyle 3 tabloya birden yazıyoruz
+      const response = await customerService.createCustomer(customerBase, phoneNumbers, emails);
+      return response;
+    } catch (error: any) {
+      console.error('🆘 Müşteri eklenirken hata:', error.message);
+      return { success: false, message: error.message };
+    }
+  });
+
+  // 10. Get Full Customer Profile
+  ipcMain.handle('get-customer-profile', async (_event, customerId: number) => {
+    try {
+      const customersRepo = new CustomersRepository();
+      // Az önce CustomersRepository'e eklediğin metodu çağırıyoruz
+      const response = await customersRepo.getFullProfile(customerId);
+      return response;
+    } catch (error: any) {
+      console.error('🆘 Müşteri profili alınırken hata:', error.message);
+      return { success: false, data: null };
     }
   });
 

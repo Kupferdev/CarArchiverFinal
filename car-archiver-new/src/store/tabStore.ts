@@ -1,59 +1,60 @@
 import { create } from 'zustand';
 
-export type TabType = 'home' | 'car' | 'customer' | 'service';
-
-export interface Tab {
-  id: string;
-  type: TabType;
+export interface TabPayload {
+  type: string;
   title: string;
   entityId?: number;
   isProfile?: boolean;
 }
 
-interface TabStore {
+export interface Tab extends TabPayload {
+  id: string;
+}
+
+interface TabState {
   tabs: Tab[];
   activeTabId: string;
-  openTab: (tab: Omit<Tab, 'id'>) => void;
+  openTab: (payload: TabPayload) => void;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
 }
 
-export const useTabStore = create<TabStore>((set, get) => ({
+export const useTabStore = create<TabState>((set) => ({
   tabs: [],
   activeTabId: 'home',
 
-  openTab: (tab) => {
-    const { tabs } = get();
-
-    // Aynı entity zaten açıksa sadece aktif et
-    const existing = tabs.find(
-      (t) => t.type === tab.type && t.entityId === tab.entityId
-    );
-    if (existing) {
-      set({ activeTabId: existing.id });
-      return;
+  openTab: (payload) => set((state) => {
+    // Benzersiz sekme ID'si oluşturuyoruz (Aynı kişi için birden fazla aynı sekme açılmasını engeller)
+    const tabId = `${payload.type}-${payload.entityId || 'main'}-${payload.isProfile ? 'profile' : 'form'}`;
+    
+    // Eğer sekme zaten açıksa, sadece ona odaklan (focus ol)
+    const existingTab = state.tabs.find((t) => t.id === tabId);
+    if (existingTab) {
+      return { activeTabId: existingTab.id };
     }
 
-    const id = `${tab.type}-${tab.entityId ?? Date.now()}`;
-    set({ tabs: [...tabs, { ...tab, id }], activeTabId: id });
-  },
+    // Yeni sekme oluştur (entityId ve isProfile değerlerini kaybetmeden ekliyoruz!)
+    const newTab: Tab = {
+      id: tabId,
+      type: payload.type,
+      title: payload.title,
+      entityId: payload.entityId, // KRİTİK NOKTA: Artık ID yutulmayacak
+      isProfile: payload.isProfile // Profil bilgisi de yutulmayacak
+    };
 
-  closeTab: (id) => {
-    const { tabs, activeTabId } = get();
-    const idx = tabs.findIndex((t) => t.id === id);
-    const remaining = tabs.filter((t) => t.id !== id);
+    return {
+      tabs: [...state.tabs, newTab],
+      activeTabId: newTab.id
+    };
+  }),
 
-    let nextActive = activeTabId;
-    if (activeTabId === id) {
-      if (remaining.length > 0) {
-        nextActive = remaining[Math.max(0, idx - 1)].id;
-      } else {
-        nextActive = 'home';
-      }
-    }
+  closeTab: (id) => set((state) => {
+    const newTabs = state.tabs.filter((t) => t.id !== id);
+    return {
+      tabs: newTabs,
+      activeTabId: newTabs.length > 0 ? newTabs[newTabs.length - 1].id : 'home'
+    };
+  }),
 
-    set({ tabs: remaining, activeTabId: nextActive });
-  },
-
-  setActiveTab: (id) => set({ activeTabId: id }),
+  setActiveTab: (id) => set({ activeTabId: id })
 }));

@@ -18,8 +18,20 @@ const HomePage: React.FC = () => {
     if (activeTabId === 'home') return <MainContent />;
     
     if (activeTab?.type === 'customer') {
+      // 1. Yeni Kayıt (999)
       if (activeTab.entityId === 999) return <CustomerForm />;
-      if (activeTab.isProfile) return <CustomerProfile customerId={activeTab.entityId} />;
+      
+      // 2. Profil Görüntüleme (ID'nin tanımsız olmadığını garanti altına alıyoruz)
+      if (activeTab.isProfile && activeTab.entityId !== undefined) {
+        return <CustomerProfile customerId={activeTab.entityId} />;
+      }
+      
+      // 3. DÜZENLEME MODU (ID'nin tanımsız olmadığını garanti altına alıyoruz)
+      if (activeTab.entityId !== undefined) {
+        return <CustomerForm customerId={activeTab.entityId} />; 
+      }
+      
+      // 4. Hiçbiri değilse Listeyi aç
       return <CustomerList />;
     }
     

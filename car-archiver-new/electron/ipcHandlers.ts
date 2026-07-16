@@ -208,4 +208,20 @@ export function registerIpcHandlers() {
     }
   });
 
+  // Müşteri Düzenleme Formu İçin Veri Çekme
+  ipcMain.handle('get-customer-edit', async (_event, customerId: number) => {
+    return await new CustomersRepository().getCustomerForEdit(customerId);
+  });
+
+// Müşteri Güncelleme
+  ipcMain.handle('update-customer', async (_event, req: any) => {
+    // req objesi formdan { id: 123, data: { firstName: '...', ... } } şeklinde gelecek
+    if (!req || !req.data) {
+      console.error("🆘 Arka uca veri ulaşmadı! Gelen istek:", req);
+      return { success: false, message: "Veri paketi boş geldi!" };
+    }
+
+    return await new CustomersRepository().updateCustomerFull(req.id, req.data);
+  });
+
 }

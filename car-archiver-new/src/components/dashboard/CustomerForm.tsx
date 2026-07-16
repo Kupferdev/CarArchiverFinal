@@ -1,23 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import styles from './CustomerForm.module.css';
 
-// DTO yapına uygun arayüzler
 interface PhoneInput { countryCode: string; number: string; }
 interface EmailInput { address: string; }
 
-// Forma customerId gelebilir (Düzenleme modu için)
 const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
   const [formData, setFormData] = useState({
     firstName: '', lastName: '', nationalId: '', taxNumber: ''
   });
   
-  // Dinamik Telefon ve E-posta Dizileri
   const [phones, setPhones] = useState<PhoneInput[]>([{ countryCode: '+90', number: '' }]);
   const [emails, setEmails] = useState<EmailInput[]>([{ address: '' }]);
   
   const [status, setStatus] = useState<{type: 'success' | 'error' | '', msg: string}>({ type: '', msg: '' });
 
-  // 1. Düzenleme Moduysa Verileri Çek
   useEffect(() => {
     if (customerId) {
       const fetchData = async () => {
@@ -47,7 +43,6 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Dinamik Alan Yönetimi
   const updatePhone = (index: number, field: keyof PhoneInput, value: string) => {
     const newPhones = [...phones];
     newPhones[index][field] = value;
@@ -66,26 +61,23 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
   const addEmail = () => setEmails([...emails, { address: '' }]);
   const removeEmail = (index: number) => setEmails(emails.filter((_, i) => i !== index));
 
-  // Akıllı Enter Tuşu Navigasyonu
   const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
     if (e.key === 'Enter') {
       const target = e.target as HTMLElement;
       
-      // Kaydet butonundaysa formu göndersin
       if (target.tagName === 'BUTTON' && (target as HTMLButtonElement).type === 'submit') {
         return;
       }
 
-      e.preventDefault(); // Varsayılan gönderimi durdur
+      e.preventDefault(); 
 
-      // Sadece inputları ve submit butonunu seç (ara butonları atla)
       const form = e.currentTarget;
       const focusableElements = form.querySelectorAll('input, button[type="submit"]');
       const focusableArray = Array.from(focusableElements) as HTMLElement[];
 
       const currentIndex = focusableArray.indexOf(target);
       if (currentIndex > -1 && currentIndex < focusableArray.length - 1) {
-        focusableArray[currentIndex + 1].focus(); // Bir sonrakine atla
+        focusableArray[currentIndex + 1].focus(); 
       }
     }
   };
@@ -99,7 +91,6 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
       return;
     }
 
-    // Boş olan telefon ve emailleri filtreleyip DTO'yu hazırlıyoruz
     const payload = {
       ...formData,
       phones: phones.filter(p => p.number.trim() !== ''),
@@ -109,17 +100,15 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
     try {
       let result;
       if (customerId) {
-        // Düzenleme İşlemi
-        result = await (window as any).electron.ipcRenderer.invoke('update-customer', customerId, payload);
+        const updatePayload = { id: customerId, data: payload };
+        result = await (window as any).electron.ipcRenderer.invoke('update-customer', updatePayload);
       } else {
-        // Yeni Kayıt İşlemi
         result = await (window as any).electron.ipcRenderer.invoke('add-customer', payload);
       }
       
       if (result.success) {
         setStatus({ type: 'success', msg: customerId ? 'Müşteri başarıyla güncellendi!' : 'Müşteri başarıyla eklendi!' });
         
-        // Sadece yeni kayıtsa formu sıfırla (Düzenlemede form dolu kalsın)
         if (!customerId) {
           setFormData({ firstName: '', lastName: '', nationalId: '', taxNumber: '' });
           setPhones([{ countryCode: '+90', number: '' }]);
@@ -137,67 +126,85 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
     <div className={styles.container}>
       <div className={styles.title}>{customerId ? 'Müşteriyi Düzenle' : 'Yeni Müşteri Ekle'}</div>
       
-      {/* onKeyDown buraya eklendi */}
-      <form onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
+      <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className={styles.formWrapper}>
         
-        {/* Temel Bilgiler */}
-        <div className={styles.formGroup}>
-          <label className={styles.label}>Ad *</label>
-          <input className={styles.input} name="firstName" value={formData.firstName} onChange={handleTextChange} placeholder="Müşteri adı" />
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.label}>Soyad</label>
-          <input className={styles.input} name="lastName" value={formData.lastName} onChange={handleTextChange} placeholder="Müşteri soyadı" />
-        </div>
-        
-        {/* İletişim Bilgileri (Dinamik) */}
-        <div className={styles.sectionTitle}>İletişim Bilgileri</div>
-        
-        <div className={styles.formGroup}>
-          <label className={styles.label}>Telefon Numaraları</label>
-          {phones.map((phone, index) => (
-            <div key={`phone-${index}`} className={styles.dynamicRow}>
-              <input className={`${styles.input} ${styles.shortInput}`} value={phone.countryCode} onChange={(e) => updatePhone(index, 'countryCode', e.target.value)} placeholder="+90" />
-              <input className={styles.input} value={phone.number} onChange={(e) => updatePhone(index, 'number', e.target.value)} placeholder="5XX XXX XX XX" />
-              {phones.length > 1 && (
-                <button type="button" onClick={() => removePhone(index)} className={`${styles.iconBtn} ${styles.danger}`}>✕</button>
-              )}
+        <div className={styles.formGrid}>
+          
+          {/* ================= 1. KOLON (Temel ve Resmi Bilgiler) ================= */}
+          <div className={styles.column}>
+            <div className={styles.sectionTitle}>Temel Bilgiler</div>
+            
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Ad *</label>
+              <input className={styles.input} name="firstName" value={formData.firstName} onChange={handleTextChange} placeholder="Müşteri adı" />
             </div>
-          ))}
-          <button type="button" onClick={addPhone} className={styles.addBtn}>+ Telefon Ekle</button>
-        </div>
-
-        <div className={styles.formGroup}>
-          <label className={styles.label}>E-Posta Adresleri</label>
-          {emails.map((email, index) => (
-            <div key={`email-${index}`} className={styles.dynamicRow}>
-              <input type="email" className={styles.input} value={email.address} onChange={(e) => updateEmail(index, e.target.value)} placeholder="ornek@mail.com" />
-              {emails.length > 1 && (
-                <button type="button" onClick={() => removeEmail(index)} className={`${styles.iconBtn} ${styles.danger}`}>✕</button>
-              )}
+            
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Soyad</label>
+              <input className={styles.input} name="lastName" value={formData.lastName} onChange={handleTextChange} placeholder="Müşteri soyadı" />
             </div>
-          ))}
-          <button type="button" onClick={addEmail} className={styles.addBtn}>+ E-Posta Ekle</button>
+
+            <div className={styles.sectionTitle} style={{ marginTop: '16px' }}>Resmi Bilgiler</div>
+            
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Kimlik No</label>
+              <input className={styles.input} name="nationalId" value={formData.nationalId} onChange={handleTextChange} placeholder="11 Haneli" maxLength={11} />
+            </div>
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Vergi No</label>
+              <input className={styles.input} name="taxNumber" value={formData.taxNumber} onChange={handleTextChange} placeholder="Kurumsal" />
+            </div>
+          </div>
+
+          {/* ================= 2. KOLON (Telefon Numaraları) ================= */}
+          <div className={styles.column}>
+            <div className={styles.sectionTitle}>Telefon Numaraları</div>
+            
+            <div className={styles.formGroup}>
+              {phones.map((phone, index) => (
+                <div key={`phone-${index}`} className={styles.dynamicRow}>
+                  <input className={`${styles.input} ${styles.shortInput}`} value={phone.countryCode} onChange={(e) => updatePhone(index, 'countryCode', e.target.value)} placeholder="+90" />
+                  <input className={styles.input} value={phone.number} onChange={(e) => updatePhone(index, 'number', e.target.value)} placeholder="5XX XXX XX XX" />
+                  {phones.length > 1 && (
+                    <button type="button" onClick={() => removePhone(index)} className={`${styles.iconBtn} ${styles.danger}`}>✕</button>
+                  )}
+                </div>
+              ))}
+              <button type="button" onClick={addPhone} className={styles.addBtn}>+ Telefon Ekle</button>
+            </div>
+          </div>
+
+          {/* ================= 3. KOLON (E-Posta Adresleri) ================= */}
+          <div className={styles.column}>
+            <div className={styles.sectionTitle}>E-Posta Adresleri</div>
+            
+            <div className={styles.formGroup}>
+              {emails.map((email, index) => (
+                <div key={`email-${index}`} className={styles.dynamicRow}>
+                  <input type="email" className={styles.input} value={email.address} onChange={(e) => updateEmail(index, e.target.value)} placeholder="ornek@mail.com" />
+                  {emails.length > 1 && (
+                    <button type="button" onClick={() => removeEmail(index)} className={`${styles.iconBtn} ${styles.danger}`}>✕</button>
+                  )}
+                </div>
+              ))}
+              <button type="button" onClick={addEmail} className={styles.addBtn}>+ E-Posta Ekle</button>
+            </div>
+          </div>
+
         </div>
 
-        {/* Kurumsal Bilgiler */}
-        <div className={styles.sectionTitle}>Resmi Bilgiler</div>
-        <div className={styles.dynamicRow}>
-          <div className={styles.formGroup} style={{ flex: 1 }}>
-            <label className={styles.label}>Kimlik No</label>
-            <input className={styles.input} name="nationalId" value={formData.nationalId} onChange={handleTextChange} placeholder="11 Haneli" maxLength={11} />
-          </div>
-          <div className={styles.formGroup} style={{ flex: 1 }}>
-            <label className={styles.label}>Vergi No</label>
-            <input className={styles.input} name="taxNumber" value={formData.taxNumber} onChange={handleTextChange} placeholder="Kurumsal" />
-          </div>
+        {/* ================= ALT KISIM (Buton ve Hata Mesajı) ================= */}
+        <div className={styles.formFooter}>
+          {status.msg && (
+            <div className={`${styles.message} ${styles[status.type]}`}>
+              {status.msg}
+            </div>
+          )}
+          <button type="submit" className={styles.submitBtn}>
+            {customerId ? 'Güncelle' : 'Kaydet'}
+          </button>
         </div>
         
-        <button type="submit" className={styles.submitBtn}>{customerId ? 'Güncelle' : 'Kaydet'}</button>
-
-        {status.msg && (
-          <div className={`${styles.message} ${styles[status.type]}`}>{status.msg}</div>
-        )}
       </form>
     </div>
   );

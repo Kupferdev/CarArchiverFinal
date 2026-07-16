@@ -5928,6 +5928,50 @@ class CustomersRepository extends BaseRepository {
       return { success: false, message: err.message, data: [] };
     }
   }
+  // Formu doldurmak için müşteriyi çeken metot
+  async getCustomerForEdit(customerId) {
+    try {
+      const db = useDb();
+      const customer = await db.select().from(Customers).where(eq(Customers.customerId, customerId));
+      const phones = await db.select().from(PhoneNumbers).where(eq(PhoneNumbers.customerId, customerId));
+      const emails = await db.select().from(Emails).where(eq(Emails.customerId, customerId));
+      return { success: true, data: { customer: customer[0], phones, emails } };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  }
+  // Müşteriyi telefon ve mailleriyle güncelleyen metot (Senkron Transaction ile)
+  async updateCustomerFull(customerId, data) {
+    try {
+      const db = useDb();
+      db.transaction((tx) => {
+        tx.update(Customers).set({
+          firstName: data.firstName,
+          lastName: data.lastName,
+          nationalId: data.nationalId,
+          taxNumber: data.taxNumber
+        }).where(eq(Customers.customerId, customerId)).run();
+        tx.delete(PhoneNumbers).where(eq(PhoneNumbers.customerId, customerId)).run();
+        if (data.phones && data.phones.length > 0) {
+          tx.insert(PhoneNumbers).values(data.phones.map((p) => ({
+            customerId,
+            countryCode: p.countryCode,
+            phoneNumber: p.number
+          }))).run();
+        }
+        tx.delete(Emails).where(eq(Emails.customerId, customerId)).run();
+        if (data.emails && data.emails.length > 0) {
+          tx.insert(Emails).values(data.emails.map((e) => ({
+            customerId,
+            customerEmail: e.address
+          }))).run();
+        }
+      });
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  }
 }
 class EmailsRepository extends BaseRepository {
   constructor() {
@@ -6269,6 +6313,16 @@ function registerIpcHandlers() {
       console.error("🆘 Müşteri profili alınırken hata:", error.message);
       return { success: false, data: null };
     }
+  });
+  ipcMain.handle("get-customer-edit", async (_event, customerId) => {
+    return await new CustomersRepository().getCustomerForEdit(customerId);
+  });
+  ipcMain.handle("update-customer", async (_event, req) => {
+    if (!req || !req.data) {
+      console.error("🆘 Arka uca veri ulaşmadı! Gelen istek:", req);
+      return { success: false, message: "Veri paketi boş geldi!" };
+    }
+    return await new CustomersRepository().updateCustomerFull(req.id, req.data);
   });
 }
 createRequire(import.meta.url);

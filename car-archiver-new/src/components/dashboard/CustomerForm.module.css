@@ -5,7 +5,8 @@
   border: 0.5px solid var(--border-color);
   border-radius: 12px;
   padding: 24px;
-  max-width: 600px;
+  height: 100%; /* Dış kutunun boyutu sabit kalır */
+  overflow: hidden; /* Dış kutunun kaymasını engelleriz */
   box-shadow: var(--shadow-sm);
 }
 
@@ -14,10 +15,47 @@
   font-weight: 500;
   color: var(--text-main);
   margin-bottom: 20px;
+  flex-shrink: 0;
+}
+
+.formWrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1; /* Form kalan tüm alanı kaplar */
+  overflow: hidden;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr; /* Formu eşit 3 SÜTUNA böler */
+  gap: 32px; /* Sütunlar arası boşluk */
+  flex: 1;
+  overflow: hidden; /* Sütunların dışarı taşmasını engeller */
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%; 
+  overflow-y: auto; /* Sütun içeriği çok uzarsa sadece bu sütun kayar */
+  padding-right: 12px; /* Kaydırma çubuğu için boşluk */
+}
+
+/* Scrollbar (Kaydırma Çubuğu) Tasarımı */
+.column::-webkit-scrollbar {
+  width: 6px;
+}
+.column::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 10px;
+}
+.column::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .formGroup {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -43,30 +81,14 @@
   border-color: var(--accent-blue);
 }
 
-.submitBtn {
-  margin-top: 10px;
-  padding: 12px;
-  background: var(--accent-blue);
-  color: white;
-  border: none;
-  border-radius: 8px;
+.sectionTitle {
   font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: opacity 0.2s;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0 0 8px 0;
+  padding-bottom: 4px;
+  border-bottom: 0.5px solid var(--border-color);
 }
-
-.submitBtn:hover {
-  opacity: 0.9;
-}
-
-.message {
-  margin-top: 15px;
-  font-size: 13px;
-  text-align: center;
-}
-.success { color: #10b981; }
-.error { color: #ef4444; }
 
 /* Dinamik Alanlar (Telefon / Email) */
 .dynamicRow {
@@ -81,7 +103,7 @@
 }
 
 .shortInput {
-  width: 80px;
+  width: 70px;
   flex: none !important;
   text-align: center;
 }
@@ -121,17 +143,44 @@
   cursor: pointer;
   padding: 4px 0;
   margin-top: 4px;
+  align-self: flex-start;
 }
 
 .addBtn:hover {
   text-decoration: underline;
 }
 
-.sectionTitle {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-main);
-  margin: 16px 0 8px 0;
-  padding-bottom: 4px;
-  border-bottom: 0.5px solid var(--border-color);
+.formFooter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end; /* Butonu sağ alt köşeye yaslar */
+  gap: 16px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+  margin-top: 20px;
+  flex-shrink: 0;
 }
+
+.submitBtn {
+  padding: 12px 24px;
+  background: var(--accent-blue);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.submitBtn:hover {
+  opacity: 0.9;
+}
+
+.message {
+  font-size: 13px;
+  text-align: center;
+  flex: 1;
+}
+.success { color: #10b981; }
+.error { color: #ef4444; }

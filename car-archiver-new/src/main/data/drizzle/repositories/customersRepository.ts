@@ -129,4 +129,55 @@ export class CustomersRepository extends BaseRepository<typeof Customers> {
     }
   }
 
+  // Formu doldurmak için müşteriyi çeken metot
+  async getCustomerForEdit(customerId: number) {
+    try {
+      const db = useDb();
+      const customer = await db.select().from(Customers).where(eq(Customers.customerId, customerId));
+      const phones = await db.select().from(PhoneNumbers).where(eq(PhoneNumbers.customerId, customerId));
+      const emails = await db.select().from(Emails).where(eq(Emails.customerId, customerId));
+      return { success: true, data: { customer: customer[0], phones, emails } };
+    } catch (err: any) {
+      return { success: false, message: err.message };
+    }
+  }
+
+// Müşteriyi telefon ve mailleriyle güncelleyen metot (Senkron Transaction ile)
+  async updateCustomerFull(customerId: number, data: any) {
+    try {
+      const db = useDb();
+      
+      // DİKKAT: better-sqlite3 senkron çalışır. async veya await YOK! İşlemlerin sonuna .run() eklenir.
+      db.transaction((tx) => {
+        // 1. Ana bilgileri güncelle
+        tx.update(Customers).set({
+          firstName: data.firstName,
+          lastName: data.lastName,
+          nationalId: data.nationalId,
+          taxNumber: data.taxNumber
+        }).where(eq(Customers.customerId, customerId)).run();
+
+        // 2. Eski telefonları sil, yenilerini kaydet
+        tx.delete(PhoneNumbers).where(eq(PhoneNumbers.customerId, customerId)).run();
+        if (data.phones && data.phones.length > 0) {
+          tx.insert(PhoneNumbers).values(data.phones.map((p: any) => ({
+            customerId, countryCode: p.countryCode, phoneNumber: p.number
+          }))).run();
+        }
+
+        // 3. Eski mailleri sil, yenilerini kaydet
+        tx.delete(Emails).where(eq(Emails.customerId, customerId)).run();
+        if (data.emails && data.emails.length > 0) {
+          tx.insert(Emails).values(data.emails.map((e: any) => ({
+            customerId, customerEmail: e.address
+          }))).run();
+        }
+      }); // Transaction bloğu bittiğinde veritabanına otomatik commit atılır.
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, message: err.message };
+    }
+  }
+
 }

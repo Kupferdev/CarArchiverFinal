@@ -224,4 +224,14 @@ export function registerIpcHandlers() {
     return await new CustomersRepository().updateCustomerFull(req.id, req.data);
   });
 
+  // Müşteri Silme Kanalı
+  ipcMain.handle('delete-customer', async (_event, req: { id: number, deleteRelated: boolean }) => {
+    return await new CustomersRepository().deleteCustomer(req.id, req.deleteRelated);
+  });
+
+  // Toplu Müşteri Silme Kanalı
+  ipcMain.handle('delete-customers-bulk', async (_event, req: { ids: number[], deleteRelated: boolean }) => {
+    return await new CustomersRepository().deleteCustomersBulk(req.ids, req.deleteRelated);
+  });
+
 }

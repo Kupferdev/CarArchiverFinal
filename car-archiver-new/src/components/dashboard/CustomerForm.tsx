@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styles from './CustomerForm.module.css';
+import { useToastStore } from '../../store/toastStore';
+import { useTabStore } from '../../store/tabStore'; // YENİ: Sekme kapatmak için
 
 interface PhoneInput { countryCode: string; number: string; }
 interface EmailInput { address: string; }
@@ -12,7 +14,12 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
   const [phones, setPhones] = useState<PhoneInput[]>([{ countryCode: '+90', number: '' }]);
   const [emails, setEmails] = useState<EmailInput[]>([{ address: '' }]);
   
-  const [status, setStatus] = useState<{type: 'success' | 'error' | '', msg: string}>({ type: '', msg: '' });
+  // Silme Modalı için Stateler
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteRelated, setDeleteRelated] = useState(false);
+
+  const { addToast } = useToastStore();
+  const { activeTabId, closeTab } = useTabStore(); // YENİ: İşlem bitince sekmeyi kapatacağız
 
   useEffect(() => {
     if (customerId) {
@@ -64,17 +71,13 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
     if (e.key === 'Enter') {
       const target = e.target as HTMLElement;
-      
       if (target.tagName === 'BUTTON' && (target as HTMLButtonElement).type === 'submit') {
         return;
       }
-
       e.preventDefault(); 
-
       const form = e.currentTarget;
       const focusableElements = form.querySelectorAll('input, button[type="submit"]');
       const focusableArray = Array.from(focusableElements) as HTMLElement[];
-
       const currentIndex = focusableArray.indexOf(target);
       if (currentIndex > -1 && currentIndex < focusableArray.length - 1) {
         focusableArray[currentIndex + 1].focus(); 
@@ -84,10 +87,9 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStatus({ type: '', msg: '' });
 
     if (!formData.firstName) {
-      setStatus({ type: 'error', msg: 'Ad alanı zorunludur!' });
+      addToast('Ad alanı zorunludur!', 'error');
       return;
     }
 
@@ -107,7 +109,7 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
       }
       
       if (result.success) {
-        setStatus({ type: 'success', msg: customerId ? 'Müşteri başarıyla güncellendi!' : 'Müşteri başarıyla eklendi!' });
+        addToast(customerId ? 'Müşteri başarıyla güncellendi!' : 'Yeni müşteri sisteme eklendi!', 'success');
         
         if (!customerId) {
           setFormData({ firstName: '', lastName: '', nationalId: '', taxNumber: '' });
@@ -115,10 +117,36 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
           setEmails([{ address: '' }]);
         }
       } else {
-        setStatus({ type: 'error', msg: 'İşlem başarısız: ' + result.message });
+        addToast('İşlem başarısız: ' + result.message, 'error');
       }
     } catch (error) {
-      setStatus({ type: 'error', msg: 'Bir hata oluştu.' });
+      addToast('Beklenmeyen bir hata oluştu.', 'error');
+    }
+  };
+
+  // --- SİLME İŞLEMLERİ ---
+  const confirmDelete = async () => {
+    if (!customerId) return;
+    
+    try {
+      const result = await (window as any).electron.ipcRenderer.invoke('delete-customer', {
+        id: customerId,
+        deleteRelated: deleteRelated
+      });
+
+      if (result.success) {
+        const successMsg = deleteRelated 
+          ? 'Müşteri ve bağlı tüm kayıtları başarıyla silindi.' 
+          : 'Müşteri başarıyla silindi.';
+        
+        addToast(successMsg, 'success');
+        setIsDeleteModalOpen(false);
+        closeTab(activeTabId); // Sildikten sonra içindeysek sekmeyi direkt kapat!
+      } else {
+        addToast('Silme işlemi başarısız: ' + result.message, 'error');
+      }
+    } catch (error) {
+      addToast('Beklenmeyen bir hata oluştu.', 'error');
     }
   };
 
@@ -129,23 +157,18 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
       <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className={styles.formWrapper}>
         
         <div className={styles.formGrid}>
-          
-          {/* ================= 1. KOLON (Temel ve Resmi Bilgiler) ================= */}
+          {/* ================= 1. KOLON ================= */}
           <div className={styles.column}>
             <div className={styles.sectionTitle}>Temel Bilgiler</div>
-            
             <div className={styles.formGroup}>
               <label className={styles.label}>Ad *</label>
               <input className={styles.input} name="firstName" value={formData.firstName} onChange={handleTextChange} placeholder="Müşteri adı" />
             </div>
-            
             <div className={styles.formGroup}>
               <label className={styles.label}>Soyad</label>
               <input className={styles.input} name="lastName" value={formData.lastName} onChange={handleTextChange} placeholder="Müşteri soyadı" />
             </div>
-
             <div className={styles.sectionTitle} style={{ marginTop: '16px' }}>Resmi Bilgiler</div>
-            
             <div className={styles.formGroup}>
               <label className={styles.label}>Kimlik No</label>
               <input className={styles.input} name="nationalId" value={formData.nationalId} onChange={handleTextChange} placeholder="11 Haneli" maxLength={11} />
@@ -156,10 +179,9 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
             </div>
           </div>
 
-          {/* ================= 2. KOLON (Telefon Numaraları) ================= */}
+          {/* ================= 2. KOLON ================= */}
           <div className={styles.column}>
             <div className={styles.sectionTitle}>Telefon Numaraları</div>
-            
             <div className={styles.formGroup}>
               {phones.map((phone, index) => (
                 <div key={`phone-${index}`} className={styles.dynamicRow}>
@@ -174,10 +196,9 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
             </div>
           </div>
 
-          {/* ================= 3. KOLON (E-Posta Adresleri) ================= */}
+          {/* ================= 3. KOLON ================= */}
           <div className={styles.column}>
             <div className={styles.sectionTitle}>E-Posta Adresleri</div>
-            
             <div className={styles.formGroup}>
               {emails.map((email, index) => (
                 <div key={`email-${index}`} className={styles.dynamicRow}>
@@ -190,22 +211,49 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
               <button type="button" onClick={addEmail} className={styles.addBtn}>+ E-Posta Ekle</button>
             </div>
           </div>
-
         </div>
 
-        {/* ================= ALT KISIM (Buton ve Hata Mesajı) ================= */}
+        {/* ================= ALT KISIM (BUTONLAR) ================= */}
         <div className={styles.formFooter}>
-          {status.msg && (
-            <div className={`${styles.message} ${styles[status.type]}`}>
-              {status.msg}
-            </div>
-          )}
+          {/* Eğer düzenleme modundaysak SİL butonunu sol tarafta göster */}
+          {customerId ? (
+            <button type="button" className={styles.deleteBtn} onClick={() => setIsDeleteModalOpen(true)}>
+              Müşteriyi Sil
+            </button>
+          ) : <div></div> /* Flex boşluğunu korumak için */}
+          
           <button type="submit" className={styles.submitBtn}>
             {customerId ? 'Güncelle' : 'Kaydet'}
           </button>
         </div>
-        
       </form>
+
+      {/* SİLME ONAY MODALI */}
+      {isDeleteModalOpen && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <h3 className={styles.modalTitle}>Müşteriyi Sil</h3>
+            <p className={styles.modalText}>
+              Bu müşteriyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+            </p>
+            
+            <label className={styles.checkboxLabel}>
+              <input 
+                type="checkbox" 
+                checked={deleteRelated} 
+                onChange={(e) => setDeleteRelated(e.target.checked)} 
+                className={styles.checkbox}
+              />
+              Müşteriye ait tüm araç ve servis kayıtlarını da sil.
+            </label>
+
+            <div className={styles.modalActions}>
+              <button className={styles.cancelBtn} onClick={() => setIsDeleteModalOpen(false)}>İptal</button>
+              <button className={styles.deleteConfirmBtn} onClick={confirmDelete}>Evet, Sil</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

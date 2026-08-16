@@ -10,6 +10,7 @@ import { Cars } from '../schemas/carsSchema';
 import { Services } from '../schemas/servicesSchema';
 import { BaseRepository } from "./baseRepository";
 import { IApiResponse, ServiceResponse } from "../../../../models/response.model";
+import { inArray } from 'drizzle-orm';
 
 import { PhoneNumbers } from "../schemas/customerSchemas/phoneNumbersSchema";
 import { Emails } from "../schemas/customerSchemas/emailsSchema";
@@ -179,5 +180,60 @@ export class CustomersRepository extends BaseRepository<typeof Customers> {
       return { success: false, message: err.message };
     }
   }
+
+  // Müşteriyi ve (istenirse) bağlı kayıtları silen metot
+  async deleteCustomer(customerId: number, deleteRelated: boolean) {
+    try {
+      const db = useDb();
+      
+      db.transaction((tx) => {
+        // 1. Telefon ve mailler müşteriye sıkı sıkıya bağlıdır, her halükarda silinir.
+        tx.delete(PhoneNumbers).where(eq(PhoneNumbers.customerId, customerId)).run();
+        tx.delete(Emails).where(eq(Emails.customerId, customerId)).run();
+
+        // 2. Kullanıcı araç ve servisleri de silmek istediyse:
+        if (deleteRelated) {
+          // İleride Arabalar ve Servisler tablolarını oluşturduğunda buraya onların silme kodunu da ekleyeceğiz.
+          // Örn: tx.delete(Cars).where(eq(Cars.customerId, customerId)).run();
+          // Örn: tx.delete(Services).where(eq(Services.customerId, customerId)).run();
+        }
+
+        // 3. Son olarak müşterinin kendisini sil
+        tx.delete(Customers).where(eq(Customers.customerId, customerId)).run();
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, message: err.message };
+    }
+  }
+
+// TOPLU SİLME METODU
+  async deleteCustomersBulk(customerIds: number[], deleteRelated: boolean) {
+    try {
+      const db = useDb();
+      
+      db.transaction((tx) => {
+        // Gelen ID listesindeki tüm telefon ve e-postaları sil
+        tx.delete(PhoneNumbers).where(inArray(PhoneNumbers.customerId, customerIds)).run();
+        tx.delete(Emails).where(inArray(Emails.customerId, customerIds)).run();
+
+        if (deleteRelated) {
+          // İleride buraya inArray ile toplu araba ve servis silme kodları gelecek
+        }
+
+        // Müşterileri topluca sil
+        tx.delete(Customers).where(inArray(Customers.customerId, customerIds)).run();
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, message: err.message };
+    }
+  }
+  
+
+
+
 
 }

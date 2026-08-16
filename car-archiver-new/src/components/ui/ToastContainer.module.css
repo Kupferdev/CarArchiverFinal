@@ -1,0 +1,75 @@
+.container {
+  position: fixed;
+  bottom: 40px; /* Aşağıdan mesafe */
+  right: 40px;  /* Sağdan mesafe (Sol ve ortalamayı iptal edip sağa aldık) */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 9999;
+  align-items: flex-end; /* Bildirim kutularını sağa yaslar */
+}
+
+.toast {
+  min-width: 320px;
+  padding: 16px 24px;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  /* Aşağıdan yukarı süzülerek girme animasyonu */
+  animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Üzerine gelince çok hafif büyür ve gölgesi artar */
+.toast:hover:not(.leaving) {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* Kaybolma (Geri Gitme) Sınıfı */
+.toast.leaving {
+  animation: slideDown 0.3s cubic-bezier(0.55, 0.085, 0.68, 0.53) forwards;
+}
+
+/* Modern, Degrade (Gradient) Renkler */
+.success {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.error {
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.info {
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Animasyon Kareleri */
+@keyframes slideUp {
+  from {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+}

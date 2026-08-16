@@ -5972,6 +5972,38 @@ class CustomersRepository extends BaseRepository {
       return { success: false, message: err.message };
     }
   }
+  // Müşteriyi ve (istenirse) bağlı kayıtları silen metot
+  async deleteCustomer(customerId, deleteRelated) {
+    try {
+      const db = useDb();
+      db.transaction((tx) => {
+        tx.delete(PhoneNumbers).where(eq(PhoneNumbers.customerId, customerId)).run();
+        tx.delete(Emails).where(eq(Emails.customerId, customerId)).run();
+        if (deleteRelated) {
+        }
+        tx.delete(Customers).where(eq(Customers.customerId, customerId)).run();
+      });
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  }
+  // TOPLU SİLME METODU
+  async deleteCustomersBulk(customerIds, deleteRelated) {
+    try {
+      const db = useDb();
+      db.transaction((tx) => {
+        tx.delete(PhoneNumbers).where(inArray(PhoneNumbers.customerId, customerIds)).run();
+        tx.delete(Emails).where(inArray(Emails.customerId, customerIds)).run();
+        if (deleteRelated) {
+        }
+        tx.delete(Customers).where(inArray(Customers.customerId, customerIds)).run();
+      });
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  }
 }
 class EmailsRepository extends BaseRepository {
   constructor() {
@@ -6323,6 +6355,12 @@ function registerIpcHandlers() {
       return { success: false, message: "Veri paketi boş geldi!" };
     }
     return await new CustomersRepository().updateCustomerFull(req.id, req.data);
+  });
+  ipcMain.handle("delete-customer", async (_event, req) => {
+    return await new CustomersRepository().deleteCustomer(req.id, req.deleteRelated);
+  });
+  ipcMain.handle("delete-customers-bulk", async (_event, req) => {
+    return await new CustomersRepository().deleteCustomersBulk(req.ids, req.deleteRelated);
   });
 }
 createRequire(import.meta.url);

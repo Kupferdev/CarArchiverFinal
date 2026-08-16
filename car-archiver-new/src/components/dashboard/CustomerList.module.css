@@ -106,3 +106,204 @@
   border-color: var(--accent-blue);
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
+
+/* Çöp Kutusu İkonu Hover Efekti */
+.deleteIconBtn:hover {
+  background-color: #fee2e2 !important;
+  color: #ef4444 !important;
+}
+
+/* Modal (Uyarı Penceresi) Tasarımı */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+}
+
+.modalContent {
+  background: var(--bg-card, #1e1e2d);
+  border: 1px solid var(--border-color, #2b2b40);
+  border-radius: 12px;
+  padding: 24px;
+  width: 400px;
+  max-width: 90%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.modalTitle {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  color: var(--text-main, #ffffff);
+}
+
+.modalText {
+  font-size: 14px;
+  color: var(--text-muted, #a1a1aa);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #ef4444; /* Tehlikeli işlem olduğunu belli etmek için kırmızı ton */
+  background: #fee2e2;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 24px;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.cancelBtn {
+  padding: 10px 16px;
+  background: transparent;
+  border: 1px solid var(--border-color, #2b2b40);
+  color: var(--text-main, #ffffff);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.cancelBtn:hover {
+  background: var(--bg-hover, #2b2b40);
+}
+
+.deleteConfirmBtn {
+  padding: 10px 16px;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+
+.deleteConfirmBtn:hover {
+  opacity: 0.9;
+}
+
+.addNewBtn {
+  padding: 8px 16px;
+  background: var(--accent-blue, #3b82f6);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  white-space: nowrap; /* Yazının alt satıra kaymasını engeller */
+}
+
+.addNewBtn:hover {
+  opacity: 0.9;
+}
+
+/* Toplu Silme Butonu Rengi */
+.bulkDeleteBtn {
+  background: #ef4444 !important;
+}
+.bulkDeleteBtn:hover {
+  background: #dc2626 !important;
+}
+
+/* Checkbox Tasarımı */
+.rowCheckbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent-blue, #3b82f6);
+}
+
+/* Seçili Satır Vurgusu */
+.selectedRow {
+  background-color: rgba(59, 130, 246, 0.05) !important;
+}
+
+/* Çoklu Seçim Modu Başlatma Butonu */
+.selectionModeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  color: var(--text-muted, #a1a1aa);
+  border: 1px solid var(--border-color, #2b2b40);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.selectionModeBtn:hover {
+  color: var(--accent-blue, #3b82f6);
+  border-color: var(--accent-blue, #3b82f6);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+/* Seçim Modundan Vazgeçme Butonu */
+/* Çarpı (X) Butonu Özel Hover Efekti */
+.cancelIconBtn:hover {
+  color: #ef4444 !important;
+  border-color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
+.cancelModeBtn:hover {
+  background: var(--bg-hover, #2b2b40);
+  color: var(--text-main, #ffffff);
+}
+
+/* Toplu Silme Çöp Kutusu İkonu (Kırmızı) */
+.bulkDeleteIconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(239, 68, 68, 0.1) !important;
+  color: #ef4444 !important;
+  border: 1px solid #ef4444 !important;
+  padding: 0 12px !important;
+  height: 36px;
+  border-radius: 8px;
+}
+
+.bulkDeleteIconBtn:hover {
+  background-color: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+/* Checkbox Tasarımı */
+.rowCheckbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent-blue, #3b82f6);
+}
+
+/* Seçili Satır Vurgusu */
+.selectedRow {
+  background-color: rgba(59, 130, 246, 0.05) !important;
+}

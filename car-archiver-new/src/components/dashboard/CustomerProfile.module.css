@@ -111,3 +111,57 @@
   height: 100%;
   color: var(--text-muted);
 }
+
+/* Sol Panel (Sidebar) Alt Kısım - Silme Butonu Alanı */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebarActions {
+  margin-top: auto; /* İçeriği en alta iter */
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color, #2b2b40);
+}
+
+.profileDeleteBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 10px;
+  background: rgba(239, 68, 68, 0.05);
+  color: #ef4444;
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.profileDeleteBtn:hover {
+  background: #ef4444;
+  color: white;
+}
+
+/* Modal Stilleri */
+.modalOverlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+}
+.modalContent {
+  background: var(--bg-secondary, #1e1e2d);
+  padding: 24px; border-radius: 12px; width: 400px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  border: 1px solid var(--border-color, #2b2b40);
+}
+.modalTitle { margin: 0 0 12px 0; font-size: 18px; font-weight: 600; }
+.modalText { margin-bottom: 20px; font-size: 14px; color: var(--text-muted, #a1a1aa); line-height: 1.5; }
+.checkboxLabel { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); cursor: pointer; margin-bottom: 24px;}
+.modalActions { display: flex; justify-content: flex-end; gap: 12px; }
+.cancelBtn { padding: 8px 16px; background: transparent; color: var(--text-main); border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; transition: 0.2s;}
+.cancelBtn:hover { background: var(--bg-hover, #2b2b40); }
+.deleteConfirmBtn { padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; transition: 0.2s;}
+.deleteConfirmBtn:hover { background: #dc2626; }

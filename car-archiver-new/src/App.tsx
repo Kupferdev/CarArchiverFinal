@@ -7,6 +7,9 @@ import './setup/setup.css';
 import HomePage from './components/dashboard/HomePage';
 import { useInitialConfig } from './hooks/useInitialConfig';
 
+// Kendi yazdığımız ToastContainer bileşenini içeri alıyoruz
+import ToastContainer from './components/ui/ToastContainer';
+
 function App() {
   const { isFirstRun } = useInitialConfig();
   const { i18n } = useTranslation();
@@ -43,7 +46,14 @@ function App() {
   // Konfigürasyon veya dil ayarı henüz yüklenmediyse ekrana bir şey basma
   if (isFirstRun === null || !isLangReady) return null;
 
-  return isFirstRun ? <SetupWizard /> : <HomePage />;
+  // Ana sayfayı veya kurulum ekranını render ederken altına ToastContainer'ı da ekliyoruz
+  // React Fragment (<> ... </>) kullanarak iki bileşeni tek bir çatı altında topluyoruz
+  return (
+    <>
+      {isFirstRun ? <SetupWizard /> : <HomePage />}
+      <ToastContainer />
+    </>
+  );
 }
 
 export default App;

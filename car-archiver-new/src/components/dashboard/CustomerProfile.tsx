@@ -1,9 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import styles from './CustomerProfile.module.css';
+import { useToastStore } from '../../store/toastStore';
+import { useTabStore } from '../../store/tabStore';
 
 const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Silme Modalı için Stateler
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteRelated, setDeleteRelated] = useState(false);
+
+  const { addToast } = useToastStore();
+  const { activeTabId, closeTab } = useTabStore();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -15,6 +24,30 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
     };
     fetchProfile();
   }, [customerId]);
+
+  // --- SİLME İŞLEMLERİ ---
+  const confirmDelete = async () => {
+    try {
+      const result = await (window as any).electron.ipcRenderer.invoke('delete-customer', {
+        id: customerId,
+        deleteRelated: deleteRelated
+      });
+
+      if (result.success) {
+        const successMsg = deleteRelated 
+          ? 'Müşteri ve bağlı tüm kayıtları başarıyla silindi.' 
+          : 'Müşteri başarıyla silindi.';
+        
+        addToast(successMsg, 'success');
+        setIsDeleteModalOpen(false);
+        closeTab(activeTabId); // Sildikten sonra sekmeyi direkt kapat!
+      } else {
+        addToast('Silme işlemi başarısız: ' + result.message, 'error');
+      }
+    } catch (error) {
+      addToast('Beklenmeyen bir hata oluştu.', 'error');
+    }
+  };
 
   if (loading) return <div className={styles.loading}>Profil Yükleniyor...</div>;
   if (!profile || !profile.customer) return <div className={styles.loading}>Müşteri bulunamadı.</div>;
@@ -61,6 +94,14 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
         ) : (
           <div className={styles.listItem}>Kayıtlı e-posta yok.</div>
         )}
+
+        {/* SOL PANEL ALT KISIM: SİLME BUTONU */}
+        <div className={styles.sidebarActions}>
+          <button className={styles.profileDeleteBtn} onClick={() => setIsDeleteModalOpen(true)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '8px' }}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            Müşteriyi Sil
+          </button>
+        </div>
       </aside>
 
       {/* SAĞ PANEL: Arabalar ve Servisler */}
@@ -93,6 +134,33 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
         </div>
 
       </div>
+
+      {/* SİLME ONAY MODALI */}
+      {isDeleteModalOpen && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <h3 className={styles.modalTitle}>Müşteriyi Sil</h3>
+            <p className={styles.modalText}>
+              <strong>{profile.customer.firstName} {profile.customer.lastName}</strong> isimli müşteriyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+            </p>
+            
+            <label className={styles.checkboxLabel}>
+              <input 
+                type="checkbox" 
+                checked={deleteRelated} 
+                onChange={(e) => setDeleteRelated(e.target.checked)} 
+                className={styles.checkbox}
+              />
+              Müşteriye ait tüm araç ve servis kayıtlarını da sil.
+            </label>
+
+            <div className={styles.modalActions}>
+              <button className={styles.cancelBtn} onClick={() => setIsDeleteModalOpen(false)}>İptal</button>
+              <button className={styles.deleteConfirmBtn} onClick={confirmDelete}>Evet, Sil</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

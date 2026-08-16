@@ -19,8 +19,7 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
   const [deleteRelated, setDeleteRelated] = useState(false);
 
   const { addToast } = useToastStore();
-  const { activeTabId, closeTab } = useTabStore(); // YENİ: İşlem bitince sekmeyi kapatacağız
-
+  const { activeTabId, closeTab, openTab } = useTabStore();
   useEffect(() => {
     if (customerId) {
       const fetchData = async () => {
@@ -108,13 +107,31 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
         result = await (window as any).electron.ipcRenderer.invoke('add-customer', payload);
       }
       
-      if (result.success) {
+if (result.success) {
         addToast(customerId ? 'Müşteri başarıyla güncellendi!' : 'Yeni müşteri sisteme eklendi!', 'success');
         
         if (!customerId) {
-          setFormData({ firstName: '', lastName: '', nationalId: '', taxNumber: '' });
-          setPhones([{ countryCode: '+90', number: '' }]);
-          setEmails([{ address: '' }]);
+          // YENİ KAYIT DURUMU: Backend'den dönen yeni müşterinin ID'sini alıyoruz
+          // (Backend'in yapısına göre result.id, result.data.id veya result.data şeklinde gelebilir)
+          const newCustomerId = result.data?.id || result.id || result.data; 
+
+          if (newCustomerId && typeof newCustomerId === 'number') {
+            // 1. Yeni eklenen kişinin profil sekmesini aç
+            openTab({ 
+              type: 'customer', 
+              title: `${formData.firstName} ${formData.lastName} Profili`, 
+              entityId: newCustomerId, 
+              isProfile: true 
+            });
+            // 2. Şu anki "Yeni Kayıt" form sekmesini kapat
+            closeTab(activeTabId);
+          } else {
+            // Eğer backend'den yeni ID dönmezse (hata payı), formu temizleyip ekranda bırak
+            setFormData({ firstName: '', lastName: '', nationalId: '', taxNumber: '' });
+            setPhones([{ countryCode: '+90', number: '' }]);
+            setEmails([{ address: '' }]);
+            console.warn("Backend yeni oluşturulan müşterinin ID'sini döndürmediği için profile yönlendirilemedi.");
+          }
         }
       } else {
         addToast('İşlem başarısız: ' + result.message, 'error');

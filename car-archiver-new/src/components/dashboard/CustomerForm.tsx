@@ -232,16 +232,39 @@ if (result.success) {
 
         {/* ================= ALT KISIM (BUTONLAR) ================= */}
         <div className={styles.formFooter}>
-          {/* Eğer düzenleme modundaysak SİL butonunu sol tarafta göster */}
-          {customerId ? (
-            <button type="button" className={styles.deleteBtn} onClick={() => setIsDeleteModalOpen(true)}>
-              Müşteriyi Sil
-            </button>
-          ) : <div></div> /* Flex boşluğunu korumak için */}
           
+          {/* SOL TARAF: Silme ve Profile Gitme Butonları (Sadece Düzenleme Modunda) */}
+          <div className={styles.footerLeftActions}>
+            {customerId && (
+              <>
+                <button type="button" className={styles.deleteBtn} onClick={() => setIsDeleteModalOpen(true)}>
+                  Müşteriyi Sil
+                </button>
+                <button 
+                  type="button" 
+                  className={styles.viewProfileBtn} 
+                  onClick={() => {
+                    openTab({ 
+                      type: 'customer', 
+                      title: `${formData.firstName} ${formData.lastName} Profili`, 
+                      entityId: customerId, 
+                      isProfile: true 
+                    });
+                    closeTab(activeTabId); // Düzenleme sekmesini kapatıp profili aç
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                  Profili Görüntüle
+                </button>
+              </>
+            )}
+          </div>
+          
+          {/* SAĞ TARAF: Kaydetme Butonu */}
           <button type="submit" className={styles.submitBtn}>
             {customerId ? 'Güncelle' : 'Kaydet'}
           </button>
+          
         </div>
       </form>
 

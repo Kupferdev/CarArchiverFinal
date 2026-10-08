@@ -3,38 +3,48 @@ var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { en
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha, _ia, _ja, _ka, _la, _ma, _na, _oa, _pa, _qa, _ra, _sa, _ta, _ua, _va, _wa, _xa, _ya, _za, _Aa, _Ba, _Ca, _Da, _Ea, _Fa, _Ga, _Ha, _Ia, _Ja, _Ka, _La, _Ma, _Na, _Oa, _Pa, _Qa, _Ra, _Sa, _Ta, _Ua, _Va, _Wa, _Xa, _Ya, _Za, __a, _$a, _ab, _bb, _cb, _db, _eb, _fb, _gb, _hb, _ib, _jb, _kb, _lb, _mb, _nb, _ob, _pb, _qb, _rb, _sb, _tb, _ub, _vb, _wb, _xb, _yb, _zb, _Ab, _Bb, _Cb, _Db, _Eb, _Fb, _Gb, _Hb, _Ib, _Jb, _Kb, _Lb, _Mb, _Nb, _Ob, _Pb, _Qb, _Rb, _Sb, _Tb, _Ub, _Vb, _Wb, _Xb, _Yb, _Zb, __b, _$b, _ac, _bc, _cc;
 import { app, ipcMain, dialog, BrowserWindow } from "electron";
-import { createRequire } from "node:module";
-import { fileURLToPath as fileURLToPath$1 } from "node:url";
+import { fileURLToPath } from "node:url";
 import path$1 from "node:path";
+import fs$1 from "node:fs";
 import fs from "fs";
 import path from "path";
 import Client from "better-sqlite3";
-import { fileURLToPath } from "url";
-import { exec } from "child_process";
-const currentFilePath$1 = fileURLToPath(import.meta.url);
-path.dirname(currentFilePath$1);
+import { execFile } from "child_process";
 let dbInstance = null;
+let activeDbPath = null;
+function normalizeDbPath(dbPath) {
+  return path.normalize(path.resolve(dbPath));
+}
 function CreateDefaultDb(dbPath) {
+  const dbPathFinal = normalizeDbPath(dbPath);
   if (dbInstance) {
-    console.log("ℹ️ Database connection is already open.");
-    return dbInstance;
+    if (activeDbPath === dbPathFinal) {
+      return dbInstance;
+    }
+    throw new Error("A different database is already open. Close the current database before switching.");
   }
-  const dbPathFinal = path.normalize(dbPath);
   try {
     const folder = path.dirname(dbPathFinal);
-    if (!fs.existsSync(folder)) {
-      fs.mkdirSync(folder, { recursive: true });
-    }
-    dbInstance = new Client(dbPathFinal);
-    dbInstance.pragma("journal_mode = WAL");
-    dbInstance.pragma("synchronous = NORMAL");
-    dbInstance.pragma("foreign_keys = on");
-    console.log("❇️ DB Started: ", dbPathFinal);
-    return dbInstance;
+    fs.mkdirSync(folder, { recursive: true });
+    const instance = new Client(dbPathFinal);
+    instance.pragma("journal_mode = WAL");
+    instance.pragma("synchronous = NORMAL");
+    instance.pragma("foreign_keys = ON");
+    dbInstance = instance;
+    activeDbPath = dbPathFinal;
+    console.log("❇️ DB Started:", dbPathFinal);
+    return instance;
   } catch (err) {
     console.error("🆘 DB Error:", err);
     throw err;
   }
+}
+function closeDb() {
+  if (!dbInstance) return;
+  dbInstance.close();
+  dbInstance = null;
+  activeDbPath = null;
+  console.log("🔒 DB connection closed.");
 }
 function getDb() {
   if (!dbInstance) {
@@ -4836,13 +4846,14 @@ function drizzle(...params) {
 let drizzleDb = null;
 function initDrizzle() {
   if (drizzleDb) {
-    console.log("ℹ️ Drizzle ORM is already initialized.");
     return drizzleDb;
   }
-  const db = getDb();
-  drizzleDb = drizzle(db);
+  drizzleDb = drizzle(getDb());
   console.log("❇️ Drizzle ORM initialized successfully.");
   return drizzleDb;
+}
+function closeDrizzle() {
+  drizzleDb = null;
 }
 function useDb() {
   if (!drizzleDb) {
@@ -4883,6 +4894,7 @@ async function createBodyTypesTable() {
       console.log(" ❇️ Base body types added the table.");
     } catch (err) {
       console.error("🆘 Base body types insert error:", err.message);
+      throw err;
     }
   } catch (err) {
     console.log("🆘 BodyTypes table not created", err.message);
@@ -4891,7 +4903,7 @@ async function createBodyTypesTable() {
 }
 const Brands = sqliteTable("Brands", {
   brandId: integer("brandId").primaryKey({ autoIncrement: true }),
-  brandName: text("brandName").notNull()
+  brandName: text("brandName").notNull().unique()
 });
 const baseCarBrands = [
   { brandName: "Abarth" },
@@ -5032,19 +5044,23 @@ function createCarsTable() {
   const db = getDb();
   const createCarTableSql = `
     CREATE TABLE IF NOT EXISTS Cars (
-    carId INTEGER PRIMARY KEY AUTOINCREMENT,
-    customerId INTEGER,
-    oldCustomerId JSON NULL,
-    brandId INTEGER NULL,
-    modelId INTEGER NULL,
-    year INTEGER NULL,
-    vinNumber TEXT NULL,
-    plateNumber TEXT NULL,
-    km REAL NULL,
-    fuelType INTEGER NULL,
-    bodyType INTEGER NULL
+      carId INTEGER PRIMARY KEY AUTOINCREMENT,
+      customerId INTEGER,
+      oldCustomerId JSON NULL,
+      brandId INTEGER NULL,
+      model TEXT NULL,
+      year INTEGER NULL,
+      vinNumber TEXT NULL,
+      plateNumber TEXT NULL,
+      km REAL NULL,
+      fuelType INTEGER NULL,
+      bodyType INTEGER NULL,
+      engineVolumeCc INTEGER NULL,
+      notes TEXT NULL,
+      FOREIGN KEY (customerId) REFERENCES Customers(customerId) ON DELETE SET NULL,
+      FOREIGN KEY (brandId) REFERENCES Brands(brandId) ON DELETE SET NULL
     )
-`;
+  `;
   try {
     db.exec(createCarTableSql);
     console.log("❇️ Car table created");
@@ -5069,6 +5085,43 @@ function createCustomersTable() {
     console.log("❇️ Customer table created");
   } catch (err) {
     console.log("🆘Customers table not created", err.message);
+    throw err;
+  }
+}
+function createCustomerEmailsTable() {
+  const db = getDb();
+  const createCustomerEmailTableSql = `
+    CREATE TABLE IF NOT EXISTS Emails (
+        emailId INTEGER PRIMARY KEY AUTOINCREMENT,
+        customerId INTEGER NOT NULL,
+        customerEmail TEXT NOT NULL,
+        FOREIGN KEY (customerId) REFERENCES Customers(customerId) ON DELETE CASCADE
+    )
+`;
+  try {
+    db.exec(createCustomerEmailTableSql);
+    console.log("❇️ Email table created");
+  } catch (err) {
+    console.log("🆘Email table not created", err.message);
+    throw err;
+  }
+}
+function createCustomerPhoneNumbersTable() {
+  const db = getDb();
+  const createPhoneNumbersTableSql = `
+    CREATE TABLE IF NOT EXISTS PhoneNumbers(
+        phoneNumberId INTEGER PRIMARY KEY AUTOINCREMENT,
+        customerId  INTEGER NOT NULL,
+        countryCode TEXT NOT NULL,
+        phoneNumber TEXT NOT NULL,
+        FOREIGN KEY (customerId) REFERENCES Customers(customerId) ON DELETE CASCADE
+        );
+`;
+  try {
+    db.exec(createPhoneNumbersTableSql);
+    console.log("❇️ PhoneNumbers table created!");
+  } catch (err) {
+    console.log("🆘PhoneNumber table not created", err.message);
     throw err;
   }
 }
@@ -5098,7 +5151,6 @@ async function createFuelTypesTable() {
     console.log("❇️ FuelTypes table created");
     try {
       await orm.insert(FuelTypes).values(baseFuelTypes).onConflictDoNothing();
-      ;
       console.log(" ❇️ Base Fuel types added the table.");
     } catch (err) {
       console.error("🆘 Base Fuel types insert error:", err.message);
@@ -5138,20 +5190,22 @@ function createServicesTable() {
             customerId INTEGER NULL,
             applicationDate DATETIME NULL,
             appointmentDate DATETIME NULL,
-            jobDuration DATETIME NULL,
+            jobDuration INTEGER NULL,
             deliveryDate DATETIME NULL,
             km REAL NULL,
             complaints TEXT NOT NULL,
             extraRequests TEXT NULL,
             faults JSON NULL,
             hasDamageOnReceive BOOLEAN NOT NULL,
-            damageonReceive JSON NULL,
+            damageOnReceive JSON NULL,
             hasDamageDuringRepair BOOLEAN NULL,
             damageDuringRepair JSON NULL,
             laborCharge REAL NULL,
             totalCharge REAL NULL,
             targetDeliveryDate DATETIME NULL,
-            isDelivered BOOLEAN NULL
+            isDelivered BOOLEAN NULL,
+            FOREIGN KEY (carId) REFERENCES Cars(carId) ON DELETE CASCADE,
+            FOREIGN KEY (customerId) REFERENCES Customers(customerId) ON DELETE SET NULL
         )
     `;
   try {
@@ -5159,41 +5213,6 @@ function createServicesTable() {
     console.log("❇️ Services table created");
   } catch (err) {
     console.log("🆘 Services table not created", err.message);
-    throw err;
-  }
-}
-function createCustomerPhoneNumbersTable() {
-  const db = getDb();
-  const createPhoneNumbersTableSql = `
-    CREATE TABLE IF NOT EXISTS PhoneNumbers(
-        phoneNumberId INTEGER PRIMARY KEY AUTOINCREMENT,
-        customerId  INTEGER NOT NULL,
-        countryCode TEXT NOT NULL,
-        phoneNumber TEXT NOT NULL
-        );
-`;
-  try {
-    db.exec(createPhoneNumbersTableSql);
-    console.log("❇️ PhoneNumbers table created!");
-  } catch (err) {
-    console.log("🆘PhoneNumber table not created", err.message);
-    throw err;
-  }
-}
-function createCustomerEmailsTable() {
-  const db = getDb();
-  const createCustomerEmailTableSql = `
-    CREATE TABLE IF NOT EXISTS Emails (
-        emailId INTEGER PRIMARY KEY AUTOINCREMENT,
-        customerId INTEGER NOT NULL,
-        customerEmail TEXT NOT NULL
-    )
-`;
-  try {
-    db.exec(createCustomerEmailTableSql);
-    console.log("❇️ Email table created");
-  } catch (err) {
-    console.log("🆘Email table not created", err.message);
     throw err;
   }
 }
@@ -5301,7 +5320,10 @@ async function createFuelTypesTranslationsTable() {
     db.exec(baseFuelTypeTranslationsSql);
     console.log("❇️ Translations Base FuelType translations table created");
     try {
-      await orm.insert(fuelTypeTranslations).values(baseFuelTypeTranslations).onConflictDoNothing();
+      const existing = db.prepare("SELECT COUNT(*) AS count FROM FuelTypeTranslations").get();
+      if (existing.count === 0) {
+        await orm.insert(fuelTypeTranslations).values(baseFuelTypeTranslations);
+      }
       console.log("❇️ Translations Base FuelType insert success");
     } catch (err) {
       console.log("🆘 Translations Base FuelType not insert.", err.message);
@@ -5471,7 +5493,10 @@ async function createBodyTypesTranslationsTable() {
     db.exec(baseBodyTypeTranslationsSql);
     console.log("❇️ Translations Base body translations table created");
     try {
-      await orm.insert(bodyTypeTranslations).values(baseBodyTypeTranslations).onConflictDoNothing();
+      const existing = db.prepare("SELECT COUNT(*) AS count FROM BodyTypeTranslations").get();
+      if (existing.count === 0) {
+        await orm.insert(bodyTypeTranslations).values(baseBodyTypeTranslations);
+      }
       console.log("❇️ Translations Base body types insert success");
     } catch (err) {
       console.log("🆘 Translations Base body types not insert.", err.message);
@@ -5482,25 +5507,333 @@ async function createBodyTypesTranslationsTable() {
     throw err;
   }
 }
-async function CreateDefaultDbTables() {
-  try {
-    console.log("⏳ Starting table creation process...");
-    await createCustomersTable();
-    await createBrandsTable();
-    await createFuelTypesTable();
-    await createBodyTypesTable();
-    await createCarsTable();
-    await createFuelTypesTranslationsTable();
-    await createBodyTypesTranslationsTable();
-    await createCustomerPhoneNumbersTable();
-    await createCustomerEmailsTable();
-    await createServicesTable();
-    await createPartsTable();
-    console.log("❇️ All database tables created successfully.");
-  } catch (error) {
-    console.error("🆘 Setup aborted:", error.message);
-    throw error;
+const CURRENT_SCHEMA_VERSION = 6;
+const ATOMIC_MIGRATIONS = /* @__PURE__ */ new Set([1, 4, 6]);
+function tableHasForeignKey(tableName, fromColumn, targetTable, onDelete) {
+  const db = getDb();
+  const rows = db.pragma(`foreign_key_list(${tableName})`);
+  return rows.some(
+    (row) => row.from === fromColumn && row.table === targetTable && row.on_delete.toUpperCase() === onDelete.toUpperCase()
+  );
+}
+function assertNoOrphans() {
+  const db = getDb();
+  const checks = [
+    ["PhoneNumbers", "customerId", "Customers", false],
+    ["Emails", "customerId", "Customers", false],
+    ["Cars", "customerId", "Customers", true],
+    ["Services", "customerId", "Customers", true],
+    ["Services", "carId", "Cars", false]
+  ];
+  for (const [child, column, parent, nullable] of checks) {
+    const condition = nullable ? `c.${column} IS NOT NULL AND c.${column} NOT IN (SELECT p.${parent === "Customers" ? "customerId" : "carId"} FROM ${parent} p)` : `c.${column} NOT IN (SELECT p.${parent === "Customers" ? "customerId" : "carId"} FROM ${parent} p)`;
+    const row = db.prepare(`SELECT COUNT(*) AS count FROM ${child} c WHERE ${condition}`).get();
+    if (row.count > 0) {
+      throw new Error(
+        `Database migration stopped: ${row.count} orphaned ${child}.${column} record(s) reference missing ${parent} records.`
+      );
+    }
   }
+}
+function migrateCustomerRelationships() {
+  const db = getDb();
+  const requirements = [
+    ["PhoneNumbers", "customerId", "Customers", "CASCADE"],
+    ["Emails", "customerId", "Customers", "CASCADE"],
+    ["Cars", "customerId", "Customers", "SET NULL"],
+    ["Services", "carId", "Cars", "CASCADE"],
+    ["Services", "customerId", "Customers", "SET NULL"]
+  ];
+  const needsMigration = requirements.some(
+    ([table, column, parent, action]) => !tableHasForeignKey(table, column, parent, action)
+  );
+  if (!needsMigration) return;
+  assertNoOrphans();
+  db.pragma("foreign_keys = OFF");
+  const carColumns = db.pragma("table_info(Cars)");
+  const legacyCarsUseModelId = carColumns.some((column) => column.name === "modelId");
+  const carsHaveEngineVolume = carColumns.some((column) => column.name === "engineVolumeCc");
+  const carsHaveNotes = carColumns.some((column) => column.name === "notes");
+  try {
+    db.transaction(() => {
+      db.exec(`
+        CREATE TABLE PhoneNumbers_new (
+          phoneNumberId INTEGER PRIMARY KEY AUTOINCREMENT,
+          customerId INTEGER NOT NULL,
+          countryCode TEXT NOT NULL,
+          phoneNumber TEXT NOT NULL,
+          FOREIGN KEY (customerId) REFERENCES Customers(customerId) ON DELETE CASCADE
+        );
+        INSERT INTO PhoneNumbers_new SELECT phoneNumberId, customerId, countryCode, phoneNumber FROM PhoneNumbers;
+        DROP TABLE PhoneNumbers;
+        ALTER TABLE PhoneNumbers_new RENAME TO PhoneNumbers;
+
+        CREATE TABLE Emails_new (
+          emailId INTEGER PRIMARY KEY AUTOINCREMENT,
+          customerId INTEGER NOT NULL,
+          customerEmail TEXT NOT NULL,
+          FOREIGN KEY (customerId) REFERENCES Customers(customerId) ON DELETE CASCADE
+        );
+        INSERT INTO Emails_new SELECT emailId, customerId, customerEmail FROM Emails;
+        DROP TABLE Emails;
+        ALTER TABLE Emails_new RENAME TO Emails;
+
+        CREATE TABLE Cars_new (
+          carId INTEGER PRIMARY KEY AUTOINCREMENT,
+          customerId INTEGER,
+          oldCustomerId JSON NULL,
+          brandId INTEGER NULL,
+          model TEXT NULL,
+          year INTEGER NULL,
+          vinNumber TEXT NULL,
+          plateNumber TEXT NULL,
+          km REAL NULL,
+          fuelType INTEGER NULL,
+          bodyType INTEGER NULL,
+          engineVolumeCc INTEGER NULL,
+          notes TEXT NULL,
+          FOREIGN KEY (customerId) REFERENCES Customers(customerId) ON DELETE SET NULL
+        );
+
+        INSERT INTO Cars_new (
+          carId, customerId, oldCustomerId, brandId, model, year,
+          vinNumber, plateNumber, km, fuelType, bodyType, engineVolumeCc, notes
+        )
+        SELECT
+          carId, customerId, oldCustomerId, brandId, ${legacyCarsUseModelId ? "NULL" : "model"}, year,
+          vinNumber, plateNumber, km, fuelType, bodyType,
+          ${carsHaveEngineVolume ? "engineVolumeCc" : "NULL"}, ${carsHaveNotes ? "notes" : "NULL"}
+        FROM Cars;
+
+        DROP TABLE Cars;
+        ALTER TABLE Cars_new RENAME TO Cars;
+
+        CREATE TABLE Services_new (
+          serviceId INTEGER PRIMARY KEY AUTOINCREMENT,
+          carId INTEGER NOT NULL,
+          customerId INTEGER NULL,
+          applicationDate DATETIME NULL,
+          appointmentDate DATETIME NULL,
+          jobDuration INTEGER NULL,
+          deliveryDate DATETIME NULL,
+          km REAL NULL,
+          complaints TEXT NOT NULL,
+          extraRequests TEXT NULL,
+          faults JSON NULL,
+          hasDamageOnReceive BOOLEAN NOT NULL,
+          damageOnReceive JSON NULL,
+          hasDamageDuringRepair BOOLEAN NULL,
+          damageDuringRepair JSON NULL,
+          laborCharge REAL NULL,
+          totalCharge REAL NULL,
+          targetDeliveryDate DATETIME NULL,
+          isDelivered BOOLEAN NULL,
+          FOREIGN KEY (carId) REFERENCES Cars(carId) ON DELETE CASCADE,
+          FOREIGN KEY (customerId) REFERENCES Customers(customerId) ON DELETE SET NULL
+        );
+        INSERT INTO Services_new SELECT serviceId, carId, customerId, applicationDate, appointmentDate, jobDuration, deliveryDate, km, complaints, extraRequests, faults, hasDamageOnReceive, damageOnReceive, hasDamageDuringRepair, damageDuringRepair, laborCharge, totalCharge, targetDeliveryDate, isDelivered FROM Services;
+        DROP TABLE Services;
+        ALTER TABLE Services_new RENAME TO Services;
+      `);
+    })();
+  } finally {
+    db.pragma("foreign_keys = ON");
+  }
+  const violations = db.pragma("foreign_key_check");
+  if (violations.length > 0) {
+    throw new Error(`Database migration failed: ${violations.length} foreign key violation(s) remain.`);
+  }
+}
+function migrateCarBrandAndModel() {
+  const db = getDb();
+  const columns = db.pragma("table_info(Cars)");
+  const hasModelColumn = columns.some((column) => column.name === "model");
+  const hasModelIdColumn = columns.some((column) => column.name === "modelId");
+  const hasBrandIdColumn = columns.some((column) => column.name === "brandId");
+  if (!hasBrandIdColumn) {
+    throw new Error("Database migration stopped: Cars.brandId column is missing.");
+  }
+  const hasBrandForeignKey = tableHasForeignKey(
+    "Cars",
+    "brandId",
+    "Brands",
+    "SET NULL"
+  );
+  if (hasModelColumn && !hasModelIdColumn && hasBrandForeignKey) {
+    return;
+  }
+  const orphanBrands = db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM Cars
+      WHERE brandId IS NOT NULL
+        AND brandId NOT IN (SELECT brandId FROM Brands)
+    `).get();
+  if (orphanBrands.count > 0) {
+    throw new Error(
+      `Database migration stopped: ${orphanBrands.count} car(s) reference missing Brands records.`
+    );
+  }
+  db.pragma("foreign_keys = OFF");
+  const carColumns = db.pragma("table_info(Cars)");
+  const carsHaveEngineVolume = carColumns.some((column) => column.name === "engineVolumeCc");
+  const carsHaveNotes = carColumns.some((column) => column.name === "notes");
+  try {
+    db.transaction(() => {
+      db.exec(`
+        CREATE TABLE Cars_new (
+          carId INTEGER PRIMARY KEY AUTOINCREMENT,
+          customerId INTEGER,
+          oldCustomerId JSON NULL,
+          brandId INTEGER NULL,
+          model TEXT NULL,
+          year INTEGER NULL,
+          vinNumber TEXT NULL,
+          plateNumber TEXT NULL,
+          km REAL NULL,
+          fuelType INTEGER NULL,
+          bodyType INTEGER NULL,
+          engineVolumeCc INTEGER NULL,
+          notes TEXT NULL,
+          FOREIGN KEY (customerId) REFERENCES Customers(customerId) ON DELETE SET NULL,
+          FOREIGN KEY (brandId) REFERENCES Brands(brandId) ON DELETE SET NULL
+        );
+
+        INSERT INTO Cars_new (
+          carId, customerId, oldCustomerId, brandId, model, year,
+          vinNumber, plateNumber, km, fuelType, bodyType, engineVolumeCc, notes
+        )
+        SELECT
+          carId, customerId, oldCustomerId, brandId, NULL, year,
+          vinNumber, plateNumber, km, fuelType, bodyType,
+          ${carsHaveEngineVolume ? "engineVolumeCc" : "NULL"}, ${carsHaveNotes ? "notes" : "NULL"}
+        FROM Cars;
+
+        DROP TABLE Cars;
+        ALTER TABLE Cars_new RENAME TO Cars;
+      `);
+    })();
+  } finally {
+    db.pragma("foreign_keys = ON");
+  }
+  const violations = db.pragma("foreign_key_check");
+  if (violations.length > 0) {
+    throw new Error(
+      `Car brand/model migration failed: ${violations.length} foreign key violation(s) remain.`
+    );
+  }
+}
+async function runMigration(version) {
+  switch (version) {
+    case 1:
+      await createCustomersTable();
+      await createBrandsTable();
+      await createFuelTypesTable();
+      await createBodyTypesTable();
+      await createCarsTable();
+      await createFuelTypesTranslationsTable();
+      await createBodyTypesTranslationsTable();
+      await createCustomerPhoneNumbersTable();
+      await createCustomerEmailsTable();
+      await createServicesTable();
+      await createPartsTable();
+      break;
+    case 2:
+      migrateCustomerRelationships();
+      break;
+    case 3:
+      migrateCustomerRelationships();
+      break;
+    case 4:
+      getDb().exec("UPDATE Services SET jobDuration = NULL WHERE jobDuration IS NOT NULL");
+      break;
+    case 5:
+      migrateCarBrandAndModel();
+      break;
+    case 6:
+      {
+        const db = getDb();
+        const columns = db.pragma("table_info(Cars)");
+        if (!columns.some((column) => column.name === "engineVolumeCc")) {
+          db.exec("ALTER TABLE Cars ADD COLUMN engineVolumeCc INTEGER NULL");
+        }
+        if (!columns.some((column) => column.name === "notes")) {
+          db.exec("ALTER TABLE Cars ADD COLUMN notes TEXT NULL");
+        }
+      }
+      break;
+    default:
+      throw new Error(`Unknown database migration: ${version}`);
+  }
+}
+async function runDatabaseMigrations() {
+  const db = getDb();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version INTEGER PRIMARY KEY,
+      appliedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  const appliedRows = db.prepare("SELECT version FROM schema_migrations ORDER BY version").all();
+  const applied = new Set(appliedRows.map((row) => row.version));
+  for (let version = 1; version <= CURRENT_SCHEMA_VERSION; version += 1) {
+    if (applied.has(version)) continue;
+    if (ATOMIC_MIGRATIONS.has(version)) {
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        await runMigration(version);
+        db.prepare("INSERT INTO schema_migrations (version) VALUES (?)").run(version);
+        db.exec("COMMIT");
+      } catch (error) {
+        if (db.inTransaction) db.exec("ROLLBACK");
+        throw error;
+      }
+    } else {
+      await runMigration(version);
+      db.prepare("INSERT INTO schema_migrations (version) VALUES (?)").run(version);
+    }
+    console.log(`❇️ Database migration ${version} applied.`);
+  }
+}
+async function CreateDefaultDbTables() {
+  await runDatabaseMigrations();
+}
+const CONFIG_FILE_NAME = "config.json";
+function getConfigPath() {
+  return path.join(app.getPath("userData"), CONFIG_FILE_NAME);
+}
+function getConfig() {
+  const configPath = getConfigPath();
+  if (!fs.existsSync(configPath)) return null;
+  try {
+    const raw = fs.readFileSync(configPath, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (!parsed.language || !parsed.savePath || parsed.eulaAccepted !== true) {
+      return null;
+    }
+    const normalizedDbPath = path.normalize(path.resolve(parsed.savePath));
+    if (path.basename(normalizedDbPath) !== "data_carArchiver.sqlite" || !fs.existsSync(normalizedDbPath) || !fs.statSync(normalizedDbPath).isFile()) {
+      return null;
+    }
+    return {
+      language: parsed.language,
+      savePath: normalizedDbPath,
+      eulaAccepted: parsed.eulaAccepted,
+      theme: parsed.theme === "dark" ? "dark" : "light",
+      onboardingCompleted: parsed.onboardingCompleted ?? true
+    };
+  } catch (error) {
+    console.error("🆘 Config could not be read:", error);
+    return null;
+  }
+}
+function saveConfig(config) {
+  const configPath = getConfigPath();
+  const directory = path.dirname(configPath);
+  fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
+}
+function hasConfig() {
+  return getConfig() !== null;
 }
 class ServiceResponse {
   // Başarılı Tekil Veri
@@ -5542,9 +5875,8 @@ class ServiceResponse {
     return {
       success: false,
       status: "error",
-      message: message + (error.message ? `: ${error.message}` : ""),
-      data: null
-      // Error detayını güvenlik için data'ya koymuyoruz, logluyoruz.
+      message,
+      data: void 0
     };
   }
   // Validasyon Hatası (Formlar için)
@@ -5565,12 +5897,13 @@ class BaseRepository {
     this.idColumn = idColumn;
   }
   handleError(error, defaultMessage) {
-    var _a2;
     console.error("❌ Database Error:", error);
-    if (error.code === "SQLITE_CONSTRAINT_UNIQUE") {
+    const message = error instanceof Error ? error.message : "";
+    const code = typeof error === "object" && error !== null && "code" in error ? error.code : void 0;
+    if (code === "SQLITE_CONSTRAINT_UNIQUE") {
       return ServiceResponse.fail("This record already exists.", "UNIQUE_CONSTRAINT");
     }
-    if ((_a2 = error.message) == null ? void 0 : _a2.includes("not been initialized")) {
+    if (message.includes("not been initialized")) {
       return ServiceResponse.error(error, "Database connection is not ready.");
     }
     return ServiceResponse.error(error, defaultMessage);
@@ -5662,18 +5995,46 @@ class BaseRepository {
     }
   }
 }
+class BrandsRepository extends BaseRepository {
+  constructor() {
+    super(Brands, "brandId");
+  }
+  async findByName(brandName) {
+    try {
+      const normalizedName = brandName.trim();
+      const result = await useDb().select().from(Brands).where(
+        sql`LOWER(${Brands.brandName}) = LOWER(${normalizedName})`
+      ).limit(1);
+      if (result.length > 0) {
+        return ServiceResponse.success(result[0], "Brand found.");
+      }
+      return ServiceResponse.success(void 0, "Brand not found.");
+    } catch (error) {
+      return this.handleError(error, "Failed to find brand.");
+    }
+  }
+}
+const Customers = sqliteTable("Customers", {
+  customerId: integer("customerId").primaryKey({ autoIncrement: true }),
+  nationalId: text("nationalId"),
+  firstName: text("firstName").notNull(),
+  lastName: text("lastName"),
+  taxNumber: text("taxNumber")
+});
 const Cars = sqliteTable("Cars", {
   carId: integer("carId").primaryKey({ autoIncrement: true }),
-  customerId: integer("customerId"),
+  customerId: integer("customerId").references(() => Customers.customerId, { onDelete: "set null" }),
   oldCustomerId: text("oldCustomerId", { mode: "json" }).$type().default([]),
-  brandId: integer("brandId"),
-  modelId: integer("modelId"),
+  brandId: integer("brandId").references(() => Brands.brandId, { onDelete: "set null" }),
+  model: text("model"),
   year: integer("year"),
   vinNumber: text("vinNumber"),
   plateNumber: text("plateNumber"),
   km: real("km"),
   fuelType: integer("fuelType"),
-  bodyType: integer("bodyType")
+  bodyType: integer("bodyType"),
+  engineVolumeCc: integer("engineVolumeCc"),
+  notes: text("notes")
 });
 class CarsRepository extends BaseRepository {
   constructor() {
@@ -5791,30 +6152,108 @@ class CarsRepository extends BaseRepository {
         return ServiceResponse.fail("Car not found.", "NOT_FOUND");
       }
       const currentIds = car.oldCustomerId ?? [];
-      if (currentIds.length === 0) {
-        return ServiceResponse.success([], "No old customers found.");
-      }
-      const idList = currentIds.map((id) => Number(id));
+      const idList = currentIds.map((id) => Number(id)).filter(Number.isInteger);
       return ServiceResponse.success(idList, "Old customers retrieved successfully.");
     } catch (err) {
       return this.handleError(err, "Failed to get old customers.");
     }
   }
+  async removeOldCustomer(carId, oldCustomerIdToRemove) {
+    try {
+      const result = await useDb().select().from(Cars).where(eq(Cars.carId, carId));
+      const car = result[0];
+      if (!car) return ServiceResponse.fail("Car not found.", "NOT_FOUND");
+      const currentIds = car.oldCustomerId ?? [];
+      const idToRemove = oldCustomerIdToRemove.toString();
+      const updatedList = currentIds.filter((id) => id !== idToRemove);
+      await useDb().update(Cars).set({ oldCustomerId: updatedList }).where(eq(Cars.carId, carId));
+      return ServiceResponse.success(void 0, "Old customer removed successfully.");
+    } catch (err) {
+      return this.handleError(err, "Failed to remove old customer.");
+    }
+  }
+  async updateWithOldCustomer(carId, data, oldCustomerIdToAdd) {
+    try {
+      const db = getDb();
+      const transaction = db.transaction(() => {
+        const currentRow = db.prepare("SELECT * FROM Cars WHERE carId = ?").get(carId);
+        if (!currentRow) return null;
+        let oldCustomerIds = [];
+        if (Array.isArray(currentRow.oldCustomerId)) {
+          oldCustomerIds = currentRow.oldCustomerId.map(String);
+        } else if (typeof currentRow.oldCustomerId === "string" && currentRow.oldCustomerId.trim()) {
+          try {
+            const parsed = JSON.parse(currentRow.oldCustomerId);
+            if (Array.isArray(parsed)) oldCustomerIds = parsed.map(String);
+          } catch {
+            oldCustomerIds = [];
+          }
+        }
+        const nextCustomerId = Object.prototype.hasOwnProperty.call(data, "customerId") ? data.customerId : currentRow.customerId;
+        if (oldCustomerIdToAdd && oldCustomerIdToAdd !== nextCustomerId) {
+          const id = String(oldCustomerIdToAdd);
+          if (!oldCustomerIds.includes(id)) oldCustomerIds.push(id);
+        }
+        const allowedFields = [
+          "customerId",
+          "brandId",
+          "model",
+          "year",
+          "vinNumber",
+          "plateNumber",
+          "km",
+          "fuelType",
+          "bodyType",
+          "engineVolumeCc",
+          "notes"
+        ];
+        const setParts = [];
+        const values = [];
+        for (const field of allowedFields) {
+          if (Object.prototype.hasOwnProperty.call(data, field)) {
+            setParts.push(`${field} = ?`);
+            values.push(data[field] ?? null);
+          }
+        }
+        setParts.push("oldCustomerId = ?");
+        values.push(JSON.stringify(oldCustomerIds));
+        values.push(carId);
+        db.prepare(`UPDATE Cars SET ${setParts.join(", ")} WHERE carId = ?`).run(...values);
+        const updated = db.prepare("SELECT * FROM Cars WHERE carId = ?").get(carId);
+        if (!updated) return null;
+        const rawOldIds = updated.oldCustomerId;
+        let normalizedOldIds = [];
+        if (typeof rawOldIds === "string" && rawOldIds.trim()) {
+          try {
+            const parsed = JSON.parse(rawOldIds);
+            if (Array.isArray(parsed)) normalizedOldIds = parsed.map(String);
+          } catch {
+            normalizedOldIds = [];
+          }
+        } else if (Array.isArray(rawOldIds)) {
+          normalizedOldIds = rawOldIds.map(String);
+        }
+        return {
+          ...updated,
+          oldCustomerId: normalizedOldIds
+        };
+      });
+      const result = transaction();
+      if (!result) return ServiceResponse.fail("Car not found.", "NOT_FOUND");
+      return ServiceResponse.success(result, "Updated successfully.");
+    } catch (err) {
+      return this.handleError(err, "Failed to update car.");
+    }
+  }
 }
-const Customers = sqliteTable("Customers", {
-  customerId: integer("customerId").primaryKey({ autoIncrement: true }),
-  nationalId: text("nationalId"),
-  firstName: text("firstName").notNull(),
-  lastName: text("lastName"),
-  taxNumber: text("taxNumber")
-});
 const Services = sqliteTable("Services", {
   serviceId: integer("serviceId").primaryKey({ autoIncrement: true }),
-  carId: integer("carId").notNull(),
-  customerId: integer("customerId"),
+  carId: integer("carId").notNull().references(() => Cars.carId, { onDelete: "cascade" }),
+  customerId: integer("customerId").references(() => Customers.customerId, { onDelete: "set null" }),
   applicationDate: integer("applicationDate", { mode: "timestamp" }),
   appointmentDate: integer("appointmentDate", { mode: "timestamp" }),
-  jobDuration: integer("jobDuration", { mode: "timestamp" }),
+  // Job duration in whole MINUTES (a length of time, not a point in time).
+  jobDuration: integer("jobDuration"),
   deliveryDate: integer("deliveryDate", { mode: "timestamp" }),
   km: real("km"),
   complaints: text("complaints").notNull(),
@@ -5831,18 +6270,38 @@ const Services = sqliteTable("Services", {
 });
 const PhoneNumbers = sqliteTable("PhoneNumbers", {
   phoneNumberId: integer("phoneNumberId").primaryKey({ autoIncrement: true }),
-  customerId: integer("customerId").notNull(),
+  customerId: integer("customerId").notNull().references(() => Customers.customerId, { onDelete: "cascade" }),
   countryCode: text("countryCode").notNull(),
   phoneNumber: text("phoneNumber").notNull()
 });
 const Emails = sqliteTable("Emails", {
   emailId: integer("emailId").primaryKey({ autoIncrement: true }),
-  customerId: integer("customerId").notNull(),
+  customerId: integer("customerId").notNull().references(() => Customers.customerId, { onDelete: "cascade" }),
   customerEmail: text("customerEmail").notNull()
 });
 class CustomersRepository extends BaseRepository {
   constructor() {
     super(Customers, "customerId");
+  }
+  /** Creates a customer and all contact records atomically. */
+  async createWithContacts(customer, phones = [], emails = []) {
+    try {
+      const db = useDb();
+      const customerId = db.transaction((tx) => {
+        const inserted = tx.insert(Customers).values(customer).returning({ customerId: Customers.customerId }).get();
+        if (!inserted) throw new Error("Customer could not be created.");
+        if (phones.length > 0) {
+          tx.insert(PhoneNumbers).values(phones.map((phone) => ({ ...phone, customerId: inserted.customerId }))).run();
+        }
+        if (emails.length > 0) {
+          tx.insert(Emails).values(emails.map((email) => ({ ...email, customerId: inserted.customerId }))).run();
+        }
+        return inserted.customerId;
+      });
+      return ServiceResponse.success(customerId, "Customer created successfully.");
+    } catch (err) {
+      return this.handleError(err, "Failed to create customer and contacts.");
+    }
   }
   async getByNatId(nationalId) {
     try {
@@ -5886,46 +6345,56 @@ class CustomersRepository extends BaseRepository {
       const servicesList = await db.select().from(Services).where(eq(Services.customerId, customerId));
       const phonesList = await db.select().from(PhoneNumbers).where(eq(PhoneNumbers.customerId, customerId));
       const emailsList = await db.select().from(Emails).where(eq(Emails.customerId, customerId));
-      return {
-        success: true,
-        data: {
-          customer: customerData[0],
-          cars: carsList,
-          services: servicesList,
-          phones: phonesList,
-          // Yüklemeye dahil edildi
-          emails: emailsList
-          // Yüklemeye dahil edildi
-        }
-      };
+      const customer = customerData[0];
+      if (!customer) {
+        return ServiceResponse.fail("Customer not found.", "NOT_FOUND");
+      }
+      return ServiceResponse.success(
+        { customer, cars: carsList, services: servicesList, phones: phonesList, emails: emailsList },
+        "Customer profile retrieved successfully."
+      );
     } catch (err) {
-      console.error("Profil verisi çekilirken hata oluştu:", err);
-      return { success: false, data: null, message: "Profil yüklenemedi." };
+      return this.handleError(err, "Failed to load customer profile.");
     }
   }
   // Tüm müşterileri telefon ve e-postalarıyla birlikte liste için çeken metot
   async getAllCustomersWithDetails() {
     try {
       const db = useDb();
-      const allCustomers = await db.select().from(Customers);
-      const result = [];
-      for (const c of allCustomers) {
-        const phones = await db.select().from(PhoneNumbers).where(eq(PhoneNumbers.customerId, c.customerId));
-        const emails = await db.select().from(Emails).where(eq(Emails.customerId, c.customerId));
-        result.push({
-          id: c.customerId,
-          fullName: `${c.firstName} ${c.lastName || ""}`.trim(),
-          nationalId: c.nationalId || "",
-          taxNumber: c.taxNumber || "",
-          // Arayüzün (UI) beklediği DTO formatına dönüştürüyoruz
-          phones: phones.map((p) => ({ countryCode: p.countryCode, number: p.phoneNumber })),
-          emails: emails.map((e) => ({ address: e.customerEmail }))
-        });
+      const [allCustomers, allPhones, allEmails] = await Promise.all([
+        db.select().from(Customers),
+        db.select().from(PhoneNumbers),
+        db.select().from(Emails)
+      ]);
+      const phonesByCustomer = /* @__PURE__ */ new Map();
+      for (const phone of allPhones) {
+        const list = phonesByCustomer.get(phone.customerId) ?? [];
+        list.push(phone);
+        phonesByCustomer.set(phone.customerId, list);
       }
-      return { success: true, data: result };
+      const emailsByCustomer = /* @__PURE__ */ new Map();
+      for (const email of allEmails) {
+        const list = emailsByCustomer.get(email.customerId) ?? [];
+        list.push(email);
+        emailsByCustomer.set(email.customerId, list);
+      }
+      const result = allCustomers.map((customer) => ({
+        id: customer.customerId,
+        fullName: `${customer.firstName} ${customer.lastName || ""}`.trim(),
+        nationalId: customer.nationalId || "",
+        taxNumber: customer.taxNumber || "",
+        phones: (phonesByCustomer.get(customer.customerId) ?? []).map((phone) => ({
+          countryCode: phone.countryCode,
+          number: phone.phoneNumber
+        })),
+        emails: (emailsByCustomer.get(customer.customerId) ?? []).map((email) => ({
+          address: email.customerEmail
+        }))
+      }));
+      return ServiceResponse.success(result, "Customers with contact details retrieved successfully.");
     } catch (err) {
       console.error("🆘 Detaylı müşteri listesi çekilirken hata:", err);
-      return { success: false, message: err.message, data: [] };
+      return this.handleError(err, "Failed to fetch customers with contact details.");
     }
   }
   // Formu doldurmak için müşteriyi çeken metot
@@ -5935,9 +6404,15 @@ class CustomersRepository extends BaseRepository {
       const customer = await db.select().from(Customers).where(eq(Customers.customerId, customerId));
       const phones = await db.select().from(PhoneNumbers).where(eq(PhoneNumbers.customerId, customerId));
       const emails = await db.select().from(Emails).where(eq(Emails.customerId, customerId));
-      return { success: true, data: { customer: customer[0], phones, emails } };
+      if (!customer[0]) {
+        return ServiceResponse.fail("Customer not found.", "NOT_FOUND");
+      }
+      return ServiceResponse.success(
+        { customer: customer[0], phones, emails },
+        "Customer edit data retrieved successfully."
+      );
     } catch (err) {
-      return { success: false, message: err.message };
+      return this.handleError(err, "Failed to load customer edit data.");
     }
   }
   // Müşteriyi telefon ve mailleriyle güncelleyen metot (Senkron Transaction ile)
@@ -5945,12 +6420,15 @@ class CustomersRepository extends BaseRepository {
     try {
       const db = useDb();
       db.transaction((tx) => {
-        tx.update(Customers).set({
+        const updatedCustomer = tx.update(Customers).set({
           firstName: data.firstName,
           lastName: data.lastName,
           nationalId: data.nationalId,
           taxNumber: data.taxNumber
-        }).where(eq(Customers.customerId, customerId)).run();
+        }).where(eq(Customers.customerId, customerId)).returning({ customerId: Customers.customerId }).get();
+        if (!updatedCustomer) {
+          throw new Error("Customer not found.");
+        }
         tx.delete(PhoneNumbers).where(eq(PhoneNumbers.customerId, customerId)).run();
         if (data.phones && data.phones.length > 0) {
           tx.insert(PhoneNumbers).values(data.phones.map((p) => ({
@@ -5967,12 +6445,12 @@ class CustomersRepository extends BaseRepository {
           }))).run();
         }
       });
-      return { success: true };
+      return ServiceResponse.success(null, "Customer updated successfully.");
     } catch (err) {
-      return { success: false, message: err.message };
+      return this.handleError(err, "Failed to update customer.");
     }
   }
-  // Müşteriyi ve (istenirse) bağlı kayıtları silen metot
+  // Müşteriyi ve (istenirse) bağlı kayıtları tek transaction içinde siler.
   async deleteCustomer(customerId, deleteRelated) {
     try {
       const db = useDb();
@@ -5980,28 +6458,42 @@ class CustomersRepository extends BaseRepository {
         tx.delete(PhoneNumbers).where(eq(PhoneNumbers.customerId, customerId)).run();
         tx.delete(Emails).where(eq(Emails.customerId, customerId)).run();
         if (deleteRelated) {
+          tx.delete(Services).where(eq(Services.customerId, customerId)).run();
+          tx.delete(Cars).where(eq(Cars.customerId, customerId)).run();
+        } else {
+          tx.update(Cars).set({ customerId: null }).where(eq(Cars.customerId, customerId)).run();
+          tx.update(Services).set({ customerId: null }).where(eq(Services.customerId, customerId)).run();
         }
-        tx.delete(Customers).where(eq(Customers.customerId, customerId)).run();
+        const deleted = tx.delete(Customers).where(eq(Customers.customerId, customerId)).returning({ customerId: Customers.customerId }).get();
+        if (!deleted) throw new Error("Customer not found.");
       });
-      return { success: true };
+      return ServiceResponse.success(null, "Customer deleted.");
     } catch (err) {
-      return { success: false, message: err.message };
+      return this.handleError(err, "Failed to delete customer.");
     }
   }
   // TOPLU SİLME METODU
   async deleteCustomersBulk(customerIds, deleteRelated) {
     try {
+      if (customerIds.length === 0) {
+        return ServiceResponse.success(null, "No customers selected.");
+      }
       const db = useDb();
       db.transaction((tx) => {
         tx.delete(PhoneNumbers).where(inArray(PhoneNumbers.customerId, customerIds)).run();
         tx.delete(Emails).where(inArray(Emails.customerId, customerIds)).run();
         if (deleteRelated) {
+          tx.delete(Services).where(inArray(Services.customerId, customerIds)).run();
+          tx.delete(Cars).where(inArray(Cars.customerId, customerIds)).run();
+        } else {
+          tx.update(Cars).set({ customerId: null }).where(inArray(Cars.customerId, customerIds)).run();
+          tx.update(Services).set({ customerId: null }).where(inArray(Services.customerId, customerIds)).run();
         }
         tx.delete(Customers).where(inArray(Customers.customerId, customerIds)).run();
       });
-      return { success: true };
+      return ServiceResponse.success(null, "Customers deleted.");
     } catch (err) {
-      return { success: false, message: err.message };
+      return this.handleError(err, "Failed to delete customers.");
     }
   }
 }
@@ -6089,7 +6581,7 @@ class PhoneNumbersRepository extends BaseRepository {
     }
   }
 }
-sqliteTable("Parts", {
+const Parts = sqliteTable("Parts", {
   partId: integer("partId").primaryKey({ autoIncrement: true }),
   carId: integer("carId").notNull(),
   serviceId: integer("serviceId").notNull(),
@@ -6097,6 +6589,43 @@ sqliteTable("Parts", {
   partTax: real("partTax"),
   partPrice: real("partPrice")
 });
+class PartsRepository extends BaseRepository {
+  constructor() {
+    super(Parts, "partId");
+  }
+  async getByCarId(carId) {
+    try {
+      const result = await useDb().select().from(Parts).where(eq(Parts.carId, carId));
+      return ServiceResponse.success(result, "Parts fetched by car successfully.");
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch parts by car.");
+    }
+  }
+  async getByServiceId(serviceId) {
+    try {
+      const result = await useDb().select().from(Parts).where(eq(Parts.serviceId, serviceId));
+      return ServiceResponse.success(result, "Parts fetched by service successfully.");
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch parts by service.");
+    }
+  }
+  async getByCarAndService(carId, serviceId) {
+    try {
+      const result = await useDb().select().from(Parts).where(and(eq(Parts.carId, carId), eq(Parts.serviceId, serviceId)));
+      return ServiceResponse.success(result, "Parts fetched matching car and service.");
+    } catch (err) {
+      return this.handleError(err, "Failed to fetch parts by car and service.");
+    }
+  }
+  async deleteByServiceId(serviceId) {
+    try {
+      await useDb().delete(Parts).where(eq(Parts.serviceId, serviceId));
+      return ServiceResponse.success(void 0, "Service parts deleted successfully.");
+    } catch (err) {
+      return this.handleError(err, "Failed to delete service parts.");
+    }
+  }
+}
 class ServicesRepository extends BaseRepository {
   constructor() {
     super(Services, "serviceId");
@@ -6124,35 +6653,32 @@ class ServicesRepository extends BaseRepository {
     }
   }
 }
+class BodyTypesRepository extends BaseRepository {
+  constructor() {
+    super(BodyTypes, "bodyTypeId");
+  }
+}
+class FuelTypesRepository extends BaseRepository {
+  constructor() {
+    super(FuelTypes, "fuelTypeId");
+  }
+}
 class CustomerService {
   constructor(customerRepository, phoneNumberRepository, emailRepository) {
     __publicField(this, "customerRepository");
-    __publicField(this, "phoneNumberRepository");
-    __publicField(this, "emailRepository");
     this.customerRepository = customerRepository;
-    this.phoneNumberRepository = phoneNumberRepository;
-    this.emailRepository = emailRepository;
   }
   async createCustomer(customer, phoneNumber, email) {
-    const response = await this.customerRepository.create(customer);
-    if (!response.success || !response.data) {
+    const response = await this.customerRepository.createWithContacts(
+      customer,
+      phoneNumber ?? [],
+      email ?? []
+    );
+    if (!response.success || response.data === void 0) {
       console.error("New customer not created! Message:", response.message);
-      return ServiceResponse.fail("Customer create failed.");
+      return ServiceResponse.fail(response.message || "Customer create failed.");
     }
-    const customerId = response.data.customerId;
-    if (phoneNumber && phoneNumber.length > 0) {
-      for (const pn of phoneNumber) {
-        await this.phoneNumberRepository.create({ ...pn, customerId });
-      }
-      console.log("❇️ New customer phone numbers added.");
-    }
-    if (email && email.length > 0) {
-      for (const em of email) {
-        await this.emailRepository.create({ ...em, customerId });
-      }
-      console.log("❇️ New customer emails added.");
-    }
-    return ServiceResponse.success(customerId, "Müşteri başarıyla oluşturuldu.");
+    return ServiceResponse.success(response.data, "Müşteri başarıyla oluşturuldu.");
   }
   async updateCustomer(customerId, customer) {
     if (!customerId) {
@@ -6200,32 +6726,411 @@ class CustomerService {
     return ServiceResponse.success(result, result.message);
   }
 }
-const userDataPath = app.getPath("userData");
-const configPath = path.join(userDataPath, "config.json");
+const MAX_BRAND_NAME_LENGTH = 40;
+function normalizeBrandName(value) {
+  return value.trim().replace(/\s+/g, " ").split(" ").map((word) => {
+    if (!word) return word;
+    return word.split("-").map((part) => {
+      if (!part) return part;
+      const lower = part.toLocaleLowerCase("tr-TR");
+      return lower.charAt(0).toLocaleUpperCase("tr-TR") + lower.slice(1);
+    }).join("-");
+  }).join(" ");
+}
+class BrandService {
+  constructor(brandsRepository) {
+    __publicField(this, "brandsRepository");
+    this.brandsRepository = brandsRepository;
+  }
+  async getAllBrands() {
+    return await this.brandsRepository.getAll();
+  }
+  async createBrand(brand) {
+    const normalizedName = normalizeBrandName(brand.brandName);
+    if (!normalizedName) {
+      return ServiceResponse.validationError([
+        {
+          field: "brandName",
+          message: "Brand name cannot be empty."
+        }
+      ]);
+    }
+    if (normalizedName.length > MAX_BRAND_NAME_LENGTH) {
+      return ServiceResponse.validationError([
+        {
+          field: "brandName",
+          message: `Brand name cannot exceed ${MAX_BRAND_NAME_LENGTH} characters.`
+        }
+      ]);
+    }
+    const existing = await this.brandsRepository.findByName(normalizedName);
+    if (!existing.success) {
+      return existing;
+    }
+    if (existing.data) {
+      return ServiceResponse.success(existing.data, "Brand already exists.");
+    }
+    return await this.brandsRepository.create({
+      brandName: normalizedName
+    });
+  }
+  async deleteBrand(brandId) {
+    const result = await this.brandsRepository.delete(brandId);
+    if (!result.success) {
+      return ServiceResponse.fail(result.message, result.code);
+    }
+    return result;
+  }
+}
+class ServiceService {
+  constructor(servicesRepository, partsRepository) {
+    __publicField(this, "servicesRepository");
+    __publicField(this, "partsRepository");
+    this.servicesRepository = servicesRepository;
+    this.partsRepository = partsRepository;
+  }
+  async createService(service, parts = []) {
+    const serviceResult = await this.servicesRepository.create(service);
+    if (!serviceResult.success || !serviceResult.data) return serviceResult;
+    const createdParts = [];
+    for (const part of parts) {
+      const result = await this.partsRepository.create({ ...part, serviceId: serviceResult.data.serviceId });
+      if (!result.success || !result.data) {
+        for (const created of createdParts) {
+          if (created.partId) await this.partsRepository.delete(created.partId);
+        }
+        await this.servicesRepository.delete(serviceResult.data.serviceId);
+        return ServiceResponse.error(new Error(result.message), "Service and parts could not be created together.");
+      }
+      createdParts.push(result.data);
+    }
+    return ServiceResponse.success({ service: serviceResult.data, parts: createdParts }, "Service created successfully.");
+  }
+  async updateService(serviceId, service, parts = []) {
+    const serviceResult = await this.servicesRepository.update(serviceId, service);
+    if (!serviceResult.success || !serviceResult.data) return serviceResult;
+    const oldParts = await this.partsRepository.getByServiceId(serviceId);
+    if (!oldParts.success) return ServiceResponse.error(new Error(oldParts.message), "Service parts could not be loaded.");
+    const deletedParts = await this.partsRepository.deleteByServiceId(serviceId);
+    if (!deletedParts.success) return ServiceResponse.error(new Error(deletedParts.message), "Service parts could not be replaced.");
+    const createdParts = [];
+    for (const part of parts) {
+      const result = await this.partsRepository.create(part);
+      if (!result.success || !result.data) {
+        for (const created of createdParts) if (created.partId) await this.partsRepository.delete(created.partId);
+        for (const old of oldParts.data ?? []) {
+          await this.partsRepository.create({
+            carId: old.carId,
+            serviceId: old.serviceId,
+            partName: old.partName,
+            partTax: old.partTax,
+            partPrice: old.partPrice
+          });
+        }
+        return ServiceResponse.error(new Error(result.message), "Service parts could not be updated.");
+      }
+      createdParts.push(result.data);
+    }
+    return ServiceResponse.success({ service: serviceResult.data, parts: createdParts }, "Service updated successfully.");
+  }
+  async deleteService(serviceId) {
+    const partsResult = await this.partsRepository.deleteByServiceId(serviceId);
+    if (!partsResult.success) return partsResult;
+    return this.servicesRepository.delete(serviceId);
+  }
+  async getDetails(serviceId) {
+    const serviceResult = await this.servicesRepository.getById(serviceId);
+    if (!serviceResult.success || !serviceResult.data) return serviceResult;
+    const partsResult = await this.partsRepository.getByServiceId(serviceId);
+    if (!partsResult.success) return ServiceResponse.error(new Error(partsResult.message), "Service parts could not be loaded.");
+    return ServiceResponse.success({ service: serviceResult.data, parts: partsResult.data ?? [] }, "Service details fetched successfully.");
+  }
+  async getAll() {
+    return this.servicesRepository.getAll();
+  }
+  async getByCarId(carId) {
+    return this.servicesRepository.getByCarId(carId);
+  }
+  async getByCustomerId(customerId) {
+    return this.servicesRepository.getByCustomerId(customerId);
+  }
+  async getPartsByService(serviceId) {
+    return this.partsRepository.getByServiceId(serviceId);
+  }
+}
+function isRecord(value) {
+  return typeof value === "object" && value !== null;
+}
+function requireString(value, field, allowEmpty = true) {
+  if (typeof value !== "string" || !allowEmpty && value.trim() === "") {
+    throw new Error(`Invalid ${field}.`);
+  }
+  return value;
+}
+function getErrorMessage(error) {
+  return error instanceof Error ? error.message : "Unknown error.";
+}
+function requireNumber(value, field) {
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    throw new Error(`Invalid ${field}.`);
+  }
+  return value;
+}
+function parseCustomerRequest(payload) {
+  if (!isRecord(payload)) throw new Error("Invalid customer payload.");
+  const phones = payload.phones === void 0 ? [] : payload.phones;
+  const emails = payload.emails === void 0 ? [] : payload.emails;
+  if (!Array.isArray(phones) || !Array.isArray(emails)) {
+    throw new Error("Invalid customer contact data.");
+  }
+  return {
+    firstName: requireString(payload.firstName, "firstName", false),
+    lastName: requireString(payload.lastName, "lastName"),
+    nationalId: requireString(payload.nationalId, "nationalId"),
+    taxNumber: requireString(payload.taxNumber, "taxNumber"),
+    phones: phones.map((phone, index) => {
+      if (!isRecord(phone)) throw new Error(`Invalid phone at index ${index}.`);
+      return {
+        countryCode: requireString(phone.countryCode, `phones[${index}].countryCode`, false),
+        number: requireString(phone.number, `phones[${index}].number`, false)
+      };
+    }),
+    emails: emails.map((email, index) => {
+      if (!isRecord(email)) throw new Error(`Invalid email at index ${index}.`);
+      return {
+        address: requireString(email.address, `emails[${index}].address`, false)
+      };
+    })
+  };
+}
+function parseUpdateCustomerRequest(payload) {
+  if (!isRecord(payload)) throw new Error("Invalid update payload.");
+  return {
+    id: requireNumber(payload.id, "customer id"),
+    data: parseCustomerRequest(payload.data)
+  };
+}
+function parseDeleteCustomerRequest(payload) {
+  if (!isRecord(payload) || typeof payload.deleteRelated !== "boolean") {
+    throw new Error("Invalid delete payload.");
+  }
+  return {
+    id: requireNumber(payload.id, "customer id"),
+    deleteRelated: payload.deleteRelated
+  };
+}
+function parseCreateBrandRequest(payload) {
+  if (!isRecord(payload)) throw new Error("Invalid brand payload.");
+  const brandName = requireString(payload.brandName, "brandName", false).trim();
+  if (brandName.length > MAX_BRAND_NAME_LENGTH) {
+    throw new Error(`Brand name cannot exceed ${MAX_BRAND_NAME_LENGTH} characters.`);
+  }
+  return { brandName };
+}
+function parseCarData(payload) {
+  if (!isRecord(payload)) throw new Error("Invalid car payload.");
+  const optionalInteger = (value, field) => {
+    if (value === null || value === void 0 || value === "") return null;
+    return requireNumber(value, field);
+  };
+  const optionalString = (value, field, maxLength) => {
+    if (value === null || value === void 0) return null;
+    const text2 = requireString(value, field).trim();
+    if (text2.length > maxLength) throw new Error(`${field} cannot exceed ${maxLength} characters.`);
+    return text2 || null;
+  };
+  const km = payload.km === null || payload.km === void 0 || payload.km === "" ? null : Number(payload.km);
+  if (km !== null && (!Number.isFinite(km) || km < 0)) {
+    throw new Error("Invalid km.");
+  }
+  const year = optionalInteger(payload.year, "year");
+  if (year !== null && (year < 1886 || year > (/* @__PURE__ */ new Date()).getFullYear() + 1)) {
+    throw new Error("Invalid year.");
+  }
+  const plateNumber = optionalString(payload.plateNumber, "plateNumber", 20);
+  if (!plateNumber) {
+    throw new Error("Plate number is required.");
+  }
+  const model = optionalString(payload.model, "model", 100);
+  const normalizedModel = model ? model.charAt(0).toLocaleUpperCase("tr-TR") + model.slice(1) : null;
+  const vinNumber = optionalString(payload.vinNumber, "vinNumber", 32);
+  const engineVolumeCc = optionalInteger(payload.engineVolumeCc, "engineVolumeCc");
+  if (engineVolumeCc !== null && engineVolumeCc < 1) {
+    throw new Error("Invalid engine volume.");
+  }
+  const notes = optionalString(payload.notes, "notes", 2e3);
+  return {
+    customerId: optionalInteger(payload.customerId, "customerId"),
+    brandId: optionalInteger(payload.brandId, "brandId"),
+    model: normalizedModel,
+    year,
+    vinNumber: vinNumber ? vinNumber.toLocaleUpperCase("tr-TR") : null,
+    plateNumber: plateNumber.toLocaleUpperCase("tr-TR"),
+    km,
+    fuelType: optionalInteger(payload.fuelType, "fuelType"),
+    bodyType: optionalInteger(payload.bodyType, "bodyType"),
+    engineVolumeCc,
+    notes
+  };
+}
+function parseUpdateCarRequest(payload) {
+  if (!isRecord(payload)) throw new Error("Invalid car update payload.");
+  return {
+    id: requireNumber(payload.id, "car id"),
+    data: parseCarData(payload.data),
+    oldCustomerIdToAdd: payload.oldCustomerIdToAdd === null || payload.oldCustomerIdToAdd === void 0 ? null : requireNumber(payload.oldCustomerIdToAdd, "old customer id")
+  };
+}
+function parseServiceDate(value, field) {
+  if (value === null || value === void 0 || value === "") return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? (() => {
+    throw new Error(`Invalid ${field}.`);
+  })() : value;
+  if (typeof value !== "string") throw new Error(`Invalid ${field}.`);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error(`Invalid ${field}.`);
+  return date;
+}
+function parseOptionalNonNegativeNumber(value, field) {
+  if (value === null || value === void 0 || value === "") return null;
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue) || numberValue < 0) throw new Error(`Invalid ${field}.`);
+  return numberValue;
+}
+function parseServiceRequest(payload) {
+  if (!isRecord(payload) || !isRecord(payload.service) || !Array.isArray(payload.parts)) {
+    throw new Error("Invalid service payload.");
+  }
+  const raw = payload.service;
+  const carId = requireNumber(raw.carId, "carId");
+  const customerId = raw.customerId === null || raw.customerId === void 0 || raw.customerId === "" ? null : requireNumber(raw.customerId, "customerId");
+  const complaints = requireString(raw.complaints, "complaints", false).trim();
+  if (complaints.length > 4e3) throw new Error("Complaints cannot exceed 4000 characters.");
+  const extraRequests = raw.extraRequests === null || raw.extraRequests === void 0 ? null : requireString(raw.extraRequests, "extraRequests").trim() || null;
+  if (extraRequests && extraRequests.length > 4e3) throw new Error("Extra requests cannot exceed 4000 characters.");
+  const parseStringArray = (value, field, maxItems, maxLength) => {
+    if (value === null || value === void 0 || value === "") return [];
+    if (!Array.isArray(value)) throw new Error(`Invalid ${field}.`);
+    return value.map((item, index) => {
+      const text2 = requireString(item, `${field}[${index}]`, false).trim();
+      if (text2.length > maxLength) throw new Error(`${field}[${index}] is too long.`);
+      return text2;
+    }).filter(Boolean).slice(0, maxItems);
+  };
+  const jobDuration = raw.jobDuration === null || raw.jobDuration === void 0 || raw.jobDuration === "" ? null : Number(raw.jobDuration);
+  if (jobDuration !== null && (!Number.isInteger(jobDuration) || jobDuration < 0)) throw new Error("Invalid job duration.");
+  const service = {
+    carId,
+    customerId,
+    applicationDate: parseServiceDate(raw.applicationDate, "applicationDate"),
+    appointmentDate: parseServiceDate(raw.appointmentDate, "appointmentDate"),
+    jobDuration,
+    deliveryDate: parseServiceDate(raw.deliveryDate, "deliveryDate"),
+    km: parseOptionalNonNegativeNumber(raw.km, "km"),
+    complaints,
+    extraRequests,
+    faults: parseStringArray(raw.faults, "faults", 30, 500),
+    hasDamageOnReceive: raw.hasDamageOnReceive === true,
+    damageOnReceive: parseStringArray(raw.damageOnReceive, "damageOnReceive", 30, 500),
+    hasDamageDuringRepair: raw.hasDamageDuringRepair === true,
+    damageDuringRepair: parseStringArray(raw.damageDuringRepair, "damageDuringRepair", 30, 500),
+    laborCharge: parseOptionalNonNegativeNumber(raw.laborCharge, "laborCharge"),
+    totalCharge: parseOptionalNonNegativeNumber(raw.totalCharge, "totalCharge"),
+    targetDeliveryDate: parseServiceDate(raw.targetDeliveryDate, "targetDeliveryDate"),
+    isDelivered: raw.isDelivered === true
+  };
+  const parts = payload.parts.map((item, index) => {
+    if (!isRecord(item)) throw new Error(`Invalid part at index ${index}.`);
+    const partName = requireString(item.partName, `parts[${index}].partName`, false).trim();
+    if (partName.length > 200) throw new Error(`parts[${index}].partName is too long.`);
+    return {
+      partName,
+      partTax: parseOptionalNonNegativeNumber(item.partTax, `parts[${index}].partTax`),
+      partPrice: parseOptionalNonNegativeNumber(item.partPrice, `parts[${index}].partPrice`)
+    };
+  }).filter((part) => part.partName);
+  return { service, parts };
+}
+function parseUpdateServiceRequest(payload) {
+  if (!isRecord(payload)) throw new Error("Invalid service update payload.");
+  return { id: requireNumber(payload.id, "service id"), ...parseServiceRequest(payload) };
+}
+function parseBulkDeleteRequest(payload) {
+  if (!isRecord(payload) || !Array.isArray(payload.ids) || typeof payload.deleteRelated !== "boolean") {
+    throw new Error("Invalid bulk delete payload.");
+  }
+  const ids = payload.ids.map((id, index) => requireNumber(id, `ids[${index}]`));
+  return { ids, deleteRelated: payload.deleteRelated };
+}
+function parseAppConfig(payload) {
+  if (!isRecord(payload)) throw new Error("Invalid app config.");
+  const language = requireString(payload.language, "language", false);
+  const savePath = requireString(payload.savePath, "savePath", false);
+  if (payload.eulaAccepted !== true) throw new Error("EULA must be accepted.");
+  if (payload.theme !== "light" && payload.theme !== "dark") throw new Error("Invalid theme.");
+  return {
+    language,
+    savePath,
+    eulaAccepted: true,
+    theme: payload.theme,
+    onboardingCompleted: payload.onboardingCompleted === true
+  };
+}
+const DATABASE_FILE_NAME = "data_carArchiver.sqlite";
+const approvedDirectories = /* @__PURE__ */ new Set();
+const approvedDatabaseFiles = /* @__PURE__ */ new Set();
+function requireApprovedDatabasePath(value) {
+  const dbPath = requireString(value, "database path", false);
+  const normalizedPath = path.normalize(path.resolve(dbPath));
+  if (path.basename(normalizedPath) !== DATABASE_FILE_NAME) {
+    throw new Error(`Invalid database file. Expected ${DATABASE_FILE_NAME}.`);
+  }
+  if (!approvedDatabaseFiles.has(normalizedPath) && !fs.existsSync(normalizedPath)) {
+    throw new Error("Database file is not available.");
+  }
+  return normalizedPath;
+}
+function requireApprovedDirectory(value) {
+  const selectedPath = requireString(value, "directory", false);
+  const normalizedPath = path.normalize(path.resolve(selectedPath));
+  if (!approvedDirectories.has(normalizedPath)) {
+    throw new Error("Directory was not selected through the native directory picker.");
+  }
+  return normalizedPath;
+}
 function registerIpcHandlers() {
   ipcMain.handle("check-config", async () => {
-    return fs.existsSync(configPath);
+    return hasConfig();
   });
   ipcMain.handle("select-directory", async () => {
     const result = await dialog.showOpenDialog({
       properties: ["openDirectory"]
     });
-    return result.canceled ? null : result.filePaths[0];
+    if (result.canceled || !result.filePaths[0]) return null;
+    const selectedPath = path.normalize(path.resolve(result.filePaths[0]));
+    approvedDirectories.add(selectedPath);
+    return selectedPath;
   });
-  ipcMain.handle("verify-import-path", async (_event, folderPath) => {
-    const dbName = "data_carArcihiver.sqlite";
+  ipcMain.handle("verify-import-path", async (_event, rawFolderPath) => {
+    const folderPath = requireApprovedDirectory(rawFolderPath);
+    const dbName = DATABASE_FILE_NAME;
     const dbPath = path.join(folderPath, dbName);
     if (fs.existsSync(dbPath)) {
+      approvedDatabaseFiles.add(path.normalize(path.resolve(dbPath)));
       return dbPath;
     }
     return null;
   });
-  ipcMain.handle("setup-new-data-structure", async (_event, selectedRoot) => {
+  ipcMain.handle("setup-new-data-structure", async (_event, rawSelectedRoot) => {
     try {
+      const selectedRoot = requireApprovedDirectory(rawSelectedRoot);
       const mainFolderName = "CarServiceArchiver";
       const mainPath = path.join(selectedRoot, mainFolderName);
-      const dbPath = path.join(mainPath, "data_carArcihiver.sqlite");
+      const dbPath = path.join(mainPath, DATABASE_FILE_NAME);
       const mediaPath = path.join(mainPath, "media");
+      if (fs.existsSync(dbPath)) {
+        throw new Error(`A database already exists at ${dbPath}. Choose a different folder or import the existing database.`);
+      }
       if (!fs.existsSync(mainPath)) {
         fs.mkdirSync(mainPath, { recursive: true });
         console.log("📁 Main folder created:", mainPath);
@@ -6235,7 +7140,7 @@ function registerIpcHandlers() {
         console.log("📁 Media folder created:", mediaPath);
       }
       if (process.platform === "win32") {
-        exec(`attrib +h +i "${mediaPath}"`, (error) => {
+        execFile("attrib", ["+h", "+i", mediaPath], (error) => {
           if (error) {
             console.error("⚠️ Media folder could not be hidden:", error);
           } else {
@@ -6243,39 +7148,56 @@ function registerIpcHandlers() {
           }
         });
       }
+      approvedDatabaseFiles.add(path.normalize(path.resolve(dbPath)));
       CreateDefaultDb(dbPath);
       initDrizzle();
       await CreateDefaultDbTables();
       console.log("❇️ Setup completed successfully. DB path:", dbPath);
       return dbPath;
     } catch (error) {
-      console.error("🆘 Setup failed:", error.message);
+      console.error("🆘 Setup failed:", getErrorMessage(error));
+      closeDrizzle();
+      closeDb();
+      return null;
+    }
+  });
+  ipcMain.handle("setup-imported-data", async (_event, rawDbPath) => {
+    try {
+      const normalizedDbPath = requireApprovedDatabasePath(rawDbPath);
+      if (!approvedDatabaseFiles.has(normalizedDbPath)) {
+        throw new Error("Database file was not selected through the import flow.");
+      }
+      closeDrizzle();
+      closeDb();
+      CreateDefaultDb(normalizedDbPath);
+      initDrizzle();
+      await CreateDefaultDbTables();
+      console.log("❇️ Imported database initialized:", normalizedDbPath);
+      return normalizedDbPath;
+    } catch (error) {
+      console.error("🆘 Imported database setup failed:", getErrorMessage(error));
+      closeDrizzle();
+      closeDb();
       return null;
     }
   });
   ipcMain.handle("save-config", async (_event, configData) => {
     try {
-      const userDataPath2 = app.getPath("userData");
-      const configPath2 = path.join(userDataPath2, "config.json");
-      fs.writeFileSync(configPath2, JSON.stringify(configData, null, 2), "utf-8");
-      console.log("❇️ Config file saved successfully:", configPath2);
+      const config = parseAppConfig(configData);
+      const normalizedDbPath = requireApprovedDatabasePath(config.savePath);
+      if (!approvedDatabaseFiles.has(normalizedDbPath)) {
+        throw new Error("Database path was not approved by the setup flow.");
+      }
+      saveConfig({ ...config, savePath: normalizedDbPath });
+      console.log("❇️ Config file saved successfully.");
       return true;
     } catch (error) {
-      console.error("🆘 Failed to save config:", error.message);
+      console.error("🆘 Failed to save config:", getErrorMessage(error));
       return false;
     }
   });
   ipcMain.handle("get-config", async () => {
-    try {
-      if (fs.existsSync(configPath)) {
-        const rawData = fs.readFileSync(configPath, "utf-8");
-        return JSON.parse(rawData);
-      }
-      return null;
-    } catch (error) {
-      console.error("🆘 Config okuma hatası:", error.message);
-      return null;
-    }
+    return getConfig();
   });
   ipcMain.handle("get-dashboard-stats", async () => {
     try {
@@ -6293,7 +7215,7 @@ function registerIpcHandlers() {
         services: servicesRes.success ? servicesRes.data : 0
       };
     } catch (error) {
-      console.error("🆘 İstatistik okuma hatası:", error.message);
+      console.error("🆘 İstatistik okuma hatası:", getErrorMessage(error));
       return { services: 0, customers: 0, cars: 0 };
     }
   });
@@ -6306,81 +7228,236 @@ function registerIpcHandlers() {
       }
       return [];
     } catch (error) {
-      console.error("🆘 Müşteriler çekilirken hata:", error.message);
+      console.error("🆘 Müşteriler çekilirken hata:", getErrorMessage(error));
       return [];
     }
   });
-  ipcMain.handle("add-customer", async (_event, payload) => {
+  ipcMain.handle("add-customer", async (_event, rawPayload) => {
     try {
       const customersRepo = new CustomersRepository();
       const phoneNumbersRepo = new PhoneNumbersRepository();
       const emailsRepo = new EmailsRepository();
       const customerService = new CustomerService(customersRepo, phoneNumbersRepo, emailsRepo);
+      const payload = parseCustomerRequest(rawPayload);
       const customerBase = {
         firstName: payload.firstName,
         lastName: payload.lastName,
         nationalId: payload.nationalId,
         taxNumber: payload.taxNumber
       };
-      const phoneNumbers = (payload.phones || []).map((p) => ({
-        countryCode: p.countryCode,
-        phoneNumber: p.number
+      const phoneNumbers = (payload.phones ?? []).map((phone) => ({
+        countryCode: phone.countryCode,
+        phoneNumber: phone.number
       }));
-      const emails = (payload.emails || []).map((e) => ({
-        customerEmail: e.address
+      const emails = (payload.emails ?? []).map((email) => ({
+        customerEmail: email.address
       }));
       const response = await customerService.createCustomer(customerBase, phoneNumbers, emails);
       return response;
     } catch (error) {
-      console.error("🆘 Müşteri eklenirken hata:", error.message);
-      return { success: false, message: error.message };
+      console.error("🆘 Müşteri eklenirken hata:", getErrorMessage(error));
+      return ServiceResponse.error(error, "Customer could not be created.");
     }
   });
-  ipcMain.handle("get-customer-profile", async (_event, customerId) => {
+  ipcMain.handle("get-customer-profile", async (_event, rawCustomerId) => {
     try {
+      const customerId = requireNumber(rawCustomerId, "customer id");
       const customersRepo = new CustomersRepository();
       const response = await customersRepo.getFullProfile(customerId);
       return response;
     } catch (error) {
-      console.error("🆘 Müşteri profili alınırken hata:", error.message);
-      return { success: false, data: null };
+      console.error("🆘 Müşteri profili alınırken hata:", getErrorMessage(error));
+      return ServiceResponse.error(error, "Customer profile could not be loaded.");
     }
   });
-  ipcMain.handle("get-customer-edit", async (_event, customerId) => {
+  ipcMain.handle("get-customer-edit", async (_event, rawCustomerId) => {
+    const customerId = requireNumber(rawCustomerId, "customer id");
     return await new CustomersRepository().getCustomerForEdit(customerId);
   });
-  ipcMain.handle("update-customer", async (_event, req) => {
-    if (!req || !req.data) {
-      console.error("🆘 Arka uca veri ulaşmadı! Gelen istek:", req);
-      return { success: false, message: "Veri paketi boş geldi!" };
+  ipcMain.handle("update-customer", async (_event, rawRequest) => {
+    const request = parseUpdateCustomerRequest(rawRequest);
+    return await new CustomersRepository().updateCustomerFull(request.id, request.data);
+  });
+  ipcMain.handle("delete-customer", async (_event, rawRequest) => {
+    const request = parseDeleteCustomerRequest(rawRequest);
+    return await new CustomersRepository().deleteCustomer(request.id, request.deleteRelated);
+  });
+  ipcMain.handle("delete-customers-bulk", async (_event, rawRequest) => {
+    const request = parseBulkDeleteRequest(rawRequest);
+    return await new CustomersRepository().deleteCustomersBulk(request.ids, request.deleteRelated);
+  });
+  ipcMain.handle("get-all-fuel-types", async () => {
+    try {
+      return await new FuelTypesRepository().getAll();
+    } catch (error) {
+      return ServiceResponse.error(error, "Fuel types could not be loaded.");
     }
-    return await new CustomersRepository().updateCustomerFull(req.id, req.data);
   });
-  ipcMain.handle("delete-customer", async (_event, req) => {
-    return await new CustomersRepository().deleteCustomer(req.id, req.deleteRelated);
+  ipcMain.handle("get-all-body-types", async () => {
+    try {
+      return await new BodyTypesRepository().getAll();
+    } catch (error) {
+      return ServiceResponse.error(error, "Body types could not be loaded.");
+    }
   });
-  ipcMain.handle("delete-customers-bulk", async (_event, req) => {
-    return await new CustomersRepository().deleteCustomersBulk(req.ids, req.deleteRelated);
+  ipcMain.handle("get-all-cars", async () => {
+    try {
+      const result = await new CarsRepository().getAll();
+      return result;
+    } catch (error) {
+      return ServiceResponse.error(error, "Cars could not be loaded.");
+    }
+  });
+  ipcMain.handle("get-car", async (_event, rawCarId) => {
+    try {
+      const carId = requireNumber(rawCarId, "car id");
+      return await new CarsRepository().getById(carId);
+    } catch (error) {
+      return ServiceResponse.error(error, "Car could not be loaded.");
+    }
+  });
+  ipcMain.handle("add-car", async (_event, rawPayload) => {
+    try {
+      const data = parseCarData(rawPayload);
+      return await new CarsRepository().create(data);
+    } catch (error) {
+      return ServiceResponse.error(error, "Car could not be created.");
+    }
+  });
+  ipcMain.handle("update-car", async (_event, rawPayload) => {
+    try {
+      const request = parseUpdateCarRequest(rawPayload);
+      const repository = new CarsRepository();
+      return request.oldCustomerIdToAdd ? await repository.updateWithOldCustomer(request.id, request.data, request.oldCustomerIdToAdd) : await repository.update(request.id, request.data);
+    } catch (error) {
+      return ServiceResponse.error(error, "Car could not be updated.");
+    }
+  });
+  ipcMain.handle("delete-car", async (_event, rawCarId) => {
+    try {
+      const carId = requireNumber(rawCarId, "car id");
+      return await new CarsRepository().delete(carId);
+    } catch (error) {
+      return ServiceResponse.error(error, "Car could not be deleted.");
+    }
+  });
+  ipcMain.handle("add-old-customer", async (_event, rawPayload) => {
+    try {
+      if (!isRecord(rawPayload)) throw new Error("Invalid old customer payload.");
+      const carId = requireNumber(rawPayload.carId, "car id");
+      const customerId = requireNumber(rawPayload.customerId, "customer id");
+      return await new CarsRepository().addOldCustomer(carId, customerId);
+    } catch (error) {
+      return ServiceResponse.error(error, "Old customer could not be added.");
+    }
+  });
+  ipcMain.handle("remove-old-customer", async (_event, rawPayload) => {
+    try {
+      if (!isRecord(rawPayload)) throw new Error("Invalid old customer payload.");
+      const carId = requireNumber(rawPayload.carId, "car id");
+      const customerId = requireNumber(rawPayload.customerId, "customer id");
+      return await new CarsRepository().removeOldCustomer(carId, customerId);
+    } catch (error) {
+      return ServiceResponse.error(error, "Old customer could not be removed.");
+    }
+  });
+  ipcMain.handle("get-all-services", async () => {
+    try {
+      return await new ServiceService(new ServicesRepository(), new PartsRepository()).getAll();
+    } catch (error) {
+      return ServiceResponse.error(error, "Services could not be loaded.");
+    }
+  });
+  ipcMain.handle("get-service", async (_event, rawServiceId) => {
+    try {
+      return await new ServiceService(new ServicesRepository(), new PartsRepository()).getDetails(requireNumber(rawServiceId, "service id"));
+    } catch (error) {
+      return ServiceResponse.error(error, "Service could not be loaded.");
+    }
+  });
+  ipcMain.handle("get-services-by-car", async (_event, rawCarId) => {
+    try {
+      return await new ServiceService(new ServicesRepository(), new PartsRepository()).getByCarId(requireNumber(rawCarId, "car id"));
+    } catch (error) {
+      return ServiceResponse.error(error, "Car service history could not be loaded.");
+    }
+  });
+  ipcMain.handle("get-services-by-customer", async (_event, rawCustomerId) => {
+    try {
+      return await new ServiceService(new ServicesRepository(), new PartsRepository()).getByCustomerId(requireNumber(rawCustomerId, "customer id"));
+    } catch (error) {
+      return ServiceResponse.error(error, "Customer service history could not be loaded.");
+    }
+  });
+  ipcMain.handle("get-parts-by-service", async (_event, rawServiceId) => {
+    try {
+      return await new PartsRepository().getByServiceId(requireNumber(rawServiceId, "service id"));
+    } catch (error) {
+      return ServiceResponse.error(error, "Service parts could not be loaded.");
+    }
+  });
+  ipcMain.handle("add-service", async (_event, rawPayload) => {
+    try {
+      const payload = parseServiceRequest(rawPayload);
+      const parts = payload.parts.map((part) => ({ carId: payload.service.carId, serviceId: 0, ...part }));
+      const result = await new ServiceService(new ServicesRepository(), new PartsRepository()).createService(payload.service, parts);
+      return result;
+    } catch (error) {
+      return ServiceResponse.error(error, "Service could not be created.");
+    }
+  });
+  ipcMain.handle("update-service", async (_event, rawPayload) => {
+    try {
+      const payload = parseUpdateServiceRequest(rawPayload);
+      const parts = payload.parts.map((part) => ({ carId: payload.service.carId, serviceId: payload.id, ...part }));
+      const result = await new ServiceService(new ServicesRepository(), new PartsRepository()).updateService(payload.id, payload.service, parts);
+      return result;
+    } catch (error) {
+      return ServiceResponse.error(error, "Service could not be updated.");
+    }
+  });
+  ipcMain.handle("delete-service", async (_event, rawServiceId) => {
+    try {
+      return await new ServiceService(new ServicesRepository(), new PartsRepository()).deleteService(requireNumber(rawServiceId, "service id"));
+    } catch (error) {
+      return ServiceResponse.error(error, "Service could not be deleted.");
+    }
+  });
+  ipcMain.handle("get-all-brands", async () => {
+    try {
+      const brandService = new BrandService(new BrandsRepository());
+      return await brandService.getAllBrands();
+    } catch (error) {
+      console.error("🆘 Markalar alınırken hata:", getErrorMessage(error));
+      return ServiceResponse.error(error, "Brands could not be loaded.");
+    }
+  });
+  ipcMain.handle("add-brand", async (_event, rawPayload) => {
+    try {
+      const payload = parseCreateBrandRequest(rawPayload);
+      const brandService = new BrandService(new BrandsRepository());
+      return await brandService.createBrand(payload);
+    } catch (error) {
+      console.error("🆘 Marka eklenirken hata:", getErrorMessage(error));
+      return ServiceResponse.error(error, "Brand could not be created.");
+    }
   });
 }
-createRequire(import.meta.url);
-const currentFilePath = fileURLToPath$1(import.meta.url);
+const currentFilePath = fileURLToPath(import.meta.url);
 const __dirname$1 = path$1.dirname(currentFilePath);
 process.env.APP_ROOT = path$1.join(__dirname$1, "..");
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 const MAIN_DIST = path$1.join(process.env.APP_ROOT, "dist-electron");
 const RENDERER_DIST = path$1.join(process.env.APP_ROOT, "dist");
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path$1.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
+const VITE_PUBLIC = VITE_DEV_SERVER_URL ? path$1.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
+process.env.VITE_PUBLIC = VITE_PUBLIC;
 let win;
 function createWindow() {
   win = new BrowserWindow({
-    icon: path$1.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+    icon: path$1.join(VITE_PUBLIC, "electron-vite.svg"),
     webPreferences: {
       preload: path$1.join(__dirname$1, "preload.mjs")
     }
-  });
-  win.webContents.on("did-finish-load", () => {
-    win == null ? void 0 : win.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
   });
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL);
@@ -6388,6 +7465,9 @@ function createWindow() {
     win.loadFile(path$1.join(RENDERER_DIST, "index.html"));
   }
 }
+app.on("before-quit", () => {
+  closeDb();
+});
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
@@ -6399,22 +7479,63 @@ app.on("activate", () => {
     createWindow();
   }
 });
+const STARTUP_ERROR_TEXTS = {
+  tr: {
+    title: "Veritabanı başlatılamadı",
+    body: (dbPath, message, logFile) => `Uygulama veritabanını açamadığı için kapatılacak.
+
+Veritabanı: ${dbPath}
+Hata: ${message}
+
+Ayrıntılar: ${logFile}
+
+Sorun sürerse bu iletiyi ve log dosyasını geliştiriciye iletin.`
+  },
+  en: {
+    title: "Database could not be started",
+    body: (dbPath, message, logFile) => `The application could not open its database and will close.
+
+Database: ${dbPath}
+Error: ${message}
+
+Details: ${logFile}
+
+If the problem persists, send this message and the log file to the developer.`
+  }
+};
+function failStartup(error, dbPath, language) {
+  const message = error instanceof Error ? error.message : String(error);
+  const logFile = path$1.join(app.getPath("userData"), "startup-error.log");
+  try {
+    const details = error instanceof Error ? error.stack ?? error.message : String(error);
+    fs$1.appendFileSync(logFile, `[${(/* @__PURE__ */ new Date()).toISOString()}] DB: ${dbPath}
+${details}
+
+`);
+  } catch (logError) {
+    console.error("Could not write startup log:", logError);
+  }
+  const texts = language === "tr" ? STARTUP_ERROR_TEXTS.tr : STARTUP_ERROR_TEXTS.en;
+  dialog.showErrorBox(texts.title, texts.body(dbPath, message, logFile));
+  closeDrizzle();
+  closeDb();
+  app.exit(1);
+  throw error;
+}
 app.whenReady().then(async () => {
   registerIpcHandlers();
-  try {
-    const configPath2 = path$1.join(app.getPath("userData"), "config.json");
-    if (fs.existsSync(configPath2)) {
-      const configRaw = fs.readFileSync(configPath2, "utf-8");
-      const config = JSON.parse(configRaw);
-      const finalDbPath = config.savePath;
-      if (finalDbPath) {
-        CreateDefaultDb(finalDbPath);
-        initDrizzle();
-        console.log("🟢 Veritabanı bağlandı:", finalDbPath);
-      }
+  const config = getConfig();
+  const finalDbPath = config == null ? void 0 : config.savePath;
+  if (finalDbPath) {
+    try {
+      CreateDefaultDb(finalDbPath);
+      initDrizzle();
+      await runDatabaseMigrations();
+      console.log("🟢 Veritabanı bağlandı:", finalDbPath);
+    } catch (error) {
+      console.error("🔴 Veritabanı başlatılırken hata oluştu:", error);
+      failStartup(error, finalDbPath, config == null ? void 0 : config.language);
     }
-  } catch (error) {
-    console.error("🔴 Veritabanı başlatılırken hata oluştu:", error);
   }
   createWindow();
 });

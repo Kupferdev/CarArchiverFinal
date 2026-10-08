@@ -1,7 +1,10 @@
-import React, { useState, useRef } from "react";
+import { useState, useRef } from "react";
 import { eulas } from "../../i18n/eulas";
+import type { SetupDataUpdater } from "../setupTypes";
 
-export const EulaStep = ({ language, onNext, onBack, updateData }: any) => {
+interface EulaStepProps { language: string; onNext: () => void; onBack: () => void; updateData: SetupDataUpdater; }
+
+export const EulaStep = ({ language, onNext, onBack, updateData }: EulaStepProps) => {
   const [isRead, setIsRead] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 

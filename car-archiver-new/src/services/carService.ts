@@ -13,9 +13,9 @@ export class CarService {
         const result = await this.carRepository.create(car);
 
         if (!result.success) {
-            return ServiceResponse.fail("Car log create fail.", result.status);
+            return ServiceResponse.fail(result.message, result.code);
         }
-        return ServiceResponse.success(result);
+        return result;
 
     }
 
@@ -23,18 +23,18 @@ export class CarService {
         const result = await this.carRepository.update(carId, car);
 
         if (!result.success) {
-            return ServiceResponse.fail("Car update fail.", result.message);
+            return ServiceResponse.fail(result.message, result.code);
         }
-        return ServiceResponse.success(result);
+        return result;
     }
 
     async deleteCar(carId: number) {
         const result = await this.carRepository.delete(carId);
 
         if (!result.success) {
-            return ServiceResponse.fail("Car delete fail.", result.message);
+            return ServiceResponse.fail(result.message, result.code);
         }
-        return ServiceResponse.success(result);
+        return result;
     }
 
     async createOldCustomer(carId: number, oldCustomerId: number) {
@@ -48,41 +48,49 @@ export class CarService {
     async getOldCustomers(carId: number) {
         const result = await this.carRepository.getOldCustomers(carId);
         if (!result.success) {
-            return ServiceResponse.fail(result.message);
+            return ServiceResponse.fail(result.message, result.code);
         }
-        return ServiceResponse.success(result);
+        return result;
+    }
+
+    async removeOldCustomer(carId: number, oldCustomerId: number) {
+        const result = await this.carRepository.removeOldCustomer(carId, oldCustomerId);
+        if (!result.success) {
+            return ServiceResponse.fail(result.message, result.code);
+        }
+        return result;
     }
 
     async getAllCar() {
         const result = await this.carRepository.getAll();
         if (!result.success) {
-            return ServiceResponse.fail(result.message);
+            return ServiceResponse.fail(result.message, result.code);
         }
-        return ServiceResponse.success(result);
+        return result;
     }
 
     async getByCustomerId(customerId: number) {
         const result = await this.carRepository.getByCustomerId(customerId);
         if (!result.success) {
-            return ServiceResponse.fail(result.message);
+            return ServiceResponse.fail(result.message, result.code);
         }
-        return ServiceResponse.success(result);
+        return result;
     }
 
     async getByBrandId(brandId: number) {
         const result = await this.carRepository.getByBrandId(brandId);
         if (!result.success) {
-            return ServiceResponse.fail(result.message);
+            return ServiceResponse.fail(result.message, result.code);
         }
-        return ServiceResponse.success(result);
+        return result;
     }
 
     async getByYear(year: number) {
         const result = await this.carRepository.getByYear(year);
         if (!result.success) {
-            return ServiceResponse.fail(result.message);
+            return ServiceResponse.fail(result.message, result.code);
         }
-        return ServiceResponse.success(result);
+        return result;
     }
 
     async getByFuelType(fuelType: number) {

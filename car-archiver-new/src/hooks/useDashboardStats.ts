@@ -11,7 +11,7 @@ export function useDashboardStats() {
     const fetchStats = async () => {
       try {
         // Arka taraftaki (Electron) IPC kanalından verileri istiyoruz
-        const data = await (window as any).electron.ipcRenderer.invoke('get-dashboard-stats');
+        const data = await window.electron.ipcRenderer.invoke('get-dashboard-stats');
         if (data) {
           setStats(data);
         }

@@ -35,8 +35,8 @@ export class PartService {
     } */
 
     async createParts(parts: Part[]) {
-        let addedParts: Part[] = [];
-        let errorParts: Part[] = [];
+        const addedParts: Part[] = [];
+        const errorParts: Part[] = [];
 
         try {
             if (!parts || parts.length === 0) throw new Error("Parts list cannot be empty");

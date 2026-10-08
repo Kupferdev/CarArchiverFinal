@@ -1,19 +1,20 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { LanguageStep } from "./steps/LanguageStep";
 import { EulaStep } from "./steps/EulaStep";
 import { DataDirStep } from './steps/DataDirStep';
 import { FinishStep } from "./steps/FinishStep";
+import type { SetupWizardData } from "./setupTypes";
 
 export const SetupWizard = () => {
   const [step, setStep] = useState(1);
-  const [configData, setConfigData] = useState({
+  const [configData, setConfigData] = useState<SetupWizardData>({
     language: "en",
     eulaAccepted: false,
     savePath: "",
     theme: "light",
   });
 
-  const updateData = (newData: any) => {
+  const updateData = (newData: Partial<SetupWizardData>) => {
     setConfigData((prev) => {
       const updated = { ...prev, ...newData };
       console.log("Güncel Ayar Verisi:", updated);
@@ -23,19 +24,27 @@ export const SetupWizard = () => {
 
   const finishSetup = async () => {
     try {
-      const dbPathResult = await (window as any).electron.ipcRenderer.invoke(
-        "setup-new-data-structure",
+      const setupChannel = configData.isNewUser
+        ? "setup-new-data-structure"
+        : "setup-imported-data";
+
+      const dbPathResult = await window.electron.ipcRenderer.invoke(
+        setupChannel,
         configData.savePath
       );
 
       if (!dbPathResult) {
-        alert("Veritabanı oluşturulurken bir hata meydana geldi!");
-        return; 
+        alert("Veritabanı hazırlanırken bir hata meydana geldi!");
+        return;
       }
 
-      const finalConfig = { ...configData, savePath: dbPathResult };
+      const finalConfig = {
+        ...configData,
+        savePath: dbPathResult,
+        onboardingCompleted: true,
+      };
 
-      const success = await (window as any).electron.ipcRenderer.invoke(
+      const success = await window.electron.ipcRenderer.invoke(
         "save-config",
         finalConfig 
       );

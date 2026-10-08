@@ -30,6 +30,142 @@ export interface DashboardInfo {
   fabNewService: string;
   fabNewCustomer: string;
   fabNewCar: string;
+
+  carListTitle?: string;
+  carSearchPlaceholder?: string;
+  carNewTitle?: string;
+  carNewButton?: string;
+  carEditTitle?: string;
+  carProfileTitle?: string;
+  carFormSubtitle?: string;
+  carBasicSection?: string;
+  carIdentitySection?: string;
+  carBrand?: string;
+  carModel?: string;
+  carYear?: string;
+  carPlate?: string;
+  carVin?: string;
+  carKm?: string;
+  carCustomer?: string;
+  carCustomerSearch?: string;
+  carCustomerNotFound?: string;
+  carPlateRequired?: string;
+  carModelPlaceholder?: string;
+  carPlatePlaceholder?: string;
+  carVinPlaceholder?: string;
+  carKmPlaceholder?: string;
+  carYearSelect?: string;
+  carYearPlaceholder?: string;
+  carFuelType?: string;
+  carFuelTypeSelect?: string;
+  carTechnicalSection?: string;
+  carBodyType?: string;
+  carBodyTypeSelect?: string;
+  carEngineVolume?: string;
+  carEngineVolumePlaceholder?: string;
+  carNotes?: string;
+  carNotesPlaceholder?: string;
+  carOldCustomers?: string;
+  carOldCustomersHint?: string;
+  carAddOldCustomer?: string;
+  carRemoveOldCustomer?: string;
+  carNoOldCustomers?: string;
+  carOldCustomerAdded?: string;
+  carOldCustomerRemoved?: string;
+  carCustomerChangeTitle?: string;
+  carAddPreviousCustomerToHistory?: string;
+  carCustomerChangeContinue?: string;
+  carUpdatedWithHistory?: string;
+  carNoCustomer?: string;
+  carBrandSelect?: string;
+  brandNew?: string;
+  brandNewPlaceholder?: string;
+  brandAdd?: string;
+  brandAdded?: string;
+  carBrandRequired?: string;
+  carModelRequired?: string;
+  carCreate?: string;
+  carSaveChanges?: string;
+  carCreated?: string;
+  carUpdated?: string;
+  carDeleted?: string;
+  carDeleteConfirm?: string;
+  carNoRecords?: string;
+  carLoading?: string;
+  carSaving?: string;
+  carNotFound?: string;
+  carView?: string;
+  carEdit?: string;
+  carDelete?: string;
+  carActions?: string;
+  cancel?: string;
+  carUnexpectedError?: string;
+  carCurrentUser?: string;
+  carCurrentUserHint?: string;
+  carCurrentUserBadge?: string;
+  carOldUsers?: string;
+  carOldUsersProfileHint?: string;
+  carNoCurrentUser?: string;
+  carNoOldUsersProfile?: string;
+  carNoContactInfo?: string;
+  carServiceHistory?: string;
+  carNoServiceHistory?: string;
+  serviceListTitle?: string;
+  serviceDate?: string;
+  servicePlate?: string;
+  serviceSearchPlaceholder?: string;
+  serviceNewTitle?: string;
+  serviceNewButton?: string;
+  serviceEditTitle?: string;
+  serviceProfileTitle?: string;
+  serviceBasicSection?: string;
+  serviceComplaintSection?: string;
+  serviceDamageSection?: string;
+  serviceFinancialSection?: string;
+  servicePartsSection?: string;
+  serviceStatusSection?: string;
+  serviceCar?: string;
+  serviceCarSelect?: string;
+  serviceCustomer?: string;
+  serviceNoCustomer?: string;
+  serviceApplicationDate?: string;
+  serviceAppointmentDate?: string;
+  serviceDeliveryDate?: string;
+  serviceTargetDelivery?: string;
+  serviceJobDuration?: string;
+  serviceKm?: string;
+  serviceComplaints?: string;
+  serviceComplaintRequired?: string;
+  serviceExtraRequests?: string;
+  serviceFaults?: string;
+  serviceOnePerLine?: string;
+  serviceDamageOnReceive?: string;
+  serviceDamageDuringRepair?: string;
+  serviceLaborCharge?: string;
+  serviceTotalCharge?: string;
+  serviceDelivered?: string;
+  serviceYes?: string;
+  serviceNo?: string;
+  serviceAddPart?: string;
+  servicePartName?: string;
+  servicePartTax?: string;
+  servicePartPrice?: string;
+  serviceNoParts?: string;
+  serviceCreate?: string;
+  serviceSaveChanges?: string;
+  serviceSaving?: string;
+  serviceCreated?: string;
+  serviceUpdated?: string;
+  serviceDeleted?: string;
+  serviceDelete?: string;
+  serviceDeleteConfirm?: string;
+  serviceView?: string;
+  serviceActions?: string;
+  serviceLoading?: string;
+  serviceNotFound?: string;
+  serviceNoRecords?: string;
+  serviceCarRequired?: string;
+  serviceUnexpectedError?: string;
 }
 
 export const DashboardInfoTexts: Array<DashboardInfo> = [
@@ -52,7 +188,9 @@ export const DashboardInfoTexts: Array<DashboardInfo> = [
     rightPanelApproaching: "Approaching delivery",
     fabNewService: "New service record",
     fabNewCustomer: "New customer",
-    fabNewCar: "New car"
+    fabNewCar: "New car",
+    serviceListTitle: "Service records", serviceDate: "Date", servicePlate: "Plate", serviceSearchPlaceholder: "Search by plate, customer, complaint or VIN...", serviceNewTitle: "New service record", serviceNewButton: "New service", serviceEditTitle: "Edit service record", serviceProfileTitle: "Service record", serviceBasicSection: "Service information", serviceComplaintSection: "Customer complaint", serviceDamageSection: "Damage and inspection", serviceFinancialSection: "Delivery and charges", servicePartsSection: "Changed parts", serviceStatusSection: "Status", serviceCar: "Vehicle", serviceCarSelect: "Select a vehicle", serviceCustomer: "Customer", serviceNoCustomer: "No customer", serviceApplicationDate: "Application date", serviceAppointmentDate: "Appointment date", serviceDeliveryDate: "Delivery date", serviceTargetDelivery: "Target delivery", serviceJobDuration: "Job duration (min)", serviceKm: "Mileage", serviceComplaints: "Complaints", serviceComplaintRequired: "Please enter the customer complaint.", serviceExtraRequests: "Extra requests", serviceFaults: "Faults", serviceOnePerLine: "One item per line", serviceDamageOnReceive: "Damage on arrival", serviceDamageDuringRepair: "Damage during repair", serviceLaborCharge: "Labor charge", serviceTotalCharge: "Total charge", serviceDelivered: "Delivered", serviceYes: "Yes", serviceNo: "No", serviceAddPart: "Add part", servicePartName: "Part name", servicePartTax: "Tax %", servicePartPrice: "Part price", serviceNoParts: "No parts recorded for this service.", serviceCreate: "Save service", serviceSaveChanges: "Save changes", serviceSaving: "Saving...", serviceCreated: "Service record created.", serviceUpdated: "Service record updated.", serviceDeleted: "Service record deleted.", serviceDelete: "Delete", serviceDeleteConfirm: "Delete this service record and its changed-part records?", serviceView: "View", serviceActions: "Actions", serviceLoading: "Loading...", serviceNotFound: "Service record not found.", serviceNoRecords: "No service records found.", serviceCarRequired: "Please select a vehicle.", serviceUnexpectedError: "An unexpected error occurred.",
+    carListTitle: "Car list", carSearchPlaceholder: "Search by plate, VIN, model or customer...", carNewTitle: "New car", carNewButton: "New car", carEditTitle: "Edit car", carProfileTitle: "Car profile", carFormSubtitle: "Record the vehicle information used in service history.", carBasicSection: "Basic information", carIdentitySection: "Vehicle identification", carBrand: "Brand", carModel: "Model", carYear: "Year", carPlate: "Plate", carVin: "VIN", carKm: "Mileage", carCustomer: "Customer", carCustomerSearch: "Search customers...", carCustomerNotFound: "No customer found.", carNoCustomer: "No customer", carBrandSelect: "Select a brand", brandNew: "New brand", brandNewPlaceholder: "Ford", brandAdd: "Add", brandAdded: "Brand saved.", carPlateRequired: "Please enter a plate number.", carModelPlaceholder: "Fiesta", carPlatePlaceholder: "", carVinPlaceholder: "WF0...", carKmPlaceholder: "180000", carYearSelect: "Select a year", carYearPlaceholder: "1997", carTechnicalSection: "Technical information", carFuelType: "Fuel type", carFuelTypeSelect: "Select fuel type", carBodyType: "Body type", carBodyTypeSelect: "Select body type", carEngineVolume: "Engine displacement", carEngineVolumePlaceholder: "1398", carNotes: "Notes", carNotesPlaceholder: "LPG, triger 165.000 km'de değişti...", carOldCustomers: "Previous users", carOldCustomersHint: "Users previously linked to this vehicle.", carAddOldCustomer: "Add previous user", carRemoveOldCustomer: "Remove previous user", carNoOldCustomers: "No previous users.", carOldCustomerAdded: "Previous user added.", carOldCustomerRemoved: "Previous user removed.", carCustomerChangeTitle: "Move {{previous}} to previous users and assign this vehicle to {{next}}?", carAddPreviousCustomerToHistory: "Add the previous user to this vehicle's previous user list.", carCustomerChangeContinue: "Continue", carBrandRequired: "Please select a brand.", carModelRequired: "Please enter a model.", carCreate: "Save car", carSaveChanges: "Save changes", carCreated: "Car created.", carUpdated: "Car updated.", carUpdatedWithHistory: "Car updated. Previous user moved to history.", carDeleted: "Car deleted.", carDeleteConfirm: "Delete this car? Its related service records may also be affected.", carNoRecords: "No cars found.", carLoading: "Loading...", carSaving: "Saving...", carNotFound: "Car not found.", carView: "View", carEdit: "Edit", carDelete: "Delete", carActions: "Actions", cancel: "Cancel", carUnexpectedError: "An unexpected error occurred.", carCurrentUser: "User", carCurrentUserHint: "The customer currently linked to this vehicle.", carCurrentUserBadge: "Current user", carOldUsers: "Previous users", carOldUsersProfileHint: "Customers previously linked to this vehicle.", carNoCurrentUser: "No current user is linked to this vehicle.", carNoOldUsersProfile: "No previous users recorded.", carNoContactInfo: "No contact information", carServiceHistory: "Service history", carNoServiceHistory: "No service records have been added for this vehicle yet."
   },
   {
     id: 2,
@@ -163,14 +301,14 @@ export const DashboardInfoTexts: Array<DashboardInfo> = [
     id: 7,
     languageCode: "tr",
     searchPlaceholder: "Plaka, müşteri adı veya VIN ile ara...",
-    tabCars: "Arabalar",
+    tabCars: "Araçlar",
     cardServiceRecordsTitle: "Servis kayıtları",
     cardServiceRecordsStat: "Toplam kayıt",
     cardServiceRecordsUnit: "servis",
     cardCustomersTitle: "Müşteriler",
     cardCustomersStat: "Kayıtlı müşteri",
     cardCustomersUnit: "kişi",
-    cardCarsTitle: "Arabalar",
+    cardCarsTitle: "Araçlar",
     cardCarsStat: "Kayıtlı araç",
     cardCarsUnit: "araç",
     rightPanelUpcoming: "Gelecek randevular",
@@ -178,7 +316,9 @@ export const DashboardInfoTexts: Array<DashboardInfo> = [
     rightPanelApproaching: "Teslim yaklaşan",
     fabNewService: "Yeni servis kaydı",
     fabNewCustomer: "Yeni müşteri",
-    fabNewCar: "Yeni araç"
+    fabNewCar: "Yeni araç",
+    serviceListTitle: "Servis Kayıtları", serviceDate: "Tarih", servicePlate: "Plaka", serviceSearchPlaceholder: "Plaka, müşteri, şikâyet veya araç ile ara...", serviceNewTitle: "Yeni Servis Kaydı", serviceNewButton: "Yeni Servis", serviceEditTitle: "Servis Kaydını Düzenle", serviceProfileTitle: "Servis Kaydı", serviceBasicSection: "Servis Bilgileri", serviceComplaintSection: "Müşteri Şikâyeti", serviceDamageSection: "Hasar ve Kontrol", serviceFinancialSection: "Teslim ve Ücretler", servicePartsSection: "Değişen Parçalar", serviceStatusSection: "Durum", serviceCar: "Araç", serviceCarSelect: "Araç seçin", serviceCustomer: "Kullanıcı", serviceNoCustomer: "Kullanıcı seçilmedi", serviceApplicationDate: "Kabul Tarihi", serviceAppointmentDate: "Randevu Tarihi", serviceDeliveryDate: "Teslim Tarihi", serviceTargetDelivery: "Hedef Teslim", serviceJobDuration: "İş Süresi (dk)", serviceKm: "Kilometre", serviceComplaints: "Şikâyet", serviceComplaintRequired: "Lütfen müşteri şikâyetini girin.", serviceExtraRequests: "Ek Talepler", serviceFaults: "Arızalar", serviceOnePerLine: "Her satıra bir kayıt", serviceDamageOnReceive: "Girişte mevcut hasar", serviceDamageDuringRepair: "Onarım sırasında oluşan hasar", serviceLaborCharge: "İşçilik Ücreti", serviceTotalCharge: "Toplam Ücret", serviceDelivered: "Teslim edildi", serviceYes: "Evet", serviceNo: "Hayır", serviceAddPart: "Parça Ekle", servicePartName: "Parça adı", servicePartTax: "KDV %", servicePartPrice: "Parça fiyatı", serviceNoParts: "Bu servis kaydında değişen parça bulunmuyor.", serviceCreate: "Servis Kaydını Kaydet", serviceSaveChanges: "Değişiklikleri Kaydet", serviceSaving: "Kaydediliyor...", serviceCreated: "Servis kaydı oluşturuldu.", serviceUpdated: "Servis kaydı güncellendi.", serviceDeleted: "Servis kaydı silindi.", serviceDelete: "Sil", serviceDeleteConfirm: "Bu servis kaydı ve bağlı değişen parça kayıtları silinsin mi?", serviceView: "Görüntüle", serviceActions: "İşlemler", serviceLoading: "Yükleniyor...", serviceNotFound: "Servis kaydı bulunamadı.", serviceNoRecords: "Servis kaydı bulunamadı.", serviceCarRequired: "Lütfen araç seçin.", serviceUnexpectedError: "Beklenmeyen bir hata oluştu.",
+    carListTitle: "Araç Listesi", carSearchPlaceholder: "Plaka, VIN, model veya müşteri ile ara...", carNewTitle: "Yeni Araç", carNewButton: "Yeni Araç", carEditTitle: "Araç Düzenle", carProfileTitle: "Araç Profili", carFormSubtitle: "Servis geçmişinde kullanılacak araç bilgilerini kaydedin.", carBasicSection: "Temel Bilgiler", carIdentitySection: "Araç Bilgileri", carBrand: "Marka", carModel: "Model", carYear: "Yıl", carPlate: "Plaka", carVin: "VIN", carKm: "Kilometre", carCustomer: "Müşteri", carCustomerSearch: "Müşteri ara...", carCustomerNotFound: "Müşteri bulunamadı.", carNoCustomer: "Müşteri seçilmedi", carBrandSelect: "Marka seçin", brandNew: "Yeni marka", brandNewPlaceholder: "Marka adı", brandAdd: "Ekle", brandAdded: "Marka kaydedildi.", carPlateRequired: "Lütfen plaka girin.", carModelPlaceholder: "Model adı", carPlatePlaceholder: "", carVinPlaceholder: "WF0...", carKmPlaceholder: "180000", carYearSelect: "Yıl seçin", carYearPlaceholder: "1997", carTechnicalSection: "Teknik Bilgiler", carFuelType: "Yakıt Tipi", carFuelTypeSelect: "Yakıt tipi seçin", carBodyType: "Kasa Tipi", carBodyTypeSelect: "Kasa tipi seçin", carEngineVolume: "Motor Hacmi", carEngineVolumePlaceholder: "1398", carNotes: "Notlar", carNotesPlaceholder: "LPG, triger 165.000 km'de değişti...", carOldCustomers: "Eski Kullanıcılar", carOldCustomersHint: "Daha önce bu araçla ilişkilendirilmiş kullanıcılar.", carAddOldCustomer: "Eski kullanıcı ekle", carRemoveOldCustomer: "Eski kullanıcıyı kaldır", carNoOldCustomers: "Kayıtlı eski kullanıcı yok.", carOldCustomerAdded: "Eski kullanıcı eklendi.", carOldCustomerRemoved: "Eski kullanıcı kaldırıldı.", carCustomerChangeTitle: "{{previous}} eski kullanıcılara taşınıp araç {{next}} adına mı kaydedilsin?", carAddPreviousCustomerToHistory: "Önceki kullanıcıyı bu aracın eski kullanıcılar listesine ekle.", carCustomerChangeContinue: "Devam Et", carBrandRequired: "Lütfen marka seçin.", carModelRequired: "Lütfen model girin.", carCreate: "Aracı Kaydet", carSaveChanges: "Değişiklikleri Kaydet", carCreated: "Araç oluşturuldu.", carUpdated: "Araç güncellendi.", carUpdatedWithHistory: "Araç güncellendi. Önceki kullanıcı eski kullanıcılara taşındı.", carDeleted: "Araç silindi.", carDeleteConfirm: "Bu araç silinsin mi? Bağlı servis kayıtları da etkilenebilir.", carNoRecords: "Kayıtlı araç bulunamadı.", carLoading: "Yükleniyor...", carSaving: "Kaydediliyor...", carNotFound: "Araç bulunamadı.", carView: "Görüntüle", carEdit: "Düzenle", carDelete: "Sil", carActions: "İşlemler", cancel: "İptal", carUnexpectedError: "Beklenmeyen bir hata oluştu.", carCurrentUser: "Kullanıcı", carCurrentUserHint: "Bu araçla şu anda ilişkilendirilmiş kullanıcı.", carCurrentUserBadge: "Mevcut Kullanıcı", carOldUsers: "Eski Kullanıcılar", carOldUsersProfileHint: "Daha önce bu araçla ilişkilendirilmiş kullanıcılar.", carNoCurrentUser: "Bu araçla ilişkilendirilmiş mevcut kullanıcı yok.", carNoOldUsersProfile: "Kayıtlı eski kullanıcı bulunmuyor.", carNoContactInfo: "İletişim bilgisi bulunmuyor", carServiceHistory: "Servis Geçmişi", carNoServiceHistory: "Bu araç için henüz servis kaydı bulunmuyor."
   },
   {
     id: 8,

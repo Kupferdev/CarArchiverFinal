@@ -10,7 +10,8 @@ export function createCustomerPhoneNumbersTable() {
         phoneNumberId INTEGER PRIMARY KEY AUTOINCREMENT,
         customerId  INTEGER NOT NULL,
         countryCode TEXT NOT NULL,
-        phoneNumber TEXT NOT NULL
+        phoneNumber TEXT NOT NULL,
+        FOREIGN KEY (customerId) REFERENCES Customers(customerId) ON DELETE CASCADE
         );
 `;
 

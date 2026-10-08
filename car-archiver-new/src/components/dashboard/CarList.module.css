@@ -1,0 +1,212 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-card);
+  border: 0.5px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-main);
+}
+
+.toolbar {
+  padding: 16px 20px;
+  border-bottom: 0.5px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.toolbarRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.searchInput {
+  padding: 8px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  color: var(--text-main);
+  width: 320px;
+  font-size: 13px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.searchInput:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.addNewBtn {
+  padding: 8px 16px;
+  background: var(--accent-blue, #3b82f6);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+
+.addNewBtn:hover {
+  opacity: 0.9;
+}
+
+.selectionModeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  color: var(--text-muted, #a1a1aa);
+  border: 1px solid var(--border-color, #2b2b40);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.selectionModeBtn:hover {
+  color: var(--accent-blue, #3b82f6);
+  border-color: var(--accent-blue, #3b82f6);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.cancelIconBtn:hover {
+  color: #ef4444 !important;
+  border-color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
+.bulkDeleteIconBtn {
+  gap: 6px;
+  width: auto;
+  min-width: 36px;
+  padding: 0 10px;
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+.bulkDeleteIconBtn:hover {
+  background-color: #ef4444;
+  color: #ffffff;
+}
+
+.selectedCount {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tableWrap {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  min-width: 900px;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel);
+  padding: 12px 20px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+  border-bottom: 0.5px solid var(--border-color);
+  z-index: 1;
+}
+
+.table td {
+  padding: 12px 20px;
+  font-size: 13px;
+  color: var(--text-main);
+  border-bottom: 0.5px solid var(--border-color);
+}
+
+.tableRow {
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+
+.tableRow:hover {
+  background: var(--bg-hover);
+}
+
+.selectedRow {
+  background-color: rgba(59, 130, 246, 0.05) !important;
+}
+
+.checkboxHeader,
+.checkboxCell {
+  width: 40px;
+  padding-left: 16px !important;
+  padding-right: 8px !important;
+  text-align: center;
+}
+
+.rowCheckbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent-blue, #3b82f6);
+}
+
+.actionsHeader,
+.actionsCell {
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.actionBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+}
+
+.actionBtn:last-child {
+  margin-right: 0;
+}
+
+.actionBtn:hover {
+  background: var(--bg-hover);
+  color: var(--accent-blue);
+}
+
+.deleteIconBtn:hover {
+  background-color: #fee2e2 !important;
+  color: #ef4444 !important;
+}
+
+.emptyState {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}

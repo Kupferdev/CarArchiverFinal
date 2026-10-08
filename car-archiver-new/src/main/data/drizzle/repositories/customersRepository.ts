@@ -11,6 +11,8 @@ import { Services } from '../schemas/servicesSchema';
 import { BaseRepository } from "./baseRepository";
 import { IApiResponse, ServiceResponse } from "../../../../models/response.model";
 import { inArray } from 'drizzle-orm';
+import type { InferInsertModel } from 'drizzle-orm';
+import type { CreateCustomerRequest } from "../../../../shared/dtos/customerDtos";
 
 import { PhoneNumbers } from "../schemas/customerSchemas/phoneNumbersSchema";
 import { Emails } from "../schemas/customerSchemas/emailsSchema";
@@ -18,6 +20,45 @@ import { Emails } from "../schemas/customerSchemas/emailsSchema";
 export class CustomersRepository extends BaseRepository<typeof Customers> {
   constructor() {
     super(Customers, "customerId");
+  }
+
+  /** Creates a customer and all contact records atomically. */
+  async createWithContacts(
+    customer: InferInsertModel<typeof Customers>,
+    phones: Omit<InferInsertModel<typeof PhoneNumbers>, "customerId">[] = [],
+    emails: Omit<InferInsertModel<typeof Emails>, "customerId">[] = []
+  ): Promise<IApiResponse<number>> {
+    try {
+      const db = useDb();
+
+      const customerId = db.transaction((tx) => {
+        const inserted = tx
+          .insert(Customers)
+          .values(customer)
+          .returning({ customerId: Customers.customerId })
+          .get();
+
+        if (!inserted) throw new Error("Customer could not be created.");
+
+        if (phones.length > 0) {
+          tx.insert(PhoneNumbers)
+            .values(phones.map((phone) => ({ ...phone, customerId: inserted.customerId })))
+            .run();
+        }
+
+        if (emails.length > 0) {
+          tx.insert(Emails)
+            .values(emails.map((email) => ({ ...email, customerId: inserted.customerId })))
+            .run();
+        }
+
+        return inserted.customerId;
+      });
+
+      return ServiceResponse.success(customerId, "Customer created successfully.");
+    } catch (err) {
+      return this.handleError(err, "Failed to create customer and contacts.");
+    }
   }
 
   async getByNatId(nationalId: string): Promise<IApiResponse<InferSelectModel<typeof Customers> | undefined>> {
@@ -37,7 +78,7 @@ export class CustomersRepository extends BaseRepository<typeof Customers> {
         );
       }
 
-      return ServiceResponse.fail("Customer not found with this National ID.", "NOT_FOUND") as any;
+      return ServiceResponse.fail("Customer not found with this National ID.", "NOT_FOUND");
     } catch (err) {
       return this.handleError(err, "Failed to fetch customer by National ID.");
     }
@@ -86,19 +127,17 @@ export class CustomersRepository extends BaseRepository<typeof Customers> {
       const phonesList = await db.select().from(PhoneNumbers).where(eq(PhoneNumbers.customerId, customerId));
       const emailsList = await db.select().from(Emails).where(eq(Emails.customerId, customerId));
 
-      return { 
-        success: true, 
-        data: { 
-          customer: customerData[0], 
-          cars: carsList, 
-          services: servicesList,
-          phones: phonesList, // Yüklemeye dahil edildi
-          emails: emailsList  // Yüklemeye dahil edildi
-        } 
-      };
+      const customer = customerData[0];
+      if (!customer) {
+        return ServiceResponse.fail("Customer not found.", "NOT_FOUND");
+      }
+
+      return ServiceResponse.success(
+        { customer, cars: carsList, services: servicesList, phones: phonesList, emails: emailsList },
+        "Customer profile retrieved successfully."
+      );
     } catch (err) {
-      console.error("Profil verisi çekilirken hata oluştu:", err);
-      return { success: false, data: null, message: "Profil yüklenemedi." };
+      return this.handleError(err, "Failed to load customer profile.");
     }
   }
 
@@ -106,27 +145,44 @@ export class CustomersRepository extends BaseRepository<typeof Customers> {
   async getAllCustomersWithDetails() {
     try {
       const db = useDb();
-      const allCustomers = await db.select().from(Customers);
-      
-      const result = [];
-      for (const c of allCustomers) {
-        const phones = await db.select().from(PhoneNumbers).where(eq(PhoneNumbers.customerId, c.customerId));
-        const emails = await db.select().from(Emails).where(eq(Emails.customerId, c.customerId));
-        
-        result.push({
-          id: c.customerId,
-          fullName: `${c.firstName} ${c.lastName || ''}`.trim(),
-          nationalId: c.nationalId || '',
-          taxNumber: c.taxNumber || '',
-          // Arayüzün (UI) beklediği DTO formatına dönüştürüyoruz
-          phones: phones.map((p: any) => ({ countryCode: p.countryCode, number: p.phoneNumber })),
-          emails: emails.map((e: any) => ({ address: e.customerEmail }))
-        });
+      const [allCustomers, allPhones, allEmails] = await Promise.all([
+        db.select().from(Customers),
+        db.select().from(PhoneNumbers),
+        db.select().from(Emails),
+      ]);
+
+      const phonesByCustomer = new Map<number, typeof allPhones>();
+      for (const phone of allPhones) {
+        const list = phonesByCustomer.get(phone.customerId) ?? [];
+        list.push(phone);
+        phonesByCustomer.set(phone.customerId, list);
       }
-      return { success: true, data: result };
-    } catch (err: any) {
+
+      const emailsByCustomer = new Map<number, typeof allEmails>();
+      for (const email of allEmails) {
+        const list = emailsByCustomer.get(email.customerId) ?? [];
+        list.push(email);
+        emailsByCustomer.set(email.customerId, list);
+      }
+
+      const result = allCustomers.map((customer) => ({
+        id: customer.customerId,
+        fullName: `${customer.firstName} ${customer.lastName || ''}`.trim(),
+        nationalId: customer.nationalId || '',
+        taxNumber: customer.taxNumber || '',
+        phones: (phonesByCustomer.get(customer.customerId) ?? []).map((phone) => ({
+          countryCode: phone.countryCode,
+          number: phone.phoneNumber,
+        })),
+        emails: (emailsByCustomer.get(customer.customerId) ?? []).map((email) => ({
+          address: email.customerEmail,
+        })),
+      }));
+
+      return ServiceResponse.success(result, "Customers with contact details retrieved successfully.");
+    } catch (err) {
       console.error("🆘 Detaylı müşteri listesi çekilirken hata:", err);
-      return { success: false, message: err.message, data: [] };
+      return this.handleError(err, "Failed to fetch customers with contact details.");
     }
   }
 
@@ -137,31 +193,41 @@ export class CustomersRepository extends BaseRepository<typeof Customers> {
       const customer = await db.select().from(Customers).where(eq(Customers.customerId, customerId));
       const phones = await db.select().from(PhoneNumbers).where(eq(PhoneNumbers.customerId, customerId));
       const emails = await db.select().from(Emails).where(eq(Emails.customerId, customerId));
-      return { success: true, data: { customer: customer[0], phones, emails } };
-    } catch (err: any) {
-      return { success: false, message: err.message };
+      if (!customer[0]) {
+        return ServiceResponse.fail("Customer not found.", "NOT_FOUND");
+      }
+      return ServiceResponse.success(
+        { customer: customer[0], phones, emails },
+        "Customer edit data retrieved successfully."
+      );
+    } catch (err) {
+      return this.handleError(err, "Failed to load customer edit data.");
     }
   }
 
 // Müşteriyi telefon ve mailleriyle güncelleyen metot (Senkron Transaction ile)
-  async updateCustomerFull(customerId: number, data: any) {
+  async updateCustomerFull(customerId: number, data: CreateCustomerRequest): Promise<IApiResponse<null>> {
     try {
       const db = useDb();
       
       // DİKKAT: better-sqlite3 senkron çalışır. async veya await YOK! İşlemlerin sonuna .run() eklenir.
       db.transaction((tx) => {
         // 1. Ana bilgileri güncelle
-        tx.update(Customers).set({
+        const updatedCustomer = tx.update(Customers).set({
           firstName: data.firstName,
           lastName: data.lastName,
           nationalId: data.nationalId,
           taxNumber: data.taxNumber
-        }).where(eq(Customers.customerId, customerId)).run();
+        }).where(eq(Customers.customerId, customerId)).returning({ customerId: Customers.customerId }).get();
+
+        if (!updatedCustomer) {
+          throw new Error("Customer not found.");
+        }
 
         // 2. Eski telefonları sil, yenilerini kaydet
         tx.delete(PhoneNumbers).where(eq(PhoneNumbers.customerId, customerId)).run();
         if (data.phones && data.phones.length > 0) {
-          tx.insert(PhoneNumbers).values(data.phones.map((p: any) => ({
+          tx.insert(PhoneNumbers).values(data.phones.map((p) => ({
             customerId, countryCode: p.countryCode, phoneNumber: p.number
           }))).run();
         }
@@ -169,71 +235,94 @@ export class CustomersRepository extends BaseRepository<typeof Customers> {
         // 3. Eski mailleri sil, yenilerini kaydet
         tx.delete(Emails).where(eq(Emails.customerId, customerId)).run();
         if (data.emails && data.emails.length > 0) {
-          tx.insert(Emails).values(data.emails.map((e: any) => ({
+          tx.insert(Emails).values(data.emails.map((e) => ({
             customerId, customerEmail: e.address
           }))).run();
         }
       }); // Transaction bloğu bittiğinde veritabanına otomatik commit atılır.
 
-      return { success: true };
-    } catch (err: any) {
-      return { success: false, message: err.message };
+      return ServiceResponse.success(null, "Customer updated successfully.");
+    } catch (err) {
+      return this.handleError(err, "Failed to update customer.");
     }
   }
 
-  // Müşteriyi ve (istenirse) bağlı kayıtları silen metot
+  // Müşteriyi ve (istenirse) bağlı kayıtları tek transaction içinde siler.
   async deleteCustomer(customerId: number, deleteRelated: boolean) {
     try {
       const db = useDb();
-      
+
       db.transaction((tx) => {
-        // 1. Telefon ve mailler müşteriye sıkı sıkıya bağlıdır, her halükarda silinir.
         tx.delete(PhoneNumbers).where(eq(PhoneNumbers.customerId, customerId)).run();
         tx.delete(Emails).where(eq(Emails.customerId, customerId)).run();
 
-        // 2. Kullanıcı araç ve servisleri de silmek istediyse:
         if (deleteRelated) {
-          // İleride Arabalar ve Servisler tablolarını oluşturduğunda buraya onların silme kodunu da ekleyeceğiz.
-          // Örn: tx.delete(Cars).where(eq(Cars.customerId, customerId)).run();
-          // Örn: tx.delete(Services).where(eq(Services.customerId, customerId)).run();
+          // Services reference cars, so delete services before cars.
+          tx.delete(Services).where(eq(Services.customerId, customerId)).run();
+          tx.delete(Cars).where(eq(Cars.customerId, customerId)).run();
+        } else {
+          // Preserve cars/services while removing the customer relationship.
+          tx.update(Cars)
+            .set({ customerId: null })
+            .where(eq(Cars.customerId, customerId))
+            .run();
+          tx.update(Services)
+            .set({ customerId: null })
+            .where(eq(Services.customerId, customerId))
+            .run();
         }
 
-        // 3. Son olarak müşterinin kendisini sil
-        tx.delete(Customers).where(eq(Customers.customerId, customerId)).run();
+        const deleted = tx
+          .delete(Customers)
+          .where(eq(Customers.customerId, customerId))
+          .returning({ customerId: Customers.customerId })
+          .get();
+
+        if (!deleted) throw new Error("Customer not found.");
       });
 
-      return { success: true };
-    } catch (err: any) {
-      return { success: false, message: err.message };
+      return ServiceResponse.success(null, "Customer deleted.");
+    } catch (err) {
+      return this.handleError(err, "Failed to delete customer.");
     }
   }
 
 // TOPLU SİLME METODU
   async deleteCustomersBulk(customerIds: number[], deleteRelated: boolean) {
     try {
+      if (customerIds.length === 0) {
+        return ServiceResponse.success(null, "No customers selected.");
+      }
+
       const db = useDb();
-      
+
       db.transaction((tx) => {
-        // Gelen ID listesindeki tüm telefon ve e-postaları sil
         tx.delete(PhoneNumbers).where(inArray(PhoneNumbers.customerId, customerIds)).run();
         tx.delete(Emails).where(inArray(Emails.customerId, customerIds)).run();
 
         if (deleteRelated) {
-          // İleride buraya inArray ile toplu araba ve servis silme kodları gelecek
+          tx.delete(Services).where(inArray(Services.customerId, customerIds)).run();
+          tx.delete(Cars).where(inArray(Cars.customerId, customerIds)).run();
+        } else {
+          tx.update(Cars)
+            .set({ customerId: null })
+            .where(inArray(Cars.customerId, customerIds))
+            .run();
+          tx.update(Services)
+            .set({ customerId: null })
+            .where(inArray(Services.customerId, customerIds))
+            .run();
         }
 
-        // Müşterileri topluca sil
-        tx.delete(Customers).where(inArray(Customers.customerId, customerIds)).run();
+        tx.delete(Customers)
+          .where(inArray(Customers.customerId, customerIds))
+          .run();
       });
 
-      return { success: true };
-    } catch (err: any) {
-      return { success: false, message: err.message };
+      return ServiceResponse.success(null, "Customers deleted.");
+    } catch (err) {
+      return this.handleError(err, "Failed to delete customers.");
     }
   }
-  
-
-
-
 
 }

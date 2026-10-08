@@ -5,7 +5,7 @@ export function useInitialConfig() {
 
   useEffect(() => {
     const check = async () => {
-      const exists = await (window as any).electron.ipcRenderer.invoke('check-config');
+      const exists = await window.electron.ipcRenderer.invoke('check-config');
       setIsFirstRun(!exists);
     };
     check();

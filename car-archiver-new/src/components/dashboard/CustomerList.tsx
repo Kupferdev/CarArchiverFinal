@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import styles from './CustomerList.module.css';
-import { CustomerViewDto } from '../../shared/dto\'s/customerDtos';
+import { CustomerViewDto } from '../../shared/dtos/customerDtos';
 import { useTabStore } from '../../store/tabStore';
 import { useToastStore } from '../../store/toastStore';
 
@@ -25,7 +25,7 @@ const CustomerList: React.FC = () => {
   const fetchCustomers = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await (window as any).electron.ipcRenderer.invoke('get-all-customers');
+      const data = await window.electron.ipcRenderer.invoke('get-all-customers');
       if (data && data.length > 0) {
         const sortedData = data.sort((a: CustomerViewDto, b: CustomerViewDto) => b.id - a.id);
         setCustomers(sortedData);
@@ -102,7 +102,7 @@ const CustomerList: React.FC = () => {
     try {
       if (isBulkDeleteMode) {
         // TOPLU SİLME
-        const result = await (window as any).electron.ipcRenderer.invoke('delete-customers-bulk', {
+        const result = await window.electron.ipcRenderer.invoke('delete-customers-bulk', {
           ids: selectedIds,
           deleteRelated: deleteRelated
         });
@@ -122,7 +122,7 @@ const CustomerList: React.FC = () => {
       } else {
         // TEKLİ SİLME
         if (!customerToDelete) return;
-        const result = await (window as any).electron.ipcRenderer.invoke('delete-customer', {
+        const result = await window.electron.ipcRenderer.invoke('delete-customer', {
           id: customerToDelete.id,
           deleteRelated: deleteRelated
         });

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import styles from '../../styles/setup/DataDitStep.module.css'; 
 import { SetupInfoTexts } from "../../i18n/setupWizard";
+import type { SetupWizardData } from "../setupTypes";
 
 interface FinishStepProps {
-    configData: any;
+    configData: SetupWizardData;
     language: string;
     onComplete: () => Promise<void> | void; 
     onBack: () => void;

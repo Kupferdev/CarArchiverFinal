@@ -1,6 +1,3 @@
-import { createCustomerEmailsTable } from "./createCustomerEmailDb";
-import { createCustomerPhoneNumbersTable } from "./createCustomerPhoneNumberDb";
-
 import { getDb } from "../../db";
 
 export function createCustomersTable() {
@@ -26,4 +23,4 @@ export function createCustomersTable() {
     }
 
 
-};
+}

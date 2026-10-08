@@ -23,7 +23,7 @@ export interface PaginationMeta {
 }
 
 // 4. Ana Response Interface'i
-export interface IApiResponse<T = any> {
+export interface IApiResponse<T = unknown> {
   success: boolean;
   status: ResponseStatus;
   message: string;
@@ -69,7 +69,7 @@ export class ServiceResponse {
   }
 
   // İş Kuralı Hatası (Örn: "Stok yetersiz")
-  static fail(message: string, code?: string): IApiResponse<null> {
+  static fail<T = never>(message: string, code?: string): IApiResponse<T> {
     return {
       success: false,
       status: ResponseStatus.FAIL,
@@ -79,18 +79,18 @@ export class ServiceResponse {
   }
 
   // Sistem Hatası (Try-Catch blokları için)
-  static error(error: any, message: string = "An unexpected error occurred"): IApiResponse<null> {
-    console.error("System Error:", error); // Loglama burada yapılır
+  static error<T = never>(error: unknown, message: string = "An unexpected error occurred"): IApiResponse<T> {
+    console.error("System Error:", error);
     return {
       success: false,
       status: ResponseStatus.ERROR,
-      message: message + (error.message ? `: ${error.message}` : ''),
-      data: null // Error detayını güvenlik için data'ya koymuyoruz, logluyoruz.
+      message,
+      data: undefined
     };
   }
 
   // Validasyon Hatası (Formlar için)
-  static validationError(errors: ValidationError[], message: string = "Validation failed"): IApiResponse<null> {
+  static validationError<T = never>(errors: ValidationError[], message: string = "Validation failed"): IApiResponse<T> {
     return {
       success: false,
       status: ResponseStatus.VALIDATION_ERROR,

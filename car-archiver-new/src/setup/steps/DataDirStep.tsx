@@ -1,8 +1,11 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { SetupInfoTexts } from "../../i18n/setupWizard";
 import styles from "../../styles/setup/DataDitStep.module.css";
+import type { SetupDataUpdater } from "../setupTypes";
 
-export const DataDirStep = ({ language, onNext, onBack, updateData }: any) => {
+interface DataDirStepProps { language: string; onNext: () => void; onBack: () => void; updateData: SetupDataUpdater; }
+
+export const DataDirStep = ({ language, onNext, onBack, updateData }: DataDirStepProps) => {
   const [subStep, setSubStep] = useState(1);
   const [setupMode, setSetupMode] = useState<"import" | "create" | null>(null);
   const [path, setPath] = useState("");
@@ -19,13 +22,13 @@ export const DataDirStep = ({ language, onNext, onBack, updateData }: any) => {
     new URL(`../../assets/icons/${name}`, import.meta.url).href;
 
   const handleBrowse = async () => {
-    const selected = await (window as any).electron.ipcRenderer.invoke(
+    const selected = await window.electron.ipcRenderer.invoke(
       "select-directory",
     );
     if (!selected) return;
 
     if (setupMode === "import") {
-      const dbFile = await (window as any).electron.ipcRenderer.invoke(
+      const dbFile = await window.electron.ipcRenderer.invoke(
         "verify-import-path",
         selected,
       );
@@ -33,7 +36,7 @@ export const DataDirStep = ({ language, onNext, onBack, updateData }: any) => {
         setPath(dbFile);
         setError("");
       } else {
-        setError("Error: data_carArcihiver.sqlite not found in selected folder.");
+        setError("Error: data_carArchiver.sqlite not found in selected folder.");
         setPath("");
       }
     } else {

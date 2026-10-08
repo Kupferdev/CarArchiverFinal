@@ -9,7 +9,7 @@ export interface PaginationParams {
   pageSize?: number;
 }
 
-export class BaseRepository<TTable extends SQLiteTable<any>> {
+export class BaseRepository<TTable extends SQLiteTable> {
   protected table: TTable;
   protected idColumn: string;
 
@@ -18,25 +18,30 @@ export class BaseRepository<TTable extends SQLiteTable<any>> {
     this.idColumn = idColumn;
   }
 
-  protected handleError<T>(error: any, defaultMessage: string): IApiResponse<T> {
+  protected handleError<T>(error: unknown, defaultMessage: string): IApiResponse<T> {
     console.error("❌ Database Error:", error);
 
-    if (error.code === "SQLITE_CONSTRAINT_UNIQUE") {
-      return ServiceResponse.fail("This record already exists.", "UNIQUE_CONSTRAINT") as any;
+    const message = error instanceof Error ? error.message : "";
+    const code = typeof error === "object" && error !== null && "code" in error
+      ? (error as { code?: unknown }).code
+      : undefined;
+
+    if (code === "SQLITE_CONSTRAINT_UNIQUE") {
+      return ServiceResponse.fail<T>("This record already exists.", "UNIQUE_CONSTRAINT");
     }
 
-    if (error.message?.includes("not been initialized")) {
-      return ServiceResponse.error(error, "Database connection is not ready.") as any;
+    if (message.includes("not been initialized")) {
+      return ServiceResponse.error<T>(error, "Database connection is not ready.");
     }
 
-    return ServiceResponse.error(error, defaultMessage) as any;
+    return ServiceResponse.error<T>(error, defaultMessage);
   }
 
   async create(data: InferInsertModel<TTable>): Promise<IApiResponse<InferSelectModel<TTable>>> {
     try {
       const result = await useDb()
         .insert(this.table)
-        .values(data as any)
+        .values(data)
         .returning();
 
       return ServiceResponse.success(result[0] as unknown as InferSelectModel<TTable>, "Created successfully.");
@@ -93,13 +98,13 @@ export class BaseRepository<TTable extends SQLiteTable<any>> {
       const result = await useDb()
         .select()
         .from(this.table)
-        .where(eq(idCol, id as any));
+        .where(eq(idCol as never, id as never));
 
       if (result[0]) {
         return ServiceResponse.success(result[0] as unknown as InferSelectModel<TTable>, "Record found.");
       }
 
-      return ServiceResponse.fail("Record not found.", "NOT_FOUND") as any;
+      return ServiceResponse.fail<InferSelectModel<TTable> | undefined>("Record not found.", "NOT_FOUND");
     } catch (err) {
       return this.handleError(err, "Failed to fetch record.");
     }
@@ -112,15 +117,15 @@ export class BaseRepository<TTable extends SQLiteTable<any>> {
 
       const result = await useDb()
         .update(this.table)
-        .set(data as any)
-        .where(eq(idCol, id as any))
+        .set(data)
+        .where(eq(idCol as never, id as never))
         .returning();
 
       if (result[0]) {
         return ServiceResponse.success(result[0] as unknown as InferSelectModel<TTable>, "Updated successfully.");
       }
 
-      return ServiceResponse.fail("Record not found.", "NOT_FOUND") as any;
+      return ServiceResponse.fail<InferSelectModel<TTable> | undefined>("Record not found.", "NOT_FOUND");
     } catch (err) {
       return this.handleError(err, "Failed to update record.");
     }
@@ -133,14 +138,14 @@ export class BaseRepository<TTable extends SQLiteTable<any>> {
 
       const result = await useDb()
         .delete(this.table)
-        .where(eq(idCol, id as any))
+        .where(eq(idCol as never, id as never))
         .returning();
 
       if (result.length > 0) {
         return ServiceResponse.success(undefined, "Deleted successfully.");
       }
 
-      return ServiceResponse.fail("Record not found.", "NOT_FOUND") as any;
+      return ServiceResponse.fail<void>("Record not found.", "NOT_FOUND");
     } catch (err) {
       return this.handleError(err, "Failed to delete record.");
     }

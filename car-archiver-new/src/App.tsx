@@ -21,11 +21,11 @@ function App() {
       if (isFirstRun === false) {
         try {
           // DÜZELTME 1: "Electron" yerine "electron" (Küçük harf)
-          const config = await (window as any).electron.ipcRenderer.invoke('get-config'); 
+          const config = await window.electron.ipcRenderer.invoke('get-config'); 
           
           if (config) {
             // DÜZELTME 2: İster languageCode ister language diye kaydetmiş ol, ikisini de yakalar
-            const savedLang = config.languageCode || config.language;
+            const savedLang = config.language;
             if (savedLang) {
               await i18n.changeLanguage(savedLang);
             }

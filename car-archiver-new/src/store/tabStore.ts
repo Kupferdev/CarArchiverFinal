@@ -4,6 +4,7 @@ export interface TabPayload {
   type: string;
   title: string;
   entityId?: number;
+  parentEntityId?: number;
   isProfile?: boolean;
 }
 
@@ -17,6 +18,7 @@ interface TabState {
   openTab: (payload: TabPayload) => void;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
+  renameTab: (id: string, title: string) => void;
 }
 
 export const useTabStore = create<TabState>((set) => ({
@@ -38,8 +40,9 @@ export const useTabStore = create<TabState>((set) => ({
       id: tabId,
       type: payload.type,
       title: payload.title,
-      entityId: payload.entityId, // KRİTİK NOKTA: Artık ID yutulmayacak
-      isProfile: payload.isProfile // Profil bilgisi de yutulmayacak
+      entityId: payload.entityId,
+      parentEntityId: payload.parentEntityId,
+      isProfile: payload.isProfile
     };
 
     return {
@@ -56,5 +59,9 @@ export const useTabStore = create<TabState>((set) => ({
     };
   }),
 
-  setActiveTab: (id) => set({ activeTabId: id })
+  setActiveTab: (id) => set({ activeTabId: id }),
+
+  renameTab: (id, title) => set((state) => ({
+    tabs: state.tabs.map((tab) => tab.id === id ? { ...tab, title } : tab),
+  }))
 }));

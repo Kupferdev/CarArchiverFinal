@@ -1,33 +1,30 @@
-import { ipcRenderer, contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from "electron";
+import { IPC_CHANNELS, type IpcChannel } from "../src/shared/ipcChannels";
+import type { ElectronApi, IpcRequestMap, IpcResponseMap } from "../src/shared/ipcApi";
 
-// --------- Expose some API to the Renderer process ---------
-contextBridge.exposeInMainWorld('ipcRenderer', {
-  on(...args: Parameters<typeof ipcRenderer.on>) {
-    const [channel, listener] = args
-    return ipcRenderer.on(channel, (event, ...args) => listener(event, ...args))
-  },
-  off(...args: Parameters<typeof ipcRenderer.off>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.off(channel, ...omit)
-  },
-  send(...args: Parameters<typeof ipcRenderer.send>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.send(channel, ...omit)
-  },
-  invoke(...args: Parameters<typeof ipcRenderer.invoke>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.invoke(channel, ...omit)
-  },
+const allowedChannels = new Set<string>(IPC_CHANNELS);
 
-  // You can expose other APTs you need here.
-  // ...
-})
-
-contextBridge.exposeInMainWorld('electron', {
-  ipcRenderer: {
-    // React'ten Electron'a mesaj gönderip cevap beklemek için (Invoke)
-    invoke: (channel: string, data: any) => ipcRenderer.invoke(channel, data),
-    // Sadece mesaj göndermek için (Send)
-    send: (channel: string, data: any) => ipcRenderer.send(channel, data),
+function assertAllowedChannel(channel: string): asserts channel is IpcChannel {
+  if (!allowedChannels.has(channel)) {
+    throw new Error(`IPC channel is not allowed: ${channel}`);
   }
-});
+}
+
+const api: ElectronApi = {
+  ipcRenderer: {
+    invoke<C extends keyof IpcResponseMap>(
+      channel: C,
+      ...args: IpcRequestMap[C] extends undefined ? [] : [data: IpcRequestMap[C]]
+    ): Promise<IpcResponseMap[C]> {
+      assertAllowedChannel(channel);
+      const data = args[0];
+      const result = data === undefined
+        ? ipcRenderer.invoke(channel)
+        : ipcRenderer.invoke(channel, data);
+
+      return result as Promise<IpcResponseMap[C]>;
+    },
+  },
+};
+
+contextBridge.exposeInMainWorld("electron", api);

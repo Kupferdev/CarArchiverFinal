@@ -1,11 +1,16 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import styles from "./CustomerProfile.module.css";
 import { useToastStore } from "../../store/toastStore";
 import { useTabStore } from "../../store/tabStore";
+import type { CustomerProfileDto } from "../../shared/ipcApi";
+import type { Brand } from "../../shared/types/brand";
 
 const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<CustomerProfileDto | null>(null);
   const [loading, setLoading] = useState(true);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const { t } = useTranslation();
 
   // Silme Modalı için Stateler
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -16,19 +21,21 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const res = await (window as any).electron.ipcRenderer.invoke(
-        "get-customer-profile",
-        customerId,
-      );
-      if (res.success) {
-        setProfile(res.data);
-      }
+      const [res, brandsRes] = await Promise.all([
+        window.electron.ipcRenderer.invoke("get-customer-profile", customerId),
+        window.electron.ipcRenderer.invoke("get-all-brands"),
+      ]);
+      if (res.success) setProfile(res.data ?? null);
+      if (brandsRes.success) setBrands(brandsRes.data ?? []);
       setLoading(false);
     };
     fetchProfile();
   }, [customerId]);
 
+  const brandMap = useMemo(() => new Map(brands.map((brand) => [brand.brandId, brand.brandName])), [brands]);
+
   const handleEditCustomer = () => {
+    if (!profile) return;
     openTab({
       type: "customer",
       title: `${profile.customer.firstName} ${profile.customer.lastName} Düzenle`,
@@ -39,7 +46,7 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
   // --- SİLME İŞLEMLERİ ---
   const confirmDelete = async () => {
     try {
-      const result = await (window as any).electron.ipcRenderer.invoke(
+      const result = await window.electron.ipcRenderer.invoke(
         "delete-customer",
         {
           id: customerId,
@@ -92,7 +99,7 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
         {/* Telefonlar */}
         <div className={styles.sectionTitle}>Telefonlar</div>
         {profile.phones && profile.phones.length > 0 ? (
-          profile.phones.map((p: any) => (
+          profile.phones.map((p) => (
             <div key={p.phoneNumberId} className={styles.listItem}>
               <svg
                 width="14"
@@ -114,7 +121,7 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
         {/* E-Postalar */}
         <div className={styles.sectionTitle}>E-Posta Adresleri</div>
         {profile.emails && profile.emails.length > 0 ? (
-          profile.emails.map((e: any) => (
+          profile.emails.map((e) => (
             <div key={e.emailId} className={styles.listItem}>
               <svg
                 width="14"
@@ -180,9 +187,33 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
       <div className={styles.mainContent}>
         {/* Arabalar Kartı */}
         <div className={styles.card}>
-          <div className={styles.cardHeader}>Müşteri Arabaları</div>
+          <div className={styles.cardHeader}>
+            <span>Müşterinin Araçları</span>
+            <button
+              className={styles.profileEditBtn}
+              style={{ width: "auto", padding: "7px 12px" }}
+              onClick={() => openTab({ type: "car", title: t("carNewTitle"), entityId: 999, parentEntityId: customerId })}
+            >
+              + {t("carNewButton")}
+            </button>
+          </div>
           {profile.cars && profile.cars.length > 0 ? (
-            <div>Araba listesi buraya gelecek...</div>
+            <div style={{ display: "grid", gap: "10px" }}>
+              {profile.cars.map((car) => (
+                <div
+                  key={car.carId}
+                  style={{ border: "1px solid var(--border-color)", borderRadius: "9px", padding: "14px", cursor: "pointer" }}
+                  onDoubleClick={() => openTab({ type: "car", title: car.plateNumber || t("carProfileTitle"), entityId: car.carId, isProfile: true })}
+                >
+                  <div style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-main)" }}>
+                    {brandMap.get(car.brandId ?? 0) ?? "-"} {car.model ?? ""}
+                  </div>
+                  <div style={{ marginTop: "6px", fontSize: "12px", color: "var(--text-muted)" }}>
+                    {car.plateNumber || "-"} · {car.year || "-"} · {car.km === null || car.km === undefined ? "-" : new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(car.km)} km
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <div className={styles.emptyState}>
               <svg
@@ -199,16 +230,27 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
                 <path d="M9 17h6"></path>
                 <circle cx="17" cy="17" r="2"></circle>
               </svg>
-              <span>Kayıtlı araba bulunmuyor.</span>
+              <span>Kayıtlı araç bulunmuyor.</span>
             </div>
           )}
         </div>
 
         {/* Servis Geçmişi Kartı */}
         <div className={styles.card}>
-          <div className={styles.cardHeader}>Servis Geçmişi</div>
+          <div className={styles.cardHeader}>
+            <span>Servis Geçmişi</span>
+            <button className={styles.profileEditBtn} style={{ width: "auto", padding: "7px 12px" }} onClick={() => openTab({ type: "service", title: t("serviceNewTitle"), entityId: 999 })}>+ {t("serviceNewButton")}</button>
+          </div>
           {profile.services && profile.services.length > 0 ? (
-            <div>Servis listesi buraya gelecek...</div>
+            <div style={{ display: "grid", gap: "8px" }}>
+              {[...profile.services].sort((a, b) => (b.applicationDate ? new Date(b.applicationDate).getTime() : 0) - (a.applicationDate ? new Date(a.applicationDate).getTime() : 0)).map((service) => (
+                <button key={service.serviceId} type="button" onClick={() => openTab({ type: "service", title: `#${service.serviceId}`, entityId: service.serviceId, isProfile: true })} style={{ display: "grid", gridTemplateColumns: "90px minmax(0, 1fr) 20px", gap: "10px", alignItems: "center", width: "100%", padding: "10px 12px", border: "1px solid var(--border-color)", borderRadius: "9px", background: "var(--bg-panel)", color: "var(--text-main)", textAlign: "left", cursor: "pointer" }}>
+                  <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>{service.applicationDate ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "short" }).format(new Date(service.applicationDate)) : "-"}</span>
+                  <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "3px" }}><strong style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "12px" }}>{service.complaints}</strong><small style={{ color: "var(--text-muted)", fontSize: "10px" }}>{service.km == null ? "-" : `${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(service.km)} km`}</small></span>
+                  <span style={{ color: "var(--text-muted)", fontSize: "18px" }}>›</span>
+                </button>
+              ))}
+            </div>
           ) : (
             <div className={styles.emptyState}>
               <svg

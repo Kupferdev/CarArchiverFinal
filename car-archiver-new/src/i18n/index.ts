@@ -4,7 +4,7 @@ import { DashboardInfoTexts } from './dashboardTexts'; // Bir önceki adımda ol
 // import { SetupInfoTexts } from './setupWizard'; // İstersen setup çevirilerini de buraya dahil edebilirsin
 
 // Çeviri verilerimizi i18next'in istediği formata (resources) dönüştürüyoruz
-const resources: any = {};
+const resources: Record<string, { translation: Record<string, string> }> = {};
 
 DashboardInfoTexts.forEach((langData) => {
   // languageCode ve id'yi ayır, geri kalan her şeyi çeviri metni olarak al

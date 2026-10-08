@@ -50,7 +50,7 @@ const MainContent: React.FC = () => {
         <div className={styles.navCardCount}>{stats.customers} <span>{t('cardCustomersUnit')}</span></div>
       </div>
 
-      {/* 3. KART: Arabalar */}
+      {/* 3. KART: Araçlar */}
       <div 
         className={styles.navCard}
         onClick={() => openTab({ type: 'car', title: t('cardCarsTitle') })}

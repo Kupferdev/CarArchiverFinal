@@ -49,7 +49,7 @@ export class PhoneNumbersRepository extends BaseRepository<typeof PhoneNumbers> 
         );
       }
 
-      return ServiceResponse.fail("Phone number not found.", "NOT_FOUND") as any;
+      return ServiceResponse.fail("Phone number not found.", "NOT_FOUND");
     } catch (err) {
       return this.handleError(err, "Failed to search by phone number.");
     }

@@ -7,7 +7,13 @@ import RightPanel from './RightPanel';
 import FabMenu from './FabMenu';
 import CustomerList from './CustomerList';
 import CustomerForm from './CustomerForm';
-import CustomerProfile from './CustomerProfile'; // İMPORT EKLENDİ
+import CustomerProfile from './CustomerProfile';
+import CarList from './CarList';
+import CarForm from './CarForm';
+import CarProfile from './CarProfile';
+import ServiceList from './ServiceList';
+import ServiceForm from './ServiceForm';
+import ServiceProfile from './ServiceProfile';
 import { useTabStore } from '../../store/tabStore';
 
 const HomePage: React.FC = () => {
@@ -17,6 +23,32 @@ const HomePage: React.FC = () => {
   const renderTabContent = () => {
     if (activeTabId === 'home') return <MainContent />;
     
+    if (activeTab?.type === 'car') {
+      if (activeTab.entityId === 999) {
+        return <CarForm customerId={activeTab.parentEntityId} />;
+      }
+      if (activeTab.isProfile && activeTab.entityId !== undefined) {
+        return <CarProfile carId={activeTab.entityId} />;
+      }
+      if (activeTab.entityId !== undefined) {
+        return <CarForm carId={activeTab.entityId} />;
+      }
+      return <CarList />;
+    }
+
+    if (activeTab?.type === 'service') {
+      if (activeTab.entityId === 999) {
+        return <ServiceForm carId={activeTab.parentEntityId} />;
+      }
+      if (activeTab.isProfile && activeTab.entityId !== undefined) {
+        return <ServiceProfile serviceId={activeTab.entityId} />;
+      }
+      if (activeTab.entityId !== undefined) {
+        return <ServiceForm serviceId={activeTab.entityId} />;
+      }
+      return <ServiceList />;
+    }
+
     if (activeTab?.type === 'customer') {
       // 1. Yeni Kayıt (999)
       if (activeTab.entityId === 999) return <CustomerForm />;

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import '../../setup/setup.css';
+import type { SetupDataUpdater } from '../setupTypes';
 
 const languages = [
   { code: 'en', name: 'English',     flag: 'united-kingdom.png' },
@@ -21,7 +22,9 @@ const languages = [
 const checkIconUrl = new URL('../../assets/icons/check_circle_blue.svg', import.meta.url).href;
 const nextArrowUrl = new URL('../../assets/icons/right_arrow-blue.svg', import.meta.url).href;
 
-export const LanguageStep = ({ onNext, updateData }: any) => {
+interface LanguageStepProps { onNext: () => void; updateData: SetupDataUpdater; }
+
+export const LanguageStep = ({ onNext, updateData }: LanguageStepProps) => {
   const systemLang = navigator.language.split('-')[0];
   const isSupported = languages.some(lang => lang.code === systemLang);
   const [selected, setSelected] = useState(isSupported ? systemLang : 'en');

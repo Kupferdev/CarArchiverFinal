@@ -1,6 +1,7 @@
 export interface AppConfig {
-  language: string | null;
-  savePath: string | null;
+  language: string;
+  savePath: string;
   eulaAccepted: boolean;
-  darkTheme: boolean;
+  theme: "light" | "dark";
+  onboardingCompleted: boolean;
 }

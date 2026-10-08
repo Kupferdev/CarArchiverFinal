@@ -1,38 +1,55 @@
 import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from 'url';
-
-const currentFilePath = fileURLToPath(import.meta.url);
-const currentDirPath = path.dirname(currentFilePath);
 
 export let dbInstance: Database.Database | null = null;
+let activeDbPath: string | null = null;
+
+function normalizeDbPath(dbPath: string): string {
+    return path.normalize(path.resolve(dbPath));
+}
+
+export function getActiveDbPath(): string | null {
+    return activeDbPath;
+}
 
 export function CreateDefaultDb(dbPath: string) {
-    if (dbInstance) {
-        console.log("ℹ️ Database connection is already open.");
-        return dbInstance;
-    }
+    const dbPathFinal = normalizeDbPath(dbPath);
 
-    const dbPathFinal = path.normalize(dbPath);
+    if (dbInstance) {
+        if (activeDbPath === dbPathFinal) {
+            return dbInstance;
+        }
+        throw new Error("A different database is already open. Close the current database before switching.");
+    }
 
     try {
         const folder = path.dirname(dbPathFinal);
-        if (!fs.existsSync(folder)) {
-            fs.mkdirSync(folder, { recursive: true });
-        }
+        fs.mkdirSync(folder, { recursive: true });
 
-        dbInstance = new Database(dbPathFinal);
-        dbInstance.pragma("journal_mode = WAL");
-        dbInstance.pragma("synchronous = NORMAL");
-        dbInstance.pragma("foreign_keys = on");
+        const instance = new Database(dbPathFinal);
+        instance.pragma("journal_mode = WAL");
+        instance.pragma("synchronous = NORMAL");
+        instance.pragma("foreign_keys = ON");
 
-        console.log("❇️ DB Started: ", dbPathFinal);
-        return dbInstance;
+        dbInstance = instance;
+        activeDbPath = dbPathFinal;
+
+        console.log("❇️ DB Started:", dbPathFinal);
+        return instance;
     } catch (err) {
         console.error("🆘 DB Error:", err);
         throw err;
     }
+}
+
+export function closeDb(): void {
+    if (!dbInstance) return;
+
+    dbInstance.close();
+    dbInstance = null;
+    activeDbPath = null;
+    console.log("🔒 DB connection closed.");
 }
 
 export function getDb() {

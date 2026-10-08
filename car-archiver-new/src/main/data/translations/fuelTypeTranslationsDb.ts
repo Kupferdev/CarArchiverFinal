@@ -111,7 +111,13 @@ export async function createFuelTypesTranslationsTable() {
         db.exec(baseFuelTypeTranslationsSql);
         console.log("❇️ Translations Base FuelType translations table created");
         try {
-            await orm.insert(fuelTypeTranslations).values(baseFuelTypeTranslations).onConflictDoNothing();
+            // No UNIQUE key exists on (fuelTypeId, languageCode), so onConflictDoNothing()
+            // cannot protect against duplicates. Seed only into an empty table so that
+            // re-running this step on an existing database is harmless.
+            const existing = db.prepare("SELECT COUNT(*) AS count FROM FuelTypeTranslations").get() as { count: number };
+            if (existing.count === 0) {
+                await orm.insert(fuelTypeTranslations).values(baseFuelTypeTranslations);
+            }
             console.log("❇️ Translations Base FuelType insert success");
 
         } catch (err) {

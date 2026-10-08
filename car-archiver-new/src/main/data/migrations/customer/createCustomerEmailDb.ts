@@ -9,7 +9,8 @@ export function createCustomerEmailsTable() {
     CREATE TABLE IF NOT EXISTS Emails (
         emailId INTEGER PRIMARY KEY AUTOINCREMENT,
         customerId INTEGER NOT NULL,
-        customerEmail TEXT NOT NULL
+        customerEmail TEXT NOT NULL,
+        FOREIGN KEY (customerId) REFERENCES Customers(customerId) ON DELETE CASCADE
     )
 `;
 

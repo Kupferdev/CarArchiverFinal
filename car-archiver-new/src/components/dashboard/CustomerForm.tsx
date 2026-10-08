@@ -2,9 +2,17 @@ import React, { useState, useEffect } from 'react';
 import styles from './CustomerForm.module.css';
 import { useToastStore } from '../../store/toastStore';
 import { useTabStore } from '../../store/tabStore'; // YENİ: Sekme kapatmak için
+import type { IApiResponse } from '../../models/response.model';
+import type { PhoneNumber } from '../../shared/types/customer/phoneNumber';
+import type { Email } from '../../shared/types/customer/email';
 
 interface PhoneInput { countryCode: string; number: string; }
 interface EmailInput { address: string; }
+
+const capitalizeFirstLetter = (value: string) => {
+  if (!value) return value;
+  return value.charAt(0).toLocaleUpperCase('tr-TR') + value.slice(1);
+};
 
 const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
   const [formData, setFormData] = useState({
@@ -23,7 +31,7 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
   useEffect(() => {
     if (customerId) {
       const fetchData = async () => {
-        const res = await (window as any).electron.ipcRenderer.invoke('get-customer-edit', customerId);
+        const res = await window.electron.ipcRenderer.invoke('get-customer-edit', customerId);
         if (res.success && res.data) {
           const d = res.data;
           setFormData({
@@ -34,10 +42,10 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
           });
           
           if (d.phones && d.phones.length > 0) {
-            setPhones(d.phones.map((p: any) => ({ countryCode: p.countryCode, number: p.phoneNumber })));
+            setPhones(d.phones.map((p: PhoneNumber) => ({ countryCode: p.countryCode, number: p.phoneNumber })));
           }
           if (d.emails && d.emails.length > 0) {
-            setEmails(d.emails.map((e: any) => ({ address: e.customerEmail })));
+            setEmails(d.emails.map((e: Email) => ({ address: e.customerEmail })));
           }
         }
       };
@@ -46,7 +54,12 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
   }, [customerId]);
 
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    const nextValue = name === 'firstName' || name === 'lastName'
+      ? capitalizeFirstLetter(value)
+      : value;
+
+    setFormData({ ...formData, [name]: nextValue });
   };
 
   const updatePhone = (index: number, field: keyof PhoneInput, value: string) => {
@@ -99,12 +112,12 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
     };
 
     try {
-      let result;
+      let result: IApiResponse<number> | IApiResponse<null>;
       if (customerId) {
         const updatePayload = { id: customerId, data: payload };
-        result = await (window as any).electron.ipcRenderer.invoke('update-customer', updatePayload);
+        result = await window.electron.ipcRenderer.invoke('update-customer', updatePayload);
       } else {
-        result = await (window as any).electron.ipcRenderer.invoke('add-customer', payload);
+        result = await window.electron.ipcRenderer.invoke('add-customer', payload);
       }
       
 if (result.success) {
@@ -113,7 +126,7 @@ if (result.success) {
         if (!customerId) {
           // YENİ KAYIT DURUMU: Backend'den dönen yeni müşterinin ID'sini alıyoruz
           // (Backend'in yapısına göre result.id, result.data.id veya result.data şeklinde gelebilir)
-          const newCustomerId = result.data?.id || result.id || result.data; 
+          const newCustomerId = result.data; 
 
           if (newCustomerId && typeof newCustomerId === 'number') {
             // 1. Yeni eklenen kişinin profil sekmesini aç
@@ -146,7 +159,7 @@ if (result.success) {
     if (!customerId) return;
     
     try {
-      const result = await (window as any).electron.ipcRenderer.invoke('delete-customer', {
+      const result = await window.electron.ipcRenderer.invoke('delete-customer', {
         id: customerId,
         deleteRelated: deleteRelated
       });
@@ -188,7 +201,7 @@ if (result.success) {
             <div className={styles.sectionTitle} style={{ marginTop: '16px' }}>Resmi Bilgiler</div>
             <div className={styles.formGroup}>
               <label className={styles.label}>Kimlik No</label>
-              <input className={styles.input} name="nationalId" value={formData.nationalId} onChange={handleTextChange} placeholder="11 Haneli" maxLength={11} />
+              <input className={styles.input} name="nationalId" value={formData.nationalId} onChange={handleTextChange} placeholder="Kimlik numarası" />
             </div>
             <div className={styles.formGroup}>
               <label className={styles.label}>Vergi No</label>

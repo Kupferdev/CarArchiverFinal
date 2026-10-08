@@ -38,6 +38,7 @@ export async function createBodyTypesTable() {
       console.log(" ❇️ Base body types added the table.");
     } catch (err) {
       console.error("🆘 Base body types insert error:", (err as Error).message);
+      throw err;
     }
   } catch (err) {
     console.log("🆘 BodyTypes table not created", (err as Error).message);

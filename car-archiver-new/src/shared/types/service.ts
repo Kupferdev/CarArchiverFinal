@@ -1,24 +1,24 @@
 export interface Service {
+  serviceId?: number;
+  carId: number;
+  customerId?: number | null;
 
-    serviceId?: number,
-    carId: number,
-    customerId?: number,
+  applicationDate?: Date | null;
+  appointmentDate?: Date | null;
+  /** Job duration in whole minutes. */
+  jobDuration?: number | null;
+  deliveryDate?: Date | null;
+  km?: number | null;
+  complaints: string;
+  extraRequests?: string | null;
+  faults?: string[] | null;
+  hasDamageOnReceive: boolean;
+  damageOnReceive?: string[] | null;
+  hasDamageDuringRepair?: boolean | null;
+  damageDuringRepair?: string[] | null;
 
-    applicationDate?: Date, //basvuru tarihi
-    appointmentDate?: Date, //randevu tarihi
-    jobDuration?: Date,
-    deliveryDate?: Date,
-    km? : number,
-    complaints: string, //sikayetler
-    extraRequests?: string,
-    faults?: string[],   //arızalar
-    hasDamageOnReceive: boolean,
-    damageOnReceive?: string[],
-    hasDamageDuringRepair?: boolean,
-    damageDuringRepair?: string[],
-    laborCharge?: number, //iscilik
-    totalCharge?: number;
-
-    targetDeliveryDate? : Date; //hedeflenen teslim tarihi
-    isDelivered? : boolean; //teslim edildi mi
+  laborCharge?: number | null;
+  totalCharge?: number | null;
+  targetDeliveryDate?: Date | null;
+  isDelivered?: boolean | null;
 }

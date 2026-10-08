@@ -31,7 +31,7 @@ export async function createFuelTypesTable() {
         db.exec(createFuelTypesTableSql);
         console.log("❇️ FuelTypes table created");
         try {
-            await orm.insert(FuelTypes).values(baseFuelTypes).onConflictDoNothing();;
+            await orm.insert(FuelTypes).values(baseFuelTypes).onConflictDoNothing();
             console.log(" ❇️ Base Fuel types added the table.");
         } catch (err){
             console.error("🆘 Base Fuel types insert error:", (err as Error).message);

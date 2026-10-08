@@ -5,15 +5,16 @@ export let drizzleDb: BetterSQLite3Database | null = null;
 
 export function initDrizzle() {
     if (drizzleDb) {
-        console.log("ℹ️ Drizzle ORM is already initialized.");
         return drizzleDb;
     }
 
-    const db = getDb();
-    
-    drizzleDb = drizzle(db);
+    drizzleDb = drizzle(getDb());
     console.log("❇️ Drizzle ORM initialized successfully.");
     return drizzleDb;
+}
+
+export function closeDrizzle(): void {
+    drizzleDb = null;
 }
 
 export function useDb() {

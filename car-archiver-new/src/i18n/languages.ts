@@ -4,7 +4,7 @@ export interface Language {
     languageName:string
 }
 
-const languages : Array<Language> = [
+export const languages : Array<Language> = [
   { id: 1,  languageCode: "en", languageName: "English" },
   { id: 2,  languageCode: "es", languageName: "Español" },
   { id: 3,  languageCode: "fr", languageName: "Français" },

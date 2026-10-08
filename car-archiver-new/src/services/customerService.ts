@@ -2,45 +2,29 @@ import { CustomersRepository, EmailsRepository, PhoneNumbersRepository } from ".
 import { Customer } from "../shared/types/customer/customer";
 import { Email } from "../shared/types/customer/email";
 import { PhoneNumber } from "../shared/types/customer/phoneNumber";
-import { ResponseStatus, ServiceResponse } from "../models/response.model"; // Bunu import etmeyi unutma
+import { ServiceResponse } from "../models/response.model";
 
 export class CustomerService {
     private customerRepository: CustomersRepository;
-    private phoneNumberRepository: PhoneNumbersRepository;
-    private emailRepository: EmailsRepository;
-
     constructor(customerRepository: CustomersRepository, phoneNumberRepository: PhoneNumbersRepository, emailRepository: EmailsRepository) {
         this.customerRepository = customerRepository;
-        this.phoneNumberRepository = phoneNumberRepository;
-        this.emailRepository = emailRepository;
+        void phoneNumberRepository;
+        void emailRepository;
     }
 
     async createCustomer(customer: Customer, phoneNumber?: PhoneNumber[], email?: Email[]) {
+        const response = await this.customerRepository.createWithContacts(
+            customer,
+            phoneNumber ?? [],
+            email ?? []
+        );
 
-        const response = await this.customerRepository.create(customer);
-
-        if (!response.success || !response.data) {
+        if (!response.success || response.data === undefined) {
             console.error("New customer not created! Message:", response.message);
-            return ServiceResponse.fail("Customer create failed.");
+            return ServiceResponse.fail(response.message || "Customer create failed.");
         }
 
-        const customerId = response.data.customerId;
-
-        if (phoneNumber && phoneNumber.length > 0) {
-            for (const pn of phoneNumber) {
-                await this.phoneNumberRepository.create({ ...pn, customerId });
-            }
-            console.log("❇️ New customer phone numbers added.");
-        }
-
-        if (email && email.length > 0) {
-            for (const em of email) {
-                await this.emailRepository.create({ ...em, customerId });
-            }
-            console.log("❇️ New customer emails added.");
-        }
-
-        return ServiceResponse.success(customerId, "Müşteri başarıyla oluşturuldu.");
+        return ServiceResponse.success(response.data, "Müşteri başarıyla oluşturuldu.");
     }
 
     async updateCustomer(customerId: number, customer: Customer) {

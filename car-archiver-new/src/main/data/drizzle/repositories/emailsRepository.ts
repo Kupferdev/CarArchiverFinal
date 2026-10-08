@@ -42,7 +42,7 @@ export class EmailsRepository extends BaseRepository<typeof Emails> {
         return ServiceResponse.success(id, "Customer found.");
       }
 
-      return ServiceResponse.fail("No customer found with this email.", "NOT_FOUND") as any;
+      return ServiceResponse.fail("No customer found with this email.", "NOT_FOUND");
     } catch (err) {
       return this.handleError(err, "Failed to find customer by email.");
     }

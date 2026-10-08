@@ -175,7 +175,13 @@ export async function createBodyTypesTranslationsTable() {
     db.exec(baseBodyTypeTranslationsSql);
     console.log("❇️ Translations Base body translations table created");
     try {
-      await orm.insert(bodyTypeTranslations).values(baseBodyTypeTranslations).onConflictDoNothing();
+      // No UNIQUE key exists on (bodyTypeId, languageCode), so onConflictDoNothing()
+      // cannot protect against duplicates. Seed only into an empty table so that
+      // re-running this step on an existing database is harmless.
+      const existing = db.prepare("SELECT COUNT(*) AS count FROM BodyTypeTranslations").get() as { count: number };
+      if (existing.count === 0) {
+        await orm.insert(bodyTypeTranslations).values(baseBodyTypeTranslations);
+      }
       console.log("❇️ Translations Base body types insert success");
 
     } catch (err) {

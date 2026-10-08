@@ -1,13 +1,19 @@
 import { sqliteTable, integer, text, real } from "drizzle-orm/sqlite-core";
+import { Customers } from "./customerSchemas/customersSchema";
+import { Cars } from "./carsSchema";
 
 export const Services = sqliteTable("Services", {
   serviceId: integer("serviceId").primaryKey({ autoIncrement: true }),
-  carId: integer("carId").notNull(),
-  customerId: integer("customerId"),
+  carId: integer("carId")
+    .notNull()
+    .references(() => Cars.carId, { onDelete: "cascade" }),
+  customerId: integer("customerId")
+    .references(() => Customers.customerId, { onDelete: "set null" }),
 
   applicationDate: integer("applicationDate", { mode: "timestamp" }),
   appointmentDate: integer("appointmentDate", { mode: "timestamp" }),
-  jobDuration: integer("jobDuration", { mode: "timestamp" }),
+  // Job duration in whole MINUTES (a length of time, not a point in time).
+  jobDuration: integer("jobDuration"),
   deliveryDate: integer("deliveryDate", { mode: "timestamp" }),
 
   km: real("km"),

@@ -1,0 +1,321 @@
+.container {
+  display: grid;
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.65fr);
+  gap: 24px;
+  padding: 24px;
+  height: 100%;
+  align-items: flex-start;
+  overflow-y: auto;
+}
+
+.sidebar {
+  min-width: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+}
+
+.vehicleHeader {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 18px;
+}
+
+.vehicleTitle {
+  font-size: 22px;
+  font-weight: 650;
+  color: var(--text-main);
+  letter-spacing: 0.2px;
+}
+
+.vehicleSubtitle {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 5px;
+}
+
+.vehicleInfoGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.infoGroup {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: var(--bg-panel);
+}
+
+.infoLabel {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
+  margin-bottom: 5px;
+}
+
+.infoValue {
+  font-size: 13px;
+  color: var(--text-main);
+  font-weight: 550;
+  word-break: break-word;
+}
+
+.notes {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-color);
+}
+
+.notesValue {
+  margin-top: 6px;
+  color: var(--text-main);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.currentUserSection {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.currentUserTitle {
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 9px;
+}
+
+.currentUserCard {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 11px 12px;
+  background: var(--bg-panel);
+  color: inherit;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.currentUserCard:hover {
+  border-color: var(--accent-blue, #3b82f6);
+  background: var(--bg-hover, var(--bg-panel));
+}
+
+
+.editButton {
+  margin-top: 18px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent-blue, #3b82f6);
+  color: #fff;
+  font-weight: 550;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.editButton:hover {
+  background: #2563eb;
+}
+
+.mainContent {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.cardTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.cardHint {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.countBadge {
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: var(--text-muted);
+  background: var(--bg-panel);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.usersScroll {
+  max-height: 270px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.usersScroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.usersScroll::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 10px;
+}
+
+.usersScroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.usersGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.userCard {
+  width: 100%;
+  min-width: 0;
+  min-height: 68px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--bg-panel);
+  color: inherit;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.userCard:hover {
+  border-color: var(--accent-blue, #3b82f6);
+  background: var(--bg-hover, var(--bg-panel));
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  color: var(--accent-blue, #3b82f6);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.userMain {
+  min-width: 0;
+  flex: 1;
+}
+
+.userName {
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.userContacts {
+  margin-top: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.userContacts span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.chevron {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.emptyState {
+  min-height: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 26px 20px;
+  background: var(--bg-panel);
+  border: 1.5px dashed var(--border-color);
+  border-radius: 9px;
+  color: var(--text-muted);
+  font-size: 13px;
+  gap: 10px;
+  text-align: center;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+}
+
+@media (max-width: 760px) {
+  .container {
+    grid-template-columns: 1fr;
+  }
+
+  .usersGrid,
+  .vehicleInfoGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.serviceList{display:flex;flex-direction:column;gap:8px;max-height:250px;overflow-y:auto;padding-right:4px}.serviceList::-webkit-scrollbar{width:6px}.serviceList::-webkit-scrollbar-thumb{background:var(--border-color);border-radius:10px}.serviceItem{width:100%;display:grid;grid-template-columns:70px minmax(0,1fr) 20px;gap:10px;align-items:center;background:var(--bg-panel);border:1px solid var(--border-color);border-radius:9px;padding:10px;text-align:left;color:inherit;cursor:pointer}.serviceItem:hover{border-color:var(--accent-blue);background:var(--bg-hover)}.serviceDate{font-size:11px;color:var(--text-muted)}.serviceMain{min-width:0;display:flex;flex-direction:column;gap:3px}.serviceMain strong{font-size:12px;color:var(--text-main);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.serviceMain span{font-size:10px;color:var(--text-muted)}.serviceChevron{font-size:20px;color:var(--text-muted);text-align:right}
+@media(max-width:760px){.container{grid-template-columns:1fr}.serviceItem{grid-template-columns:60px minmax(0,1fr) 18px}}
+
+.historyAddButton{border:1px solid var(--border-color);background:transparent;color:var(--text-main);border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer}.historyAddButton:hover{background:var(--bg-hover);border-color:var(--accent-blue)}

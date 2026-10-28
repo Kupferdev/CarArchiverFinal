@@ -19,7 +19,7 @@
 }
 
 .customerName {
-  font-size: 20px;
+  font-size: calc(20px * var(--user-font-factor, 1));
   font-weight: 600;
   color: var(--text-main);
   margin-bottom: 16px;
@@ -32,7 +32,7 @@
 }
 
 .infoLabel {
-  font-size: 11px;
+  font-size: calc(11px * var(--user-font-factor, 1));
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-muted);
@@ -40,13 +40,13 @@
 }
 
 .infoValue {
-  font-size: 14px;
+  font-size: calc(14px * var(--user-font-factor, 1));
   color: var(--text-main);
   font-weight: 500;
 }
 
 .sectionTitle {
-  font-size: 14px;
+  font-size: calc(14px * var(--user-font-factor, 1));
   font-weight: 600;
   color: var(--text-main);
   margin: 24px 0 12px 0;
@@ -55,7 +55,7 @@
 }
 
 .listItem {
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
   color: var(--text-muted);
   margin-bottom: 8px;
   display: flex;
@@ -80,7 +80,7 @@
 }
 
 .cardHeader {
-  font-size: 16px;
+  font-size: calc(16px * var(--user-font-factor, 1));
   font-weight: 600;
   color: var(--text-main);
   margin-bottom: 16px;
@@ -100,7 +100,7 @@
   border: 1.5px dashed var(--border-color);
   border-radius: 8px;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: calc(14px * var(--user-font-factor, 1));
   gap: 12px;
 }
 
@@ -157,9 +157,9 @@
   box-shadow: 0 10px 25px rgba(0,0,0,0.5);
   border: 1px solid var(--border-color, #2b2b40);
 }
-.modalTitle { margin: 0 0 12px 0; font-size: 18px; font-weight: 600; }
-.modalText { margin-bottom: 20px; font-size: 14px; color: var(--text-muted, #a1a1aa); line-height: 1.5; }
-.checkboxLabel { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); cursor: pointer; margin-bottom: 24px;}
+.modalTitle { margin: 0 0 12px 0; font-size: calc(18px * var(--user-font-factor, 1)); font-weight: 600; }
+.modalText { margin-bottom: 20px; font-size: calc(14px * var(--user-font-factor, 1)); color: var(--text-muted, #a1a1aa); line-height: 1.5; }
+.checkboxLabel { display: flex; align-items: center; gap: 8px; font-size: calc(13px * var(--user-font-factor, 1)); color: var(--text-muted); cursor: pointer; margin-bottom: 24px;}
 .modalActions { display: flex; justify-content: flex-end; gap: 12px; }
 .cancelBtn { padding: 8px 16px; background: transparent; color: var(--text-main); border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; transition: 0.2s;}
 .cancelBtn:hover { background: var(--bg-hover, #2b2b40); }
@@ -195,3 +195,4 @@
 .profileEditBtn:hover {
   background: #2563eb;
 }
+.headerActions,.historyActionGroup{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}

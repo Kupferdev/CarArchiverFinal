@@ -10,7 +10,7 @@
 }
 
 .title {
-  font-size: 16px;
+  font-size: calc(16px * var(--user-font-factor, 1));
   font-weight: 500;
   color: var(--text-main);
 }
@@ -31,7 +31,7 @@
   top: 0;
   background: var(--bg-panel);
   padding: 12px 20px;
-  font-size: 12px;
+  font-size: calc(12px * var(--user-font-factor, 1));
   color: var(--text-muted);
   font-weight: 500;
   border-bottom: 0.5px solid var(--border-color);
@@ -40,7 +40,7 @@
 
 .table td {
   padding: 12px 20px;
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
   color: var(--text-main);
   border-bottom: 0.5px solid var(--border-color);
 }
@@ -58,7 +58,7 @@
   padding: 40px;
   text-align: center;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: calc(14px * var(--user-font-factor, 1));
 }
 
 .actionBtn {
@@ -97,7 +97,7 @@
   background: var(--bg-panel); /* Arka planı karttan ayırıp panel rengi yaptık (derinlik için) */
   color: var(--text-main);
   width: 320px;
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
   outline: none;
   transition: all 0.2s ease;
 }
@@ -140,12 +140,12 @@
 
 .modalTitle {
   margin: 0 0 12px 0;
-  font-size: 18px;
+  font-size: calc(18px * var(--user-font-factor, 1));
   color: var(--text-main, #ffffff);
 }
 
 .modalText {
-  font-size: 14px;
+  font-size: calc(14px * var(--user-font-factor, 1));
   color: var(--text-muted, #a1a1aa);
   margin-bottom: 20px;
   line-height: 1.5;
@@ -155,7 +155,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
   color: #ef4444; /* Tehlikeli işlem olduğunu belli etmek için kırmızı ton */
   background: #fee2e2;
   padding: 12px;
@@ -211,7 +211,7 @@
   color: white;
   border: none;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: calc(14px * var(--user-font-factor, 1));
   font-weight: 500;
   cursor: pointer;
   transition: opacity 0.2s;

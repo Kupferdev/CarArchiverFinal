@@ -284,9 +284,9 @@ const TrashIcon = () => (
   </svg>
 );
 
-const CarForm: React.FC<{ carId?: number; customerId?: number }> = ({ carId, customerId }) => {
-  const { t } = useTranslation();
-  const { activeTabId, closeTab, openTab } = useTabStore();
+const CarForm: React.FC<{ carId?: number; customerId?: number; tabId?: string }> = ({ carId, customerId, tabId }) => {
+  const { t, i18n } = useTranslation();
+  const { activeTabId, closeTab, openTab, setTabDirty } = useTabStore();
   const { addToast } = useToastStore();
   const [form, setForm] = useState<Car>({ ...emptyCar, customerId: customerId ?? null });
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -305,38 +305,70 @@ const CarForm: React.FC<{ carId?: number; customerId?: number }> = ({ carId, cus
   const [oldCustomerIds, setOldCustomerIds] = useState<number[]>([]);
   const [savingOldCustomer, setSavingOldCustomer] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [initialSnapshot, setInitialSnapshot] = useState('');
+  const formTabId = tabId ?? activeTabId;
+
+
+  const formSnapshot = JSON.stringify({ form, oldCustomerIds });
+
+  useEffect(() => {
+    if (!carId) {
+      setInitialSnapshot(JSON.stringify({
+        form: { ...emptyCar, customerId: customerId ?? null },
+        oldCustomerIds: [],
+      }));
+    }
+  }, [carId, customerId]);
+
+  useEffect(() => {
+    if (!initialSnapshot) return;
+    setTabDirty(formTabId, formSnapshot !== initialSnapshot);
+  }, [formTabId, formSnapshot, initialSnapshot, setTabDirty]);
 
   useEffect(() => {
     const load = async () => {
-      const [brandsRes, customersRes, fuelRes, bodyRes] = await Promise.all([
+      // Locale-sensitive fuel/body options are fetched exclusively by the language effect below.
+      // Never let the initial car fetch overwrite freshly translated dropdown labels.
+      const [brandsRes, customersRes] = await Promise.all([
         window.electron.ipcRenderer.invoke("get-all-brands"),
         window.electron.ipcRenderer.invoke("get-all-customers"),
-        window.electron.ipcRenderer.invoke("get-all-fuel-types"),
-        window.electron.ipcRenderer.invoke("get-all-body-types"),
       ]);
-
       if (brandsRes.success) setBrands(brandsRes.data ?? []);
       setCustomers(customersRes ?? []);
-      if (fuelRes.success) setFuelTypes(fuelRes.data ?? []);
-      if (bodyRes.success) setBodyTypes(bodyRes.data ?? []);
 
       if (carId) {
         const carRes = await window.electron.ipcRenderer.invoke("get-car", carId);
         if (carRes.success && carRes.data) {
+          const loadedOldCustomerIds = (carRes.data.oldCustomerId ?? []).map(Number).filter(Number.isInteger);
           setForm(carRes.data);
           setOriginalCustomerId(carRes.data.customerId ?? null);
-          setOldCustomerIds((carRes.data.oldCustomerId ?? []).map(Number).filter(Number.isInteger));
+          setOldCustomerIds(loadedOldCustomerIds);
           setKmInput(formatKm(carRes.data.km));
-        } else addToast(carRes.message, "error");
+          setInitialSnapshot(JSON.stringify({ form: carRes.data, oldCustomerIds: loadedOldCustomerIds }));
+        } else addToast(i18n.t("carUnexpectedError"), "error");
         setLoading(false);
       }
     };
     void load();
-  }, [carId, addToast]);
+  }, [carId, addToast, i18n]);
+
+  // Locale switches must only refresh translated option labels; do not reload and overwrite a dirty form.
+  useEffect(() => {
+    let alive = true;
+    void Promise.all([
+      window.electron.ipcRenderer.invoke('get-all-fuel-types', i18n.language),
+      window.electron.ipcRenderer.invoke('get-all-body-types', i18n.language)
+    ]).then(([fuel, body]) => {
+      if (!alive) return;
+      if (fuel.success) setFuelTypes(fuel.data ?? []);
+      if (body.success) setBodyTypes(body.data ?? []);
+    }).catch(console.error);
+    return () => { alive = false; };
+  }, [i18n.language]);
 
   const sortedBrands = useMemo(() => [...brands].sort((a, b) => a.brandName.localeCompare(b.brandName, "tr-TR")), [brands]);
-  const sortedFuelTypes = useMemo(() => [...fuelTypes].sort((a, b) => a.fuelTypeName.localeCompare(b.fuelTypeName, "tr-TR")), [fuelTypes]);
-  const sortedBodyTypes = useMemo(() => [...bodyTypes].sort((a, b) => a.bodyTypeName.localeCompare(b.bodyTypeName, "tr-TR")), [bodyTypes]);
+  const sortedFuelTypes = useMemo(() => [...fuelTypes].sort((a, b) => a.fuelTypeName.localeCompare(b.fuelTypeName, i18n.language)), [fuelTypes, i18n.language]);
+  const sortedBodyTypes = useMemo(() => [...bodyTypes].sort((a, b) => a.bodyTypeName.localeCompare(b.bodyTypeName, i18n.language)), [bodyTypes, i18n.language]);
   const setField = <K extends keyof Car>(field: K, value: Car[K]) => setForm((current) => ({ ...current, [field]: value }));
 
   const handleCustomerChange = (value: number | null) => {
@@ -358,7 +390,7 @@ const CarForm: React.FC<{ carId?: number; customerId?: number }> = ({ carId, cus
     const value = newBrand.trim();
     if (!value) return;
     const result = await window.electron.ipcRenderer.invoke("add-brand", { brandName: value });
-    if (!result.success || !result.data) { addToast(result.message, "error"); return; }
+    if (!result.success || !result.data) { addToast(t("carUnexpectedError"), "error"); return; }
     const brand = result.data;
     setBrands((current) => [...current.filter((item) => item.brandId !== brand.brandId), brand].sort((a, b) => a.brandName.localeCompare(b.brandName, "tr-TR")));
     setField("brandId", brand.brandId ?? null);
@@ -372,7 +404,7 @@ const CarForm: React.FC<{ carId?: number; customerId?: number }> = ({ carId, cus
     setSavingOldCustomer(true);
     const result = await window.electron.ipcRenderer.invoke("add-old-customer", { carId, customerId });
     setSavingOldCustomer(false);
-    if (!result.success) { addToast(result.message, "error"); return; }
+    if (!result.success) { addToast(t("carUnexpectedError"), "error"); return; }
     setOldCustomerIds((current) => [...current, customerId]);
     addToast(t("carOldCustomerAdded"), "success");
   };
@@ -380,7 +412,7 @@ const CarForm: React.FC<{ carId?: number; customerId?: number }> = ({ carId, cus
   const removeOldCustomer = async (customerId: number) => {
     if (!carId) return;
     const result = await window.electron.ipcRenderer.invoke("remove-old-customer", { carId, customerId });
-    if (!result.success) { addToast(result.message, "error"); return; }
+    if (!result.success) { addToast(t("carUnexpectedError"), "error"); return; }
     setOldCustomerIds((current) => current.filter((id) => id !== customerId));
     addToast(t("carOldCustomerRemoved"), "success");
   };
@@ -417,13 +449,14 @@ const CarForm: React.FC<{ carId?: number; customerId?: number }> = ({ carId, cus
       : await window.electron.ipcRenderer.invoke("add-car", payload);
     setSubmitting(false);
 
-    if (!result.success) { addToast(result.message, "error"); return; }
+    if (!result.success) { addToast(t("carUnexpectedError"), "error"); return; }
 
+    setInitialSnapshot(formSnapshot);
     addToast(carId ? (willRecordPreviousOwner ? t("carUpdatedWithHistory") : t("carUpdated")) : t("carCreated"), "success");
     const savedId = carId ?? result.data?.carId;
     if (savedId) {
       openTab({ type: "car", title: t("carProfileTitle"), entityId: savedId, isProfile: true });
-      closeTab(activeTabId);
+      closeTab(formTabId);
     }
   };
 
@@ -484,7 +517,7 @@ const CarForm: React.FC<{ carId?: number; customerId?: number }> = ({ carId, cus
 
               <div className={styles.formGroup}>
                 <label className={styles.label}>{t("carModel")}</label>
-                <input className={styles.input} maxLength={100} value={form.model ?? ""} onChange={(event) => setField("model", normalizeFirstLetter(event.target.value))} placeholder={t("carModelPlaceholder")} />
+                <input className={styles.input} maxLength={100} value={form.model ?? ""} onChange={(event) => setField("model", normalizeFirstLetter(event.target.value))} placeholder="" />
               </div>
 
               <div className={styles.formGroup}>
@@ -573,7 +606,7 @@ const CarForm: React.FC<{ carId?: number; customerId?: number }> = ({ carId, cus
         <div className={styles.formFooter}>
           <div />
           <div className={styles.footerActions}>
-            <button type="button" className={styles.cancelBtn} disabled={submitting} onClick={() => closeTab(activeTabId)}>{t("cancel")}</button>
+            <button type="button" className={styles.cancelBtn} disabled={submitting} onClick={() => closeTab(formTabId)}>{t("cancel")}</button>
             <button type="submit" className={styles.submitBtn} disabled={submitting}>
               {submitting ? t("carSaving") : carId ? t("carSaveChanges") : t("carCreate")}
             </button>

@@ -6,4 +6,5 @@ export const Customers = sqliteTable("Customers", {
   firstName: text("firstName").notNull(),
   lastName: text("lastName"),
   taxNumber: text("taxNumber"),
+  address: text("address"),
 });

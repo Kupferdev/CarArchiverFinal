@@ -26,7 +26,7 @@
 }
 
 .vehicleTitle {
-  font-size: 22px;
+  font-size: calc(22px * var(--user-font-factor, 1));
   font-weight: 650;
   color: var(--text-main);
   letter-spacing: 0.2px;
@@ -34,7 +34,7 @@
 
 .vehicleSubtitle {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
   margin-top: 5px;
 }
 
@@ -53,7 +53,7 @@
 }
 
 .infoLabel {
-  font-size: 10px;
+  font-size: calc(10px * var(--user-font-factor, 1));
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.35px;
@@ -61,7 +61,7 @@
 }
 
 .infoValue {
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
   color: var(--text-main);
   font-weight: 550;
   word-break: break-word;
@@ -76,7 +76,7 @@
 .notesValue {
   margin-top: 6px;
   color: var(--text-main);
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
@@ -90,7 +90,7 @@
 
 .currentUserTitle {
   color: var(--text-main);
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
   font-weight: 600;
   margin-bottom: 9px;
 }
@@ -162,7 +162,7 @@
 }
 
 .cardTitle {
-  font-size: 16px;
+  font-size: calc(16px * var(--user-font-factor, 1));
   font-weight: 600;
   color: var(--text-main);
 }
@@ -170,7 +170,7 @@
 .cardHint {
   margin-top: 4px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--user-font-factor, 1));
 }
 
 .countBadge {
@@ -180,7 +180,7 @@
   padding: 5px 9px;
   color: var(--text-muted);
   background: var(--bg-panel);
-  font-size: 11px;
+  font-size: calc(11px * var(--user-font-factor, 1));
   font-weight: 600;
 }
 
@@ -241,7 +241,7 @@
   background: rgba(59, 130, 246, 0.12);
   border: 1px solid rgba(59, 130, 246, 0.22);
   color: var(--accent-blue, #3b82f6);
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
   font-weight: 650;
 }
 
@@ -252,7 +252,7 @@
 
 .userName {
   color: var(--text-main);
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -265,7 +265,7 @@
   flex-direction: column;
   gap: 2px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--user-font-factor, 1));
 }
 
 .userContacts span {
@@ -291,7 +291,7 @@
   border: 1.5px dashed var(--border-color);
   border-radius: 9px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
   gap: 10px;
   text-align: center;
 }
@@ -315,7 +315,9 @@
   }
 }
 
-.serviceList{display:flex;flex-direction:column;gap:8px;max-height:250px;overflow-y:auto;padding-right:4px}.serviceList::-webkit-scrollbar{width:6px}.serviceList::-webkit-scrollbar-thumb{background:var(--border-color);border-radius:10px}.serviceItem{width:100%;display:grid;grid-template-columns:70px minmax(0,1fr) 20px;gap:10px;align-items:center;background:var(--bg-panel);border:1px solid var(--border-color);border-radius:9px;padding:10px;text-align:left;color:inherit;cursor:pointer}.serviceItem:hover{border-color:var(--accent-blue);background:var(--bg-hover)}.serviceDate{font-size:11px;color:var(--text-muted)}.serviceMain{min-width:0;display:flex;flex-direction:column;gap:3px}.serviceMain strong{font-size:12px;color:var(--text-main);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.serviceMain span{font-size:10px;color:var(--text-muted)}.serviceChevron{font-size:20px;color:var(--text-muted);text-align:right}
+.serviceList{display:flex;flex-direction:column;gap:8px;max-height:250px;overflow-y:auto;padding-right:4px}.serviceList::-webkit-scrollbar{width:6px}.serviceList::-webkit-scrollbar-thumb{background:var(--border-color);border-radius:10px}.serviceItem{width:100%;display:grid;grid-template-columns:70px minmax(0,1fr) 20px;gap:10px;align-items:center;background:var(--bg-panel);border:1px solid var(--border-color);border-radius:9px;padding:10px;text-align:left;color:inherit;cursor:pointer}.serviceItem:hover{border-color:var(--accent-blue);background:var(--bg-hover)}.serviceDate{font-size:calc(11px * var(--user-font-factor, 1));color:var(--text-muted)}.serviceMain{min-width:0;display:flex;flex-direction:column;gap:3px}.serviceMain strong{font-size:calc(12px * var(--user-font-factor, 1));color:var(--text-main);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.serviceMain span{font-size:calc(10px * var(--user-font-factor, 1));color:var(--text-muted)}.serviceChevron{font-size:calc(20px * var(--user-font-factor, 1));color:var(--text-muted);text-align:right}
 @media(max-width:760px){.container{grid-template-columns:1fr}.serviceItem{grid-template-columns:60px minmax(0,1fr) 18px}}
 
-.historyAddButton{border:1px solid var(--border-color);background:transparent;color:var(--text-main);border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer}.historyAddButton:hover{background:var(--bg-hover);border-color:var(--accent-blue)}
+.historyAddButton{border:1px solid var(--border-color);background:transparent;color:var(--text-main);border-radius:7px;padding:6px 10px;font-size:calc(12px * var(--user-font-factor, 1));cursor:pointer}.historyAddButton:hover{background:var(--bg-hover);border-color:var(--accent-blue)}
+
+.headerActions,.historyActionGroup{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}

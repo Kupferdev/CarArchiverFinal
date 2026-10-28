@@ -4,9 +4,12 @@ import type { Part } from "../types/part";
 export type CreateServiceRequest = Omit<Service, "serviceId">;
 
 export interface ServicePartInput {
+  /** Present only for an existing service part. */
+  partId?: number;
   partName: string;
-  partTax?: number | null;
-  partPrice?: number | null;
+  quantity: number;
+  /** Unit cost in kuruş, not the calculated row total. */
+  unitPriceKurus: number;
 }
 
 export interface CreateServiceWithPartsRequest {

@@ -1,0 +1,34 @@
+/** Guard for the nine reported October 2026 UI bugs. Source checks are not a
+ * replacement for Windows/Electron interaction and SQLite integration tests. */
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const read = (file) => fs.readFileSync(file, 'utf8');
+const carLocales = read('src/i18n/dashboardTexts.ts') + read('src/i18n/extendedDashboardTexts.ts');
+const placeholders = [...carLocales.matchAll(/carNotesPlaceholder["']?\s*:\s*"([^"]*)"/g)].map((match) => match[1]);
+assert.equal(placeholders.length, 14, 'All fourteen notes placeholders must be present');
+assert.ok(placeholders.every((text) => !/(^|\W)(LPG|GPL|GLP|ГБО)(\W|$)/i.test(text)), 'Car notes examples should not mention LPG');
+console.log('PASS car notes examples omit LPG across 14 languages');
+assert.match(read('electron/main.ts'), /setSpellCheckerEnabled\(false\)/);
+assert.match(read('index.html'), /id="root" spellcheck="false"/);
+console.log('PASS native spellcheck disabled');
+assert.match(read('src/components/common/LocalizedDateTimeField.tsx'), /value=\{draft\} placeholder=""/);
+console.log('PASS dates have no example-date placeholder');
+const service = read('src/services/serviceService.ts');
+assert.match(service, /tx\.update\(Cars\)\.set\(\{ km: createdService\.km \}\)/);
+assert.match(service, /tx\.update\(Cars\)\.set\(\{ km: updated\.km \}\)/);
+assert.match(service, /km > car\.km/);
+const integration = read('scripts/service-integration-test.mjs');
+assert.match(integration, /Historical mileage must not decrease vehicle km/);
+assert.match(integration, /Failed edit must not change vehicle km/);
+console.log('PASS mileage update & rollback regression assertions present');
+assert.match(read('src/components/dashboard/DeleteConfirmDialog.module.css'), /background:var\(--bg-panel\)/);
+assert.match(read('src/components/dashboard/UnsavedChangesDialog.module.css'), /background:var\(--bg-panel\)/);
+console.log('PASS delete and unsaved-close dialogs use theme background');
+assert.match(read('src/components/dashboard/RightPanel.tsx'), /if \(s\.isDelivered \|\| s\.deliveryDate \|\| !s\.appointmentDate\) return false/);
+console.log('PASS delivered services excluded from upcoming list');
+assert.match(read('src/App.css'), /-webkit-app-region:\s*drag/);
+assert.doesNotMatch(read('electron/main.ts'), /savedState\?\.isMaximized \|\| !savedState/);
+console.log('PASS first-run window is not forced maximized; drag strip remains');
+assert.match(read('vite.config.ts'), /server:\s*\{ open: false \}/);
+assert.match(read('vite.config.ts'), /preview:\s*\{ open: false \}/);
+console.log('PASS Vite dev server does not auto-open browser');

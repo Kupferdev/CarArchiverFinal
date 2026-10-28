@@ -12,3 +12,70 @@ body, html, #root {
   max-width: none;
   overflow: hidden;
 }
+.windowChrome{display:none}
+.windows-overlay #root{padding-top:30px;box-sizing:border-box}
+.windows-overlay .windowChrome{position:fixed;top:0;left:0;right:140px;height:30px;background:var(--bg-panel);-webkit-app-region:drag;user-select:none;z-index:9999}
+.windows-overlay .appContainer{height:100%}
+.windows-overlay .wizard-main-container{min-height:calc(100vh - 30px)}
+
+.appContainer{font-family:var(--user-font-family,system-ui,sans-serif);font-size:var(--user-font-size,14px)}.appContainer :is(button,input,select,textarea){font-family:inherit}.appContainer .tabbar svg,.appContainer button svg{max-width:var(--user-icon-size,20px);max-height:var(--user-icon-size,20px)}
+
+/* UI scale is handled by HomePage.module.css without coupling it to font size. */
+
+.windows-overlay .windowChrome{background:var(--bg-panel)}
+
+.windows-overlay{--window-chrome-height:30px}
+
+/* Keep the entire native draggable strip visually aligned with the chosen theme. */
+.windows-overlay .windowChrome { background-color: var(--bg-panel); }
+/* Navigation and tabular UI are controls, not selectable document text. */
+.appContainer :is(button, [role="button"], nav, header, table, th, td, .tabbar),
+.appContainer :is(button, [role="button"], nav, header, table, th, td, .tabbar) * {
+  -webkit-user-select: none; user-select: none;
+}
+.appContainer :is(input, textarea, [contenteditable="true"]),
+.appContainer :is(input, textarea, [contenteditable="true"]) * {
+  -webkit-user-select: text; user-select: text;
+}
+
+/* Prevent Ctrl+A from painting the entire dashboard blue. Only editable text is selectable. */
+.appContainer, .appContainer * { -webkit-user-select: none; user-select: none; }
+.appContainer :is(input, textarea, [contenteditable="true"]),
+.appContainer :is(input, textarea, [contenteditable="true"]) * { -webkit-user-select: text; user-select: text; }
+
+/* Desktop UI should not behave like a selectable webpage.  This intentionally
+   covers portals, first-run setup and the window overlay, not only HomePage. */
+html, body, #root, #root *, #root *::before, #root *::after {
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Keep text inputs and explicitly editable content usable for caret/selection. */
+#root :is(input, textarea, [contenteditable="true"]),
+#root [contenteditable="true"] * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+/* Decorative assets must not be dragged out of Electron as files. */
+#root img, #root svg {
+  -webkit-user-drag: none;
+}
+/* CSS layer that shares exactly the same theme token as the application header. */
+html.windows-overlay, html.windows-overlay body, html.windows-overlay #root {
+  background-color: var(--bg-panel);
+}
+html.windows-overlay .windowChrome {
+  background: var(--bg-panel);
+}
+
+/* Dedicated 30px Windows titlebar drag strip. Keep system caption buttons unobstructed. */
+html.windows-overlay .windowChrome {
+  /* Base .windowChrome is display:none on non-Windows. Explicitly re-enable
+     it here: without display:block the 30px native caption never existed. */
+  display: block;
+  -webkit-app-region: drag;
+  position: fixed;
+  inset: 0 140px auto 0;
+  height: 30px;
+  z-index: 9999;
+  pointer-events: auto;
+}

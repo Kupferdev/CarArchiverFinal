@@ -1,9 +1,11 @@
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useState } from 'react';
 import styles from './ToastContainer.module.css';
 import { useToastStore, ToastType } from '../../store/toastStore';
 
 // Her bir bildirim kendi süresini ve animasyonunu kendi yönetsin diye alt bileşen yaptık
 const ToastItem: React.FC<{ id: string; message: string; type: ToastType; onRemove: (id: string) => void }> = ({ id, message, type, onRemove }) => {
+  const { t } = useTranslation();
   const [isLeaving, setIsLeaving] = useState(false);
 
   useEffect(() => {
@@ -27,7 +29,7 @@ const ToastItem: React.FC<{ id: string; message: string; type: ToastType; onRemo
       className={`${styles.toast} ${styles[type]} ${isLeaving ? styles.leaving : ''}`}
       onClick={() => setIsLeaving(true)} // Tıklanınca direk geri gitme animasyonunu başlatır
       onAnimationEnd={handleAnimationEnd}
-      title="Kapatmak için tıklayın"
+      title={t("toastCloseHint")}
     >
       <span>{message}</span>
     </div>

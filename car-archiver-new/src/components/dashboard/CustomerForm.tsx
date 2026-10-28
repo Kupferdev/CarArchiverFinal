@@ -1,5 +1,8 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect } from 'react';
 import styles from './CustomerForm.module.css';
+import { DeleteConfirmDialog } from './DeleteConfirmDialog';
+import { capitalizeWordStarts } from '../../utils/textCapitalization';
 import { useToastStore } from '../../store/toastStore';
 import { useTabStore } from '../../store/tabStore'; // YENİ: Sekme kapatmak için
 import type { IApiResponse } from '../../models/response.model';
@@ -14,12 +17,13 @@ const capitalizeFirstLetter = (value: string) => {
   return value.charAt(0).toLocaleUpperCase('tr-TR') + value.slice(1);
 };
 
-const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
+const CustomerForm: React.FC<{ customerId?: number; tabId?: string }> = ({ customerId, tabId }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
-    firstName: '', lastName: '', nationalId: '', taxNumber: ''
+    firstName: '', lastName: '', nationalId: '', taxNumber: '', address: ''
   });
   
-  const [phones, setPhones] = useState<PhoneInput[]>([{ countryCode: '+90', number: '' }]);
+  const [phones, setPhones] = useState<PhoneInput[]>([{ countryCode: '', number: '' }]);
   const [emails, setEmails] = useState<EmailInput[]>([{ address: '' }]);
   
   // Silme Modalı için Stateler
@@ -27,7 +31,28 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
   const [deleteRelated, setDeleteRelated] = useState(false);
 
   const { addToast } = useToastStore();
-  const { activeTabId, closeTab, openTab } = useTabStore();
+  const { activeTabId, closeTab, openTab, setTabDirty } = useTabStore();
+  const [initialSnapshot, setInitialSnapshot] = useState('');
+  const formTabId = tabId ?? activeTabId;
+
+
+  const snapshot = JSON.stringify({ formData, phones, emails });
+
+  useEffect(() => {
+    if (!initialSnapshot) return;
+    setTabDirty(formTabId, snapshot !== initialSnapshot);
+  }, [formTabId, initialSnapshot, setTabDirty, snapshot]);
+
+  useEffect(() => {
+    if (!customerId) {
+      setInitialSnapshot(JSON.stringify({
+        formData: { firstName: '', lastName: '', nationalId: '', taxNumber: '', address: '' },
+        phones: [{ countryCode: '', number: '' }],
+        emails: [{ address: '' }],
+      }));
+    }
+  }, [customerId]);
+
   useEffect(() => {
     if (customerId) {
       const fetchData = async () => {
@@ -38,26 +63,38 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
             firstName: d.customer.firstName,
             lastName: d.customer.lastName || '',
             nationalId: d.customer.nationalId || '',
-            taxNumber: d.customer.taxNumber || ''
+            taxNumber: d.customer.taxNumber || '',
+            address: d.customer.address || ''
           });
           
-          if (d.phones && d.phones.length > 0) {
-            setPhones(d.phones.map((p: PhoneNumber) => ({ countryCode: p.countryCode, number: p.phoneNumber })));
-          }
-          if (d.emails && d.emails.length > 0) {
-            setEmails(d.emails.map((e: Email) => ({ address: e.customerEmail })));
-          }
+          const nextPhones = d.phones && d.phones.length > 0 ? d.phones.map((p: PhoneNumber) => ({ countryCode: p.countryCode, number: p.phoneNumber })) : [{ countryCode: '', number: '' }];
+          const nextEmails = d.emails && d.emails.length > 0 ? d.emails.map((e: Email) => ({ address: e.customerEmail })) : [{ address: '' }];
+          setPhones(nextPhones);
+          setEmails(nextEmails);
+          setInitialSnapshot(JSON.stringify({
+            formData: {
+              firstName: d.customer.firstName,
+              lastName: d.customer.lastName || '',
+              nationalId: d.customer.nationalId || '',
+              taxNumber: d.customer.taxNumber || '',
+              address: d.customer.address || ''
+            },
+            phones: nextPhones,
+            emails: nextEmails,
+          }));
         }
       };
       fetchData();
     }
   }, [customerId]);
 
-  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    const nextValue = name === 'firstName' || name === 'lastName'
-      ? capitalizeFirstLetter(value)
-      : value;
+    const nextValue = name === 'address'
+      ? capitalizeWordStarts(value)
+      : name === 'firstName' || name === 'lastName'
+        ? capitalizeFirstLetter(value)
+        : value;
 
     setFormData({ ...formData, [name]: nextValue });
   };
@@ -74,7 +111,7 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
     setEmails(newEmails);
   };
 
-  const addPhone = () => setPhones([...phones, { countryCode: '+90', number: '' }]);
+  const addPhone = () => setPhones([...phones, { countryCode: '', number: '' }]);
   const removePhone = (index: number) => setPhones(phones.filter((_, i) => i !== index));
 
   const addEmail = () => setEmails([...emails, { address: '' }]);
@@ -83,6 +120,7 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
     if (e.key === 'Enter') {
       const target = e.target as HTMLElement;
+      if (target.tagName === 'TEXTAREA') return;
       if (target.tagName === 'BUTTON' && (target as HTMLButtonElement).type === 'submit') {
         return;
       }
@@ -101,10 +139,14 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
     e.preventDefault();
 
     if (!formData.firstName) {
-      addToast('Ad alanı zorunludur!', 'error');
+      addToast(t('customerFirstRequired'), 'error');
       return;
     }
 
+    if (phones.some(phone => phone.number.trim() && !/^\+\d{1,4}$/.test(phone.countryCode.trim()))) {
+      addToast(t('phoneCountryRequired'), 'error');
+      return;
+    }
     const payload = {
       ...formData,
       phones: phones.filter(p => p.number.trim() !== ''),
@@ -121,7 +163,8 @@ const CustomerForm: React.FC<{ customerId?: number }> = ({ customerId }) => {
       }
       
 if (result.success) {
-        addToast(customerId ? 'Müşteri başarıyla güncellendi!' : 'Yeni müşteri sisteme eklendi!', 'success');
+        setInitialSnapshot(snapshot);
+        addToast(customerId ? t('customerUpdated') : t('customerCreated'), 'success');
         
         if (!customerId) {
           // YENİ KAYIT DURUMU: Backend'den dönen yeni müşterinin ID'sini alıyoruz
@@ -132,25 +175,25 @@ if (result.success) {
             // 1. Yeni eklenen kişinin profil sekmesini aç
             openTab({ 
               type: 'customer', 
-              title: `${formData.firstName} ${formData.lastName} Profili`, 
+              title: `${formData.firstName} ${formData.lastName} · ${t("customerViewProfile")}`, 
               entityId: newCustomerId, 
               isProfile: true 
             });
             // 2. Şu anki "Yeni Kayıt" form sekmesini kapat
-            closeTab(activeTabId);
+            closeTab(formTabId);
           } else {
             // Eğer backend'den yeni ID dönmezse (hata payı), formu temizleyip ekranda bırak
-            setFormData({ firstName: '', lastName: '', nationalId: '', taxNumber: '' });
-            setPhones([{ countryCode: '+90', number: '' }]);
+            setFormData({ firstName: '', lastName: '', nationalId: '', taxNumber: '', address: '' });
+            setPhones([{ countryCode: '', number: '' }]);
             setEmails([{ address: '' }]);
             console.warn("Backend yeni oluşturulan müşterinin ID'sini döndürmediği için profile yönlendirilemedi.");
           }
         }
       } else {
-        addToast('İşlem başarısız: ' + result.message, 'error');
+        addToast(t('customerOperationFailed'), 'error');
       }
     } catch (error) {
-      addToast('Beklenmeyen bir hata oluştu.', 'error');
+      addToast(t('serviceUnexpectedError'), 'error');
     }
   };
 
@@ -166,79 +209,83 @@ if (result.success) {
 
       if (result.success) {
         const successMsg = deleteRelated 
-          ? 'Müşteri ve bağlı tüm kayıtları başarıyla silindi.' 
-          : 'Müşteri başarıyla silindi.';
+          ? t('customerDeleteSuccessRelated') 
+          : t('customerDeleteSuccess');
         
         addToast(successMsg, 'success');
         setIsDeleteModalOpen(false);
-        closeTab(activeTabId); // Sildikten sonra içindeysek sekmeyi direkt kapat!
+        closeTab(formTabId); // Sildikten sonra içindeysek sekmeyi direkt kapat!
       } else {
-        addToast('Silme işlemi başarısız: ' + result.message, 'error');
+        addToast(t('customerDeleteFailed'), 'error');
       }
     } catch (error) {
-      addToast('Beklenmeyen bir hata oluştu.', 'error');
+      addToast(t('serviceUnexpectedError'), 'error');
     }
   };
 
   return (
     <div className={styles.container}>
-      <div className={styles.title}>{customerId ? 'Müşteriyi Düzenle' : 'Yeni Müşteri Ekle'}</div>
+      <div className={styles.title}>{customerId ? t("customerEditForm") : t("customerNewForm")}</div>
       
       <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className={styles.formWrapper}>
         
         <div className={styles.formGrid}>
           {/* ================= 1. KOLON ================= */}
           <div className={styles.column}>
-            <div className={styles.sectionTitle}>Temel Bilgiler</div>
+            <div className={styles.sectionTitle}>{t("customerBasic")}</div>
             <div className={styles.formGroup}>
-              <label className={styles.label}>Ad *</label>
-              <input className={styles.input} name="firstName" value={formData.firstName} onChange={handleTextChange} placeholder="Müşteri adı" />
+              <label className={styles.label}>{t("customerFirstName")} *</label>
+              <input className={styles.input} name="firstName" value={formData.firstName} onChange={handleTextChange} placeholder={t("customerFirstName")} />
             </div>
             <div className={styles.formGroup}>
-              <label className={styles.label}>Soyad</label>
-              <input className={styles.input} name="lastName" value={formData.lastName} onChange={handleTextChange} placeholder="Müşteri soyadı" />
-            </div>
-            <div className={styles.sectionTitle} style={{ marginTop: '16px' }}>Resmi Bilgiler</div>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Kimlik No</label>
-              <input className={styles.input} name="nationalId" value={formData.nationalId} onChange={handleTextChange} placeholder="Kimlik numarası" />
+              <label className={styles.label}>{t("customerLastName")}</label>
+              <input className={styles.input} name="lastName" value={formData.lastName} onChange={handleTextChange} placeholder={t("customerLastName")} />
             </div>
             <div className={styles.formGroup}>
-              <label className={styles.label}>Vergi No</label>
-              <input className={styles.input} name="taxNumber" value={formData.taxNumber} onChange={handleTextChange} placeholder="Kurumsal" />
+              <label className={styles.label}>{t("customerAddress")}</label>
+              <textarea className={`${styles.input} ${styles.addressInput}`} name="address" value={formData.address} onChange={handleTextChange} rows={3} placeholder="123 Main Street, No. 8" style={{ resize: "vertical", lineHeight: 1.5 }} />
+            </div>
+            <div className={styles.sectionTitle} style={{ marginTop: '16px' }}>{t("customerOfficial")}</div>
+            <div className={styles.formGroup}>
+              <label className={styles.label}>{t("customerNationalId")}</label>
+              <input className={styles.input} name="nationalId" value={formData.nationalId} onChange={handleTextChange} placeholder={t("customerNationalId")} />
+            </div>
+            <div className={styles.formGroup}>
+              <label className={styles.label}>{t("customerTaxId")}</label>
+              <input className={styles.input} name="taxNumber" value={formData.taxNumber} onChange={handleTextChange} placeholder={t("customerTaxId")} />
             </div>
           </div>
 
           {/* ================= 2. KOLON ================= */}
           <div className={styles.column}>
-            <div className={styles.sectionTitle}>Telefon Numaraları</div>
+            <div className={styles.sectionTitle}>{t("customerPhones")}</div>
             <div className={styles.formGroup}>
               {phones.map((phone, index) => (
                 <div key={`phone-${index}`} className={styles.dynamicRow}>
-                  <input className={`${styles.input} ${styles.shortInput}`} value={phone.countryCode} onChange={(e) => updatePhone(index, 'countryCode', e.target.value)} placeholder="+90" />
+                  <input className={`${styles.input} ${styles.shortInput}`} value={phone.countryCode} onChange={(e) => updatePhone(index, 'countryCode', e.target.value)} placeholder="+__" />
                   <input className={styles.input} value={phone.number} onChange={(e) => updatePhone(index, 'number', e.target.value)} placeholder="5XX XXX XX XX" />
                   {phones.length > 1 && (
                     <button type="button" onClick={() => removePhone(index)} className={`${styles.iconBtn} ${styles.danger}`}>✕</button>
                   )}
                 </div>
               ))}
-              <button type="button" onClick={addPhone} className={styles.addBtn}>+ Telefon Ekle</button>
+              <button type="button" onClick={addPhone} className={styles.addBtn}>+ {t("customerAddPhone")}</button>
             </div>
           </div>
 
           {/* ================= 3. KOLON ================= */}
           <div className={styles.column}>
-            <div className={styles.sectionTitle}>E-Posta Adresleri</div>
+            <div className={styles.sectionTitle}>{t("customerEmails")}</div>
             <div className={styles.formGroup}>
               {emails.map((email, index) => (
                 <div key={`email-${index}`} className={styles.dynamicRow}>
-                  <input type="email" className={styles.input} value={email.address} onChange={(e) => updateEmail(index, e.target.value)} placeholder="ornek@mail.com" />
+                  <input type="email" className={styles.input} value={email.address} onChange={(e) => updateEmail(index, e.target.value)} placeholder="name@example.com" />
                   {emails.length > 1 && (
                     <button type="button" onClick={() => removeEmail(index)} className={`${styles.iconBtn} ${styles.danger}`}>✕</button>
                   )}
                 </div>
               ))}
-              <button type="button" onClick={addEmail} className={styles.addBtn}>+ E-Posta Ekle</button>
+              <button type="button" onClick={addEmail} className={styles.addBtn}>+ {t("customerAddEmail")}</button>
             </div>
           </div>
         </div>
@@ -251,7 +298,7 @@ if (result.success) {
             {customerId && (
               <>
                 <button type="button" className={styles.deleteBtn} onClick={() => setIsDeleteModalOpen(true)}>
-                  Müşteriyi Sil
+                  {t("customerDeleteTitle")}
                 </button>
                 <button 
                   type="button" 
@@ -259,15 +306,15 @@ if (result.success) {
                   onClick={() => {
                     openTab({ 
                       type: 'customer', 
-                      title: `${formData.firstName} ${formData.lastName} Profili`, 
+                      title: `${formData.firstName} ${formData.lastName} · ${t("customerViewProfile")}`, 
                       entityId: customerId, 
                       isProfile: true 
                     });
-                    closeTab(activeTabId); // Düzenleme sekmesini kapatıp profili aç
+                    closeTab(formTabId); // Düzenleme sekmesini kapatıp profili aç
                   }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                  Profili Görüntüle
+                  {t("customerViewProfile")}
                 </button>
               </>
             )}
@@ -275,38 +322,21 @@ if (result.success) {
           
           {/* SAĞ TARAF: Kaydetme Butonu */}
           <button type="submit" className={styles.submitBtn}>
-            {customerId ? 'Güncelle' : 'Kaydet'}
+            {customerId ? t("customerUpdate") : t("customerSave")}
           </button>
           
         </div>
       </form>
 
-      {/* SİLME ONAY MODALI */}
-      {isDeleteModalOpen && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
-            <h3 className={styles.modalTitle}>Müşteriyi Sil</h3>
-            <p className={styles.modalText}>
-              Bu müşteriyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
-            </p>
-            
-            <label className={styles.checkboxLabel}>
-              <input 
-                type="checkbox" 
-                checked={deleteRelated} 
-                onChange={(e) => setDeleteRelated(e.target.checked)} 
-                className={styles.checkbox}
-              />
-              Müşteriye ait tüm araç ve servis kayıtlarını da sil.
-            </label>
+      {isDeleteModalOpen && <DeleteConfirmDialog
+        title={t("customerDeleteTitle")}
+        option={t("customerDeleteRelated")}
+        checked={deleteRelated}
+        onCheckedChange={setDeleteRelated}
+        onCancel={() => setIsDeleteModalOpen(false)}
+        onConfirm={() => void confirmDelete()}
+      >{t("customerDeletePrompt")}</DeleteConfirmDialog>}
 
-            <div className={styles.modalActions}>
-              <button className={styles.cancelBtn} onClick={() => setIsDeleteModalOpen(false)}>İptal</button>
-              <button className={styles.deleteConfirmBtn} onClick={confirmDelete}>Evet, Sil</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

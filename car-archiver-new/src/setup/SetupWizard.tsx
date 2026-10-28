@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from "react";
 import { LanguageStep } from "./steps/LanguageStep";
 import { EulaStep } from "./steps/EulaStep";
@@ -6,6 +7,7 @@ import { FinishStep } from "./steps/FinishStep";
 import type { SetupWizardData } from "./setupTypes";
 
 export const SetupWizard = () => {
+  const { t } = useTranslation();
   const [step, setStep] = useState(1);
   const [configData, setConfigData] = useState<SetupWizardData>({
     language: "en",
@@ -34,7 +36,7 @@ export const SetupWizard = () => {
       );
 
       if (!dbPathResult) {
-        alert("Veritabanı hazırlanırken bir hata meydana geldi!");
+        alert(t("setupDbError"));
         return;
       }
 
@@ -52,11 +54,11 @@ export const SetupWizard = () => {
       if (success) {
         window.location.reload();
       } else {
-        alert("Ayarlar kaydedilirken bir hata oluştu!");
+        alert(t("setupSaveError"));
       }
     } catch (error) {
       console.error("Kurulum sırasında beklenmeyen hata:", error);
-      alert("Kurulum tamamlanamadı.");
+      alert(t("setupFailed"));
     }
   };
 

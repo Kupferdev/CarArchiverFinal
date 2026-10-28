@@ -99,10 +99,10 @@ async function runDetailedRepoTest() {
             applicationDate: today,
             appointmentDate: tomorrow,
             km: faker.number.int({ min: 50000, max: 120000 }),
-            complaints: "Motordan ses geliyor, frenler zayıf tutuyor.", // Zorunlu
+            complaints: "Motordan ses geliyor, frenler zayıf tutuyor.", // Istege bagli
             extraRequests: "Silecek sularını da doldurur musunuz?",
             faults: ["Fren balatası aşınmış", "Motor kulakçığı kopuk"], // Array (JSON objesi)
-            hasDamageOnReceive: true, // Zorunlu
+            hasDamageOnReceive: true, // Istege bagli
             damageOnReceive: ["Sağ arka kapı göçük", "Ön tamponda çizikler mevcut"],
             hasDamageDuringRepair: false,
             laborCharge: 2500.00,

@@ -17,8 +17,9 @@ export const Services = sqliteTable("Services", {
   deliveryDate: integer("deliveryDate", { mode: "timestamp" }),
 
   km: real("km"),
-  complaints: text("complaints").notNull(),
+  complaints: text("complaints"),
   extraRequests: text("extraRequests"),
+  advisorNotes: text("advisorNotes"),
 
   faults: text("faults", { mode: 'json' }).$type<string[]>().default([]),
 

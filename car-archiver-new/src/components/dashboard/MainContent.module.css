@@ -33,7 +33,7 @@
 
 .navCardTitle {
   color: var(--text-main);
-  font-size: 17px;
+  font-size: calc(17px * var(--user-font-factor, 1));
   font-weight: 500;
 }
 
@@ -52,18 +52,18 @@
 
 .navCardStat {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--user-font-factor, 1));
 }
 
 .navCardCount {
   color: var(--text-main);
-  font-size: 28px;
+  font-size: calc(28px * var(--user-font-factor, 1));
   font-weight: 300;
   margin-top: auto;
 }
 
 .navCardCount span {
-  font-size: 12px;
+  font-size: calc(12px * var(--user-font-factor, 1));
   color: var(--text-muted);
   font-weight: 400;
   margin-left: 4px;
@@ -80,3 +80,13 @@
     grid-template-columns: 1fr;
   }
 }
+.dashboardBody{display:flex;flex-direction:column;gap:18px;width:100%;max-width:1680px;margin:auto}
+.recentSection{background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:14px 18px;min-width:0;color:var(--text-main)}
+.recentHeader{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.recentHeader button{border:1px solid var(--border-color);border-radius:7px;background:var(--bg-panel);color:var(--text-main);padding:7px 11px;cursor:pointer}
+.recentScroll{width:100%;overflow-x:auto;max-height:340px;overflow-y:auto}
+.recentTable{width:100%;border-collapse:collapse;table-layout:fixed;min-width:580px;font-size:calc(12px * var(--user-font-factor, 1))}
+.recentTable th{text-align:left;color:var(--text-muted);font-weight:500;padding:11px;border-bottom:1px solid var(--border-color)}
+.recentTable td{padding:11px;border-bottom:1px solid var(--border-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.recentTable td span{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.recentTable tr{cursor:pointer}.recentTable tbody tr:hover{background:var(--bg-hover)}

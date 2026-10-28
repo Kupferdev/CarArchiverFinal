@@ -1,10 +1,14 @@
+import { useTranslation } from 'react-i18next';
+import { BulkSelectionActions } from "../common/BulkSelectionActions";
 import React, { useEffect, useState, useCallback } from 'react';
 import styles from './CustomerList.module.css';
+import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 import { CustomerViewDto } from '../../shared/dtos/customerDtos';
 import { useTabStore } from '../../store/tabStore';
 import { useToastStore } from '../../store/toastStore';
 
 const CustomerList: React.FC = () => {
+  const { t } = useTranslation();
   const [customers, setCustomers] = useState<CustomerViewDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -46,15 +50,15 @@ const CustomerList: React.FC = () => {
   }, [fetchCustomers]);
 
   const handleViewProfile = (customer: CustomerViewDto) => {
-    openTab({ type: 'customer', title: `${customer.fullName} Profili`, entityId: customer.id, isProfile: true });
+    openTab({ type: 'customer', title: `${customer.fullName} · ${t("customerViewProfile")}`, entityId: customer.id, isProfile: true });
   };
 
   const handleEditCustomer = (customer: CustomerViewDto) => {
-    openTab({ type: 'customer', title: `${customer.fullName} Düzenle`, entityId: customer.id });
+    openTab({ type: 'customer', title: `${customer.fullName} · ${t("customerEdit")}`, entityId: customer.id });
   };
 
   const handleAddCustomer = () => {
-    openTab({ type: 'customer', title: 'Yeni Müşteri', entityId: 999 });
+    openTab({ type: 'customer', title: t("customerNew"), entityId: 999 });
   };
 
   // --- ÇOKLU SEÇİM METOTLARI ---
@@ -109,14 +113,14 @@ const CustomerList: React.FC = () => {
 
         if (result.success) {
           const successMsg = deleteRelated 
-            ? `${selectedIds.length} müşteri ve bağlı kayıtları silindi.` 
-            : `${selectedIds.length} müşteri başarıyla silindi.`;
+            ? t('customerDeleteSuccessRelated') 
+            : t('customerDeleteSuccess');
           addToast(successMsg, 'success');
           
           setIsSelectionMode(false); // Silme başarılıysa seçim modunu kapat
           setSelectedIds([]);
         } else {
-          addToast('Toplu silme başarısız: ' + result.message, 'error');
+          addToast(t('customerBulkFailed'), 'error');
         }
 
       } else {
@@ -129,11 +133,11 @@ const CustomerList: React.FC = () => {
 
         if (result.success) {
           const successMsg = deleteRelated 
-            ? 'Müşteri ve bağlı tüm kayıtları başarıyla silindi.' 
-            : 'Müşteri başarıyla silindi.';
+            ? t('customerDeleteSuccessRelated') 
+            : t('customerDeleteSuccess');
           addToast(successMsg, 'success');
         } else {
-          addToast('Silme işlemi başarısız: ' + result.message, 'error');
+          addToast(t('customerDeleteFailed'), 'error');
         }
       }
 
@@ -141,7 +145,7 @@ const CustomerList: React.FC = () => {
       closeDeleteModal();
     } catch (error) {
       console.error(error);
-      addToast('Beklenmeyen bir hata oluştu.', 'error');
+      addToast(t('serviceUnexpectedError'), 'error');
     }
   };
 
@@ -158,47 +162,23 @@ const CustomerList: React.FC = () => {
   return (
     <div className={styles.container}>
       <div className={styles.toolbar}>
-        <div className={styles.title}>Müşteri Listesi</div>
+        <div className={styles.title}>{t("customerListTitle")}</div>
         
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           
 {/* SEÇİM MODU AÇIKSA GÖSTERİLECEK BUTONLAR */}
-          {isSelectionMode ? (
-            <>
-              {selectedIds.length > 0 && (
-                <button className={`${styles.actionBtn} ${styles.bulkDeleteIconBtn}`} onClick={openBulkDeleteModal} title="Seçilenleri Sil">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                  <span style={{ marginLeft: '6px', fontSize: '13px', fontWeight: 600 }}>{selectedIds.length}</span>
-                </button>
-              )}
-              {/* VAZGEÇ (KUTU İÇİNDE ÇARPI İKONU) */}
-              <button className={`${styles.selectionModeBtn} ${styles.cancelIconBtn}`} onClick={toggleSelectionMode} title="Seçim Modunu Kapat">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                  <line x1="9" y1="9" x2="15" y2="15"></line>
-                  <line x1="15" y1="9" x2="9" y2="15"></line>
-                </svg>
-              </button>
-            </>
-          ) : (
-            /* SEÇİM MODU KAPALIYSA (KUTU İÇİNDE TİK İKONU) */
-            <button className={styles.selectionModeBtn} onClick={toggleSelectionMode} title="Çoklu Seçim Modu">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="9 11 12 14 22 4"></polyline>
-                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-              </svg>
-            </button>
-          )}
+          <BulkSelectionActions active={isSelectionMode} selectedCount={selectedIds.length}
+            onToggle={toggleSelectionMode} onDelete={openBulkDeleteModal} entityLabel={t("serviceCustomer")} />
 
           <input 
             type="text" 
             className={styles.searchInput} 
-            placeholder="İsim, telefon, e-posta ile ara..." 
+            placeholder={t("customerSearchPlaceholder")} 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           <button className={styles.addNewBtn} onClick={handleAddCustomer}>
-            + Yeni Müşteri
+            + {t("customerNew")}
           </button>
         </div>
       </div>
@@ -218,17 +198,17 @@ const CustomerList: React.FC = () => {
                   />
                 </th>
               )}
-              <th>AD SOYAD</th>
-              <th>TELEFON</th>
-              <th>E-POSTA</th>
-              <th style={{ textAlign: 'right' }}>İŞLEMLER</th>
+              <th>{t("customerFullName")}</th>
+              <th>{t("customerPhone")}</th>
+              <th>{t("customerEmail")}</th>
+              <th style={{ textAlign: 'right' }}>{t("serviceActions")}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={isSelectionMode ? 5 : 4} className={styles.emptyState}>Yükleniyor...</td></tr>
+              <tr><td colSpan={isSelectionMode ? 5 : 4} className={styles.emptyState}>{t("customerLoading")}</td></tr>
             ) : filteredCustomers.length === 0 ? (
-              <tr><td colSpan={isSelectionMode ? 5 : 4} className={styles.emptyState}>Kayıt bulunamadı.</td></tr>
+              <tr><td colSpan={isSelectionMode ? 5 : 4} className={styles.emptyState}>{t("customerNoRecords")}</td></tr>
             ) : (
               filteredCustomers.map((c) => (
                 <tr key={c.id} className={`${styles.tableRow} ${selectedIds.includes(c.id) ? styles.selectedRow : ''}`} onDoubleClick={() => handleViewProfile(c)}>
@@ -248,21 +228,21 @@ const CustomerList: React.FC = () => {
                   <td style={{ fontWeight: 500 }}>{c.fullName}</td>
                   <td>
                     {c.phones && c.phones.length > 0 ? `${c.phones[0].countryCode} ${c.phones[0].number}` : '-'}
-                    {c.phones && c.phones.length > 1 && <span style={{fontSize: '10px', marginLeft: '6px', color: 'var(--accent-blue)'}}>+{c.phones.length - 1}</span>}
+                    {c.phones && c.phones.length > 1 && <span style={{fontSize: 'calc(10px * var(--user-font-factor, 1))', marginLeft: '6px', color: 'var(--accent-blue)'}}>+{c.phones.length - 1}</span>}
                   </td>
                   <td>
                     {c.emails && c.emails.length > 0 ? c.emails[0].address : '-'}
-                    {c.emails && c.emails.length > 1 && <span style={{fontSize: '10px', marginLeft: '6px', color: 'var(--accent-blue)'}}>+{c.emails.length - 1}</span>}
+                    {c.emails && c.emails.length > 1 && <span style={{fontSize: 'calc(10px * var(--user-font-factor, 1))', marginLeft: '6px', color: 'var(--accent-blue)'}}>+{c.emails.length - 1}</span>}
                   </td>
                   <td className={styles.actionsCell}>
-                    <button className={styles.actionBtn} onClick={() => handleViewProfile(c)} title="Profili Görüntüle">
+                    <button className={styles.actionBtn} onClick={() => handleViewProfile(c)} title={t("customerViewProfile")}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                     </button>
-                    <button className={styles.actionBtn} onClick={() => handleEditCustomer(c)} title="Düzenle">
+                    <button className={styles.actionBtn} onClick={() => handleEditCustomer(c)} title={t("customerEdit")}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                     </button>
                     {/* Tekli Silme Butonu (Seçim Modunda Bile Görünebilir) */}
-                    <button className={`${styles.actionBtn} ${styles.deleteIconBtn}`} onClick={() => openDeleteModal(c)} title="Sil">
+                    <button className={`${styles.actionBtn} ${styles.deleteIconBtn}`} onClick={() => openDeleteModal(c)} title={t("customerDelete")}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                     </button>
                   </td>
@@ -273,33 +253,15 @@ const CustomerList: React.FC = () => {
         </table>
       </div>
 
-      {isDeleteModalOpen && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
-            <h3 className={styles.modalTitle}>{isBulkDeleteMode ? 'Toplu Silme İşlemi' : 'Müşteriyi Sil'}</h3>
-            <p className={styles.modalText}>
-              {isBulkDeleteMode 
-                ? `${selectedIds.length} adet müşteriyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`
-                : <strong>{customerToDelete?.fullName}</strong>} {isBulkDeleteMode ? '' : 'isimli müşteriyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.'}
-            </p>
-            
-            <label className={styles.checkboxLabel}>
-              <input 
-                type="checkbox" 
-                checked={deleteRelated} 
-                onChange={(e) => setDeleteRelated(e.target.checked)} 
-                className={styles.checkbox}
-              />
-              Müşteri(ler)e ait tüm araç ve servis kayıtlarını da sil.
-            </label>
+      {isDeleteModalOpen && <DeleteConfirmDialog
+        title={isBulkDeleteMode ? t("customerDeleteSelectedTitle") : t("customerDeleteTitle")}
+        option={t("customerDeleteRelated")}
+        checked={deleteRelated}
+        onCheckedChange={setDeleteRelated}
+        onCancel={closeDeleteModal}
+        onConfirm={() => void confirmDelete()}
+      >{isBulkDeleteMode ? t("customerDeleteSelectedPrompt", { count: selectedIds.length }) : t("customerDeleteCustomerPrompt", { name: customerToDelete?.fullName || t("serviceCustomer") })}</DeleteConfirmDialog>}
 
-            <div className={styles.modalActions}>
-              <button className={styles.cancelBtn} onClick={closeDeleteModal}>İptal</button>
-              <button className={styles.deleteConfirmBtn} onClick={confirmDelete}>Evet, Sil</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -1,0 +1,58 @@
+.page{height:100%;overflow:auto;max-width:1300px;margin:auto;padding:24px;color:var(--text-main)}.page h2{margin:0 0 20px;font-size:calc(21px * var(--user-font-factor, 1))}.layout{display:grid;grid-template-columns:220px 1fr;gap:18px}.nav,.content{background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:14px}.nav{display:flex;flex-direction:column;gap:6px;align-self:start}.nav button,.content button{background:transparent;border:1px solid transparent;border-radius:8px;color:var(--text-main);text-align:left;padding:12px;cursor:pointer}.nav button:hover,.nav .active{background:var(--bg-hover);border-color:var(--border-color)}.content{min-height:350px;padding:22px}.content h3{font-size:calc(17px * var(--user-font-factor, 1));margin:0 0 15px}.content p{font-size:calc(13px * var(--user-font-factor, 1));line-height:1.6;color:var(--text-muted);margin:12px 0}.themeGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.themeChoice{display:flex;flex-direction:column;gap:7px;border:1px solid var(--border-color)!important;background:var(--bg-panel)!important;padding:12px!important}.themeChoice.selected{border-color:var(--accent-blue)!important}.themeChoice small{color:var(--text-muted)}.preview{height:95px;border-radius:8px;border:1px solid #667085;padding:14px;display:flex;flex-direction:column;gap:8px}.preview div{height:10px;background:#7989f5;border-radius:4px;width:55%}.preview span{height:19px;background:#8f97af33;border-radius:4px}.content label{display:block;font-size:calc(12px * var(--user-font-factor, 1));color:var(--text-muted)}.content select,.content textarea{display:block;margin:12px 0;width:100%;max-width:550px;padding:12px;background:var(--bg-panel);color:var(--text-main);border:1px solid var(--border-color);border-radius:8px}.content textarea{min-height:150px}.content button:not(.themeChoice){border-color:var(--border-color)}.path{padding:12px;background:var(--bg-panel);border:1px solid var(--border-color);border-radius:8px;overflow-wrap:anywhere;font-size:calc(13px * var(--user-font-factor, 1))}@media(max-width:800px){.layout{grid-template-columns:1fr}.themeGrid{grid-template-columns:repeat(2,1fr)}}
+.controlGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin:18px 0}.controlGrid label{display:flex;flex-direction:column;gap:9px}.controlGrid input{width:100%;accent-color:var(--accent-blue)}.controlGrid select{margin:0}.livePreview{background:var(--bg-panel);padding:18px;border-radius:10px;border:1px solid var(--border-color);margin-bottom:16px}.livePreview small{display:block;color:var(--text-muted);margin-bottom:12px}@media(max-width:820px){.controlGrid{grid-template-columns:1fr}}
+
+.storageSection{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:20px 0;border-bottom:1px solid var(--border-color)}
+.storageSection:first-child{padding-top:0}
+.storageSection:last-child{border-bottom:0;padding-bottom:0}
+.storageSection h3,.storageSection p{margin:0}
+.storageSection .path{width:100%}
+.storageSection button{margin-top:4px;min-height:40px}
+
+.restoreArea{display:flex;flex-direction:column;align-items:flex-start;gap:12px;width:100%;border-top:1px solid var(--border-color);margin-top:12px;padding-top:20px}
+.restoreArea h3,.restoreArea p{margin:0}
+.restoreArea button{margin-top:5px}
+
+.modalShade{position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:4000;display:flex;align-items:center;justify-content:center;padding:20px}
+.restoreDialog{width:min(520px,100%);background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;box-shadow:0 24px 70px rgba(0,0,0,.3);padding:24px;color:var(--text-main)}
+.restoreDialog h3{margin:0 0 12px}.restoreDialog p{color:var(--text-muted);line-height:1.55;margin:0 0 14px}
+.restoreFolder{overflow-wrap:anywhere;padding:11px 12px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-panel);font-size:12px}
+.dialogActions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:12px;margin-top:20px}
+.dialogActions button{padding:11px 16px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-panel);color:var(--text-main);cursor:pointer}
+.dialogActions .primaryAction{background:var(--accent-blue);color:#fff;border-color:var(--accent-blue)}
+
+.extraPanel{margin:24px 0;padding-top:20px;border-top:1px solid var(--border-color)}
+.styleGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px}
+.styleChoice{display:flex;flex-direction:column;align-items:center;gap:7px;min-height:105px;background:var(--bg-panel)!important;border:1px solid var(--border-color)!important}
+.styleSelected{border-color:var(--accent-blue)!important;box-shadow:0 0 0 1px var(--accent-blue)}
+.styleChoice strong{font-size:12px}.styleChoice span{font-size:23px;white-space:nowrap}.styleChoice small{color:var(--text-muted)}
+.preview_digital{font-weight:900;letter-spacing:-.07em}.preview_compact{font-size:16px!important;font-weight:600}.preview_elegant{font-family:Georgia,serif;font-style:italic}.preview_clock{font-weight:700}
+.feedbackForm label{display:block;margin:12px 0}.feedbackForm input{display:block;width:100%;max-width:550px;margin-top:8px;background:var(--bg-panel);border:1px solid var(--border-color);border-radius:8px;color:var(--text-main);padding:12px}
+.feedbackActions{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}.feedbackActions button{border:1px solid var(--accent-blue)!important}.feedbackActions button:disabled{opacity:.45;cursor:not-allowed}.feedbackForm small{color:var(--text-muted)}
+.legalNav{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}.legalDocument{background:var(--bg-panel);border:1px solid var(--border-color);border-radius:10px;padding:20px;max-height:450px;overflow:auto;line-height:1.65;font-size:13px}.legalDocument h1,.legalDocument h2,.legalDocument h3{color:var(--text-main);margin:12px 0}.legalDocument p{color:var(--text-main);margin:8px 0}
+
+
+/* EULA is injected HTML, not a CSS module component. Scope all typography
+   to the legal viewer so onboarding's intentionally dark-on-light EULA rules
+   never override the dark Settings theme. */
+.legalDocument :global(.eula-container),
+.legalDocument :global(.eula-container) * {
+  color: var(--text-main) !important;
+  -webkit-text-fill-color: var(--text-main) !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+.legalDocument :global(.eula-container) {
+  width: 100%; max-width: none; padding: 0; margin: 0;
+  font-family: inherit; font-size: calc(13px * var(--user-font-factor, 1));
+  line-height: 1.75; overflow-wrap: anywhere;
+}
+.legalDocument :global(.eula-container h1) {font-size: calc(18px * var(--user-font-factor, 1));line-height:1.4;margin:0 0 18px;font-weight:750;}
+.legalDocument :global(.eula-container h2),
+.legalDocument :global(.eula-container h3) {font-size:calc(15px * var(--user-font-factor, 1));margin:20px 0 8px;font-weight:700;}
+.legalDocument :global(.eula-container p) {margin:0 0 12px;line-height:1.7;}
+.legalDocument :global(.eula-container ul),
+.legalDocument :global(.eula-container ol) {margin:8px 0 16px;padding-inline-start:25px;list-style-position:outside;}
+.legalDocument :global(.eula-container li) {margin:0 0 7px;line-height:1.65;}
+.legalDocument :global(.eula-container strong) {font-weight:750;}
+.legalDocument :global(.eula-container li::marker) {color:var(--text-main)!important;}
+@media(max-width:800px){.legalDocument{padding:14px;max-height:60vh}}

@@ -75,8 +75,8 @@ async function runFullTest() {
             carId: 1,
             serviceId: 1,
             partName: "TEST_" + faker.commerce.productName(),
-            partPrice: 500,
-            partTax: 20
+            quantity: 1,
+            unitPriceKurus: 50000
         }));
 
         const createRes = await partService.createParts(mockParts);

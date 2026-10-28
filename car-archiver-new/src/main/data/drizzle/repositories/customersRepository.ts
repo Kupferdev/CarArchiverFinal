@@ -170,6 +170,7 @@ export class CustomersRepository extends BaseRepository<typeof Customers> {
         fullName: `${customer.firstName} ${customer.lastName || ''}`.trim(),
         nationalId: customer.nationalId || '',
         taxNumber: customer.taxNumber || '',
+        address: customer.address || '',
         phones: (phonesByCustomer.get(customer.customerId) ?? []).map((phone) => ({
           countryCode: phone.countryCode,
           number: phone.phoneNumber,
@@ -217,7 +218,8 @@ export class CustomersRepository extends BaseRepository<typeof Customers> {
           firstName: data.firstName,
           lastName: data.lastName,
           nationalId: data.nationalId,
-          taxNumber: data.taxNumber
+          taxNumber: data.taxNumber,
+          address: data.address ?? null
         }).where(eq(Customers.customerId, customerId)).returning({ customerId: Customers.customerId }).get();
 
         if (!updatedCustomer) {

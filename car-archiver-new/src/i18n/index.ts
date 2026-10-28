@@ -1,6 +1,16 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import { DashboardInfoTexts } from './dashboardTexts'; // Bir önceki adımda oluşturduğumuz dosya
+import { DashboardInfoTexts } from './dashboardTexts';
+import { FeatureTexts } from './featureTexts';
+import { ExtendedDashboardTexts } from './extendedDashboardTexts';
+import { CustomerTexts } from './customerTexts';
+import { DialogTexts } from './dialogTexts';
+import { CommonTexts } from './commonTexts';
+import { SettingsTexts } from './settingsTexts';
+import { DetailTexts } from './detailTexts';
+import { PrintTexts } from './printTexts';
+import { V34Texts } from './v34Texts';
+import { V35Texts } from './v35Texts';
 // import { SetupInfoTexts } from './setupWizard'; // İstersen setup çevirilerini de buraya dahil edebilirsin
 
 // Çeviri verilerimizi i18next'in istediği formata (resources) dönüştürüyoruz
@@ -12,7 +22,17 @@ DashboardInfoTexts.forEach((langData) => {
   
   resources[languageCode] = {
     translation: {
-      ...translations
+      ...translations,
+      ...(ExtendedDashboardTexts[languageCode] ?? {}),
+      ...(CustomerTexts[languageCode] ?? {}),
+      ...(DialogTexts[languageCode] ?? {}),
+      ...(CommonTexts[languageCode] ?? {}),
+      ...(SettingsTexts[languageCode] ?? {}),
+      ...(DetailTexts[languageCode] ?? {}),
+      ...(PrintTexts[languageCode] ?? {}),
+      ...(FeatureTexts[languageCode] ?? {}),
+      ...(V34Texts[languageCode] ?? {}),
+      ...(V35Texts[languageCode] ?? {})
     }
   };
 });

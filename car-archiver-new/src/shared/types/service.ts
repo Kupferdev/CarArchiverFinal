@@ -9,8 +9,9 @@ export interface Service {
   jobDuration?: number | null;
   deliveryDate?: Date | null;
   km?: number | null;
-  complaints: string;
+  complaints?: string | null;
   extraRequests?: string | null;
+  advisorNotes?: string | null;
   faults?: string[] | null;
   hasDamageOnReceive: boolean;
   damageOnReceive?: string[] | null;

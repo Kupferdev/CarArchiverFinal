@@ -14,6 +14,7 @@ export interface CreateCustomerRequest {
   lastName?: string;
   nationalId?: string;
   taxNumber?: string;
+  address?: string;
   emails?: EmailInput[];
   phones?: PhoneInput[];
 }
@@ -38,6 +39,7 @@ export interface CustomerViewDto {
   fullName: string;
   nationalId?: string;
   taxNumber?: string;
+  address?: string;
   phones?: { countryCode: string; number: string }[];
   emails?: { address: string }[];
 }

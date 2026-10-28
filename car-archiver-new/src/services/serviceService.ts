@@ -1,73 +1,110 @@
-import { Service } from "../shared/types/service";
-import { Part } from "../shared/types/part";
+import { eq } from "drizzle-orm";
+import type { Service } from "../shared/types/service";
+import type { Part } from "../shared/types/part";
 import { PartsRepository, ServicesRepository } from "../main/data/drizzle/repositories";
+import { useDb } from "../main/data/drizzle/drizzleDb";
+import { Services } from "../main/data/drizzle/schemas/servicesSchema";
+import { Parts } from "../main/data/drizzle/schemas/partsSchema";
+import { Cars } from "../main/data/drizzle/schemas/carsSchema";
 import { ServiceResponse } from "../models/response.model";
 
+/** All writes are synchronous inside Drizzle's better-sqlite3 transaction. */
 export class ServiceService {
-  private servicesRepository: ServicesRepository;
-  private partsRepository: PartsRepository;
-
-  constructor(servicesRepository: ServicesRepository, partsRepository: PartsRepository) {
-    this.servicesRepository = servicesRepository;
-    this.partsRepository = partsRepository;
-  }
+  constructor(
+    private readonly servicesRepository: ServicesRepository,
+    private readonly partsRepository: PartsRepository,
+  ) {}
 
   async createService(service: Service, parts: Part[] = []) {
-    const serviceResult = await this.servicesRepository.create(service);
-    if (!serviceResult.success || !serviceResult.data) return serviceResult;
-
-    const createdParts: Part[] = [];
-    for (const part of parts) {
-      const result = await this.partsRepository.create({ ...part, serviceId: serviceResult.data.serviceId });
-      if (!result.success || !result.data) {
-        for (const created of createdParts) {
-          if (created.partId) await this.partsRepository.delete(created.partId);
+    if (parts.some((part) => part.partId != null)) return ServiceResponse.fail("New service parts must not have existing IDs.");
+    try {
+      const result = useDb().transaction((tx) => {
+        validatePartEntries(parts);
+        const { serviceId: _id, ...values } = service;
+        void _id;
+        const createdService = tx.insert(Services).values(values).returning().get();
+        const createdParts = parts.map(({ partId: _partId, ...part }) => {
+          void _partId;
+          return tx.insert(Parts).values({ ...part, carId: createdService.carId, serviceId: createdService.serviceId }).returning().get();
+        });
+        // A service's odometer reading updates the vehicle's latest known mileage,
+        // without overwriting a newer (higher) vehicle reading.
+        if (createdService.km !== null && Number.isFinite(createdService.km) && createdService.km >= 0) {
+          const car = tx.select({ km: Cars.km }).from(Cars).where(eq(Cars.carId, createdService.carId)).get();
+          if (car && (car.km === null || createdService.km > car.km)) {
+            tx.update(Cars).set({ km: createdService.km }).where(eq(Cars.carId, createdService.carId)).run();
+          }
         }
-        await this.servicesRepository.delete(serviceResult.data.serviceId);
-        return ServiceResponse.error(new Error(result.message), "Service and parts could not be created together.");
-      }
-      createdParts.push(result.data as Part);
+        return { service: createdService as Service, parts: createdParts as Part[] };
+      });
+      return ServiceResponse.success(result, "Service created successfully.");
+    } catch (error) {
+      return ServiceResponse.error(error, "Service and parts could not be created together.");
     }
-
-    return ServiceResponse.success({ service: serviceResult.data as Service, parts: createdParts }, "Service created successfully.");
   }
 
   async updateService(serviceId: number, service: Service, parts: Part[] = []) {
-    const serviceResult = await this.servicesRepository.update(serviceId, service);
-    if (!serviceResult.success || !serviceResult.data) return serviceResult;
+    try {
+      const result = useDb().transaction((tx) => {
+        validatePartEntries(parts);
+        const { serviceId: _id, ...values } = service;
+        void _id;
+        const updated = tx.update(Services).set(values).where(eq(Services.serviceId, serviceId)).returning().get();
+        if (!updated) throw new Error("Service not found.");
 
-    const oldParts = await this.partsRepository.getByServiceId(serviceId);
-    if (!oldParts.success) return ServiceResponse.error(new Error(oldParts.message), "Service parts could not be loaded.");
-
-    const deletedParts = await this.partsRepository.deleteByServiceId(serviceId);
-    if (!deletedParts.success) return ServiceResponse.error(new Error(deletedParts.message), "Service parts could not be replaced.");
-
-    const createdParts: Part[] = [];
-    for (const part of parts) {
-      const result = await this.partsRepository.create(part);
-      if (!result.success || !result.data) {
-        for (const created of createdParts) if (created.partId) await this.partsRepository.delete(created.partId);
-        for (const old of oldParts.data ?? []) {
-          await this.partsRepository.create({
-            carId: old.carId,
-            serviceId: old.serviceId,
-            partName: old.partName,
-            partTax: old.partTax,
-            partPrice: old.partPrice,
-          });
+        const existing = tx.select().from(Parts).where(eq(Parts.serviceId, serviceId)).all();
+        const existingIds = new Set(existing.map((part) => part.partId));
+        const incomingIds = new Set<number>();
+        for (const part of parts) {
+          if (part.partId == null) continue;
+          if (!Number.isSafeInteger(part.partId) || !existingIds.has(part.partId) || incomingIds.has(part.partId)) {
+            throw new Error("Invalid or duplicate part ID for this service.");
+          }
+          incomingIds.add(part.partId);
         }
-        return ServiceResponse.error(new Error(result.message), "Service parts could not be updated.");
-      }
-      createdParts.push(result.data as Part);
+        // Delete only rows removed in the UI. Preserve IDs of unchanged rows.
+        for (const old of existing) {
+          if (!incomingIds.has(old.partId)) tx.delete(Parts).where(eq(Parts.partId, old.partId)).run();
+        }
+        const savedParts = parts.map((part) => {
+          const values = {
+            carId: updated.carId,
+            serviceId,
+            partName: part.partName,
+            quantity: part.quantity,
+            unitPriceKurus: part.unitPriceKurus,
+          };
+          if (part.partId != null) {
+            return tx.update(Parts).set(values).where(eq(Parts.partId, part.partId)).returning().get();
+          }
+          return tx.insert(Parts).values(values).returning().get();
+        });
+        // Keep the vehicle profile and service records consistent atomically.
+        // Do this after parts writes so any failure rolls back both changes.
+        if (updated.km !== null && Number.isFinite(updated.km) && updated.km >= 0) {
+          const car = tx.select({ km: Cars.km }).from(Cars).where(eq(Cars.carId, updated.carId)).get();
+          if (car && (car.km === null || updated.km > car.km)) {
+            tx.update(Cars).set({ km: updated.km }).where(eq(Cars.carId, updated.carId)).run();
+          }
+        }
+        return { service: updated as Service, parts: savedParts as Part[] };
+      });
+      return ServiceResponse.success(result, "Service updated successfully.");
+    } catch (error) {
+      return ServiceResponse.error(error, "Service and parts could not be updated together.");
     }
-
-    return ServiceResponse.success({ service: serviceResult.data as Service, parts: createdParts }, "Service updated successfully.");
   }
 
   async deleteService(serviceId: number) {
-    const partsResult = await this.partsRepository.deleteByServiceId(serviceId);
-    if (!partsResult.success) return partsResult;
-    return this.servicesRepository.delete(serviceId);
+    try {
+      const deleted = useDb().transaction((tx) =>
+        tx.delete(Services).where(eq(Services.serviceId, serviceId)).returning().get());
+      if (!deleted) return ServiceResponse.fail("Service not found.");
+      // Parts are removed by the existing ON DELETE CASCADE FK.
+      return ServiceResponse.success(undefined, "Service deleted successfully.");
+    } catch (error) {
+      return ServiceResponse.error(error, "Service could not be deleted.");
+    }
   }
 
   async getDetails(serviceId: number) {
@@ -83,3 +120,14 @@ export class ServiceService {
   async getByCustomerId(customerId: number) { return this.servicesRepository.getByCustomerId(customerId); }
   async getPartsByService(serviceId: number) { return this.partsRepository.getByServiceId(serviceId); }
 }
+
+/** Defense in depth: callers outside IPC must obey the same part rules. */
+function validatePartEntries(parts: Part[]): void {
+  for (const part of parts) {
+    if (!part.partName.trim() || part.partName.length > 200) throw new Error("Invalid part name.");
+    if (!Number.isSafeInteger(part.quantity) || part.quantity < 1) throw new Error("Part quantity must be positive whole number.");
+    if (!Number.isSafeInteger(part.unitPriceKurus) || part.unitPriceKurus < 0 ||
+        !Number.isSafeInteger(part.quantity * part.unitPriceKurus)) throw new Error("Invalid part price.");
+  }
+}
+

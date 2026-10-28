@@ -1,0 +1,19 @@
+en 298/298 keys, missing 0, interpolation errors 0
+es 298/298 keys, missing 0, interpolation errors 0
+fr 298/298 keys, missing 0, interpolation errors 0
+de 298/298 keys, missing 0, interpolation errors 0
+pt 298/298 keys, missing 0, interpolation errors 0
+zh 298/298 keys, missing 0, interpolation errors 0
+tr 298/298 keys, missing 0, interpolation errors 0
+ja 298/298 keys, missing 0, interpolation errors 0
+ko 298/298 keys, missing 0, interpolation errors 0
+ru 298/298 keys, missing 0, interpolation errors 0
+nl 298/298 keys, missing 0, interpolation errors 0
+az 298/298 keys, missing 0, interpolation errors 0
+it 298/298 keys, missing 0, interpolation errors 0
+pl 298/298 keys, missing 0, interpolation errors 0
+
+Missing localized keys: 0; interpolation mismatches: 0
+Missing keys referenced by t(): 0
+Remaining literal Turkish JSX text/attribute occurrences: 0 across 121 source files
+

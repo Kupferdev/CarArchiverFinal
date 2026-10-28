@@ -78,7 +78,7 @@ Une perte de données peut survenir en cas de panne de l'ordinateur ou de suppre
 
 L'option « Importer » vous permet de restaurer vos anciennes données et de continuer.`,
     importButton: "Importer",
-    createNewButton: "Crear nuevo",
+    createNewButton: "Créer nouveau",
     importText: "Sélectionnez le dossier où se trouvent vos données : ",
     createNewText: "Sélectionnez l'emplacement où vous souhaitez enregistrer vos données : ",
     browseButton: "Parcourir",
@@ -129,7 +129,7 @@ A opção "Importar" permite restaurar seus dados antigos e continuar.`,
     createNewText: "Selecione o local onde deseja salvar seus dados: ",
     browseButton: "Procurar",
     youAreReady: "Você está pronto!🎉",
-    lastInfoText: "Seus datos serão salvos neste local.",
+    lastInfoText: "Seus dados serão salvos neste local.",
     continueText: "Continuar",
     startButton: "Iniciar"
   },

@@ -60,7 +60,7 @@ if (problem) {
     process.exit(child.status ?? 1);
   }
   console.error("better-sqlite3 could not be loaded:\n", problem.message);
-  console.error("\nTry: npm rebuild better-sqlite3   (or: npx electron-rebuild -f -w better-sqlite3)");
+  console.error("\nTry: npm rebuild better-sqlite3   (or: npm run native:rebuild)");
   process.exit(1);
 }
 
@@ -191,11 +191,11 @@ await test("fresh install creates all tables and records every migration", async
 
   const expected = [
     "Customers", "Brands", "FuelTypes", "BodyTypes", "Cars", "FuelTypeTranslations",
-    "BodyTypeTranslations", "PhoneNumbers", "Emails", "Services", "Parts", "schema_migrations",
+    "BodyTypeTranslations", "PhoneNumbers", "Emails", "Services", "Parts", "ServiceMedia", "TrashItems", "PendingMediaDeletes", "schema_migrations",
   ];
   for (const table of expected) assert.ok(tableNames(db).includes(table), `missing table ${table}`);
 
-  assert.deepEqual(versions(db), [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(versions(db), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   assert.equal(db.pragma("foreign_key_check").length, 0);
   assert.ok(count(db, "Brands") > 0, "brands were not seeded");
   assert.ok(hasForeignKey(db, "Cars", "brandId", "Brands", "SET NULL"));
@@ -203,11 +203,38 @@ await test("fresh install creates all tables and records every migration", async
   assert.equal(db.pragma("table_info(Cars)").some((column) => column.name === "modelId"), false);
   assert.ok(db.pragma("table_info(Cars)").some((column) => column.name === "engineVolumeCc"));
   assert.ok(db.pragma("table_info(Cars)").some((column) => column.name === "notes"));
+  const addressColumn = db.pragma("table_info(Customers)").find((c) => c.name === "address");
+  const advisorNotesColumn = db.pragma("table_info(Services)").find((c) => c.name === "advisorNotes");
+  assert.ok(addressColumn, "Customers.address migration missing");
+  assert.ok(advisorNotesColumn, "Services.advisorNotes migration missing");
+  assert.equal(addressColumn.notnull, 0, "address must be nullable");
+  assert.equal(advisorNotesColumn.notnull, 0, "advisorNotes must be nullable");
+  const partColumns = db.pragma("table_info(Parts)").map((column) => column.name);
+  assert.ok(partColumns.includes("quantity"));
+  assert.ok(partColumns.includes("unitPriceKurus"));
+  assert.equal(partColumns.includes("partTax"), false);
+  assert.ok(hasForeignKey(db, "Parts", "serviceId", "Services", "CASCADE"));
+  assert.ok(hasForeignKey(db, "ServiceMedia", "serviceId", "Services", "CASCADE"));
   assert.equal(count(db, "FuelTypes"), 5);
   assert.equal(count(db, "BodyTypes"), 9);
 
+  const complaintsColumn = db.pragma("table_info(Services)").find((c) => c.name === "complaints");
+  assert.equal(complaintsColumn.notnull, 0, "complaints must be nullable");
   const jobDuration = db.pragma("table_info(Services)").find((c) => c.name === "jobDuration");
   assert.equal(jobDuration.type, "INTEGER", "jobDuration must be an INTEGER (minutes)");
+});
+
+await test("optional complaint saves NULL and preserves dependent parts", async () => {
+  const db = openDb("nullable-complaints");
+  await migrate();
+  db.exec(`
+    INSERT INTO Customers (customerId, firstName) VALUES (99, 'Test');
+    INSERT INTO Cars (carId, customerId, plateNumber) VALUES (99, 99, '34 TEST 99');
+    INSERT INTO Services (serviceId, carId, customerId, complaints, hasDamageOnReceive)
+      VALUES (99, 99, 99, NULL, 0);
+  `);
+  assert.equal(db.prepare("SELECT complaints FROM Services WHERE serviceId=99").get().complaints, null);
+  assert.equal(db.pragma("foreign_key_check").length, 0);
 });
 
 await test("running migrations twice changes nothing", async () => {
@@ -217,7 +244,7 @@ await test("running migrations twice changes nothing", async () => {
     brands: count(db, "Brands"), fuel: count(db, "FuelTypeTranslations"), body: count(db, "BodyTypeTranslations"),
   };
   await migrate();
-  assert.deepEqual(versions(db), [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(versions(db), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   assert.equal(count(db, "Brands"), before.brands);
   assert.equal(count(db, "FuelTypeTranslations"), before.fuel);
   assert.equal(count(db, "BodyTypeTranslations"), before.body);
@@ -307,7 +334,7 @@ await test("legacy database upgrades without losing data", async () => {
   assert.ok(hasForeignKey(db, "Services", "carId", "Cars", "CASCADE"));
   assert.ok(hasForeignKey(db, "Services", "customerId", "Customers", "SET NULL"));
   assert.equal(db.pragma("foreign_key_check").length, 0);
-  assert.deepEqual(versions(db), [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(versions(db), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
 
   // Rows and their ids are preserved.
   assert.equal(db.prepare("SELECT phoneNumber FROM PhoneNumbers WHERE phoneNumberId = 5").get().phoneNumber, "5551112233");
@@ -341,6 +368,24 @@ await test("orphaned rows stop the upgrade and leave the data untouched", async 
   assert.equal(count(db, "PhoneNumbers"), 2, "data must not be modified");
   assert.equal(count(db, "Cars"), 3, "data must not be modified");
   assert.equal(hasForeignKey(db, "Cars", "customerId", "Customers", "SET NULL"), false);
+});
+
+await test("service media metadata stays external and cascades with service", async () => {
+  const db = openDb("service-media");
+  await migrate();
+  db.exec(`
+    INSERT INTO Customers (customerId, firstName) VALUES (501, 'Media Test');
+    INSERT INTO Cars (carId, customerId, plateNumber) VALUES (501, 501, '34 MEDIA 501');
+    INSERT INTO Services (serviceId, carId, customerId, hasDamageOnReceive) VALUES (501, 501, 501, 0);
+    INSERT INTO ServiceMedia (serviceId, relativePath, originalName, mimeType, bytes)
+      VALUES (501, 'services/501/123e4567-e89b-12d3-a456-426614174000.jpg', 'before.jpg', 'image/jpeg', 2048);
+  `);
+  assert.equal(count(db, 'ServiceMedia'), 1);
+  const cols = db.pragma('table_info(ServiceMedia)').map(row => row.name);
+  assert.equal(cols.includes('data'), false, 'media contents must not be in SQLite');
+  assert.equal(cols.includes('blob'), false, 'image blobs must not be in SQLite');
+  db.prepare('DELETE FROM Services WHERE serviceId = ?').run(501);
+  assert.equal(count(db, 'ServiceMedia'), 0, 'media metadata should cascade');
 });
 
 // ---------------------------------------------------------------------------

@@ -12,7 +12,7 @@
 }
 
 .title {
-  font-size: 18px;
+  font-size: calc(18px * var(--user-font-factor, 1));
   font-weight: 500;
   color: var(--text-main);
   margin-bottom: 20px;
@@ -51,7 +51,7 @@
 .column::-webkit-scrollbar-track { background: transparent; }
 
 .sectionTitle {
-  font-size: 14px;
+  font-size: calc(14px * var(--user-font-factor, 1));
   font-weight: 600;
   color: var(--text-main);
   margin: 0 0 8px;
@@ -67,7 +67,7 @@
 }
 
 .label {
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
   color: var(--text-muted);
 }
 
@@ -80,7 +80,7 @@
   border: 0.5px solid var(--border-color);
   border-radius: 8px;
   color: var(--text-main);
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
   outline: none;
   transition: border 0.2s ease, background 0.2s ease;
 }
@@ -140,7 +140,7 @@
   padding: 7px 11px;
   border-radius: 7px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: calc(12px * var(--user-font-factor, 1));
 }
 .addBtnPrimary { background: var(--accent-blue); border: 1px solid var(--accent-blue); color: white; }
 .addBtnSecondary { background: transparent; border: 1px solid var(--border-color); color: var(--text-main); }
@@ -198,7 +198,7 @@
   border: 0;
   outline: none;
   color: var(--text-main);
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
 }
 
 .customerOptions { max-height: 230px; overflow-y: auto; }
@@ -227,14 +227,14 @@
   border-radius: 50%;
   background: var(--bg-hover);
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--user-font-factor, 1));
   font-weight: 600;
 }
 .customerOptionText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.customerOptionText strong { font-size: 13px; font-weight: 500; }
-.customerOptionText small { color: var(--text-muted); font-size: 11px; }
+.customerOptionText strong { font-size: calc(13px * var(--user-font-factor, 1)); font-weight: 500; }
+.customerOptionText small { color: var(--text-muted); font-size: calc(11px * var(--user-font-factor, 1)); }
 .checkMark { margin-left: auto; color: var(--accent-blue); font-weight: 700; }
-.customerEmpty { padding: 18px 12px; color: var(--text-muted); font-size: 12px; text-align: center; }
+.customerEmpty { padding: 18px 12px; color: var(--text-muted); font-size: calc(12px * var(--user-font-factor, 1)); text-align: center; }
 
 .unitInputWrap { position: relative; }
 .unitInputWrap .input { padding-right: 42px; }
@@ -244,12 +244,12 @@
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--user-font-factor, 1));
   pointer-events: none;
 }
 
 .notesGroup { margin-top: 2px; }
-.counter { font-size: 11px; color: var(--text-muted); text-align: right; margin-top: -2px; }
+.counter { font-size: calc(11px * var(--user-font-factor, 1)); color: var(--text-muted); text-align: right; margin-top: -2px; }
 
 .formFooter {
   display: flex;
@@ -282,7 +282,7 @@
   color: white;
   border: none;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: calc(14px * var(--user-font-factor, 1));
   font-weight: 500;
   cursor: pointer;
 }
@@ -352,7 +352,7 @@
   outline: none;
   background: transparent;
   color: var(--text-main);
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
 }
 
 .yearInput::placeholder {
@@ -419,7 +419,7 @@
   background: transparent;
   color: var(--text-main);
   cursor: pointer;
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
 }
 
 .yearOption:hover {
@@ -447,7 +447,7 @@
 
 .promptTitle {
   color: var(--text-main);
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
   font-weight: 600;
   margin-bottom: 9px;
 }
@@ -457,7 +457,7 @@
   align-items: flex-start;
   gap: 8px;
   color: var(--text-main);
-  font-size: 12px;
+  font-size: calc(12px * var(--user-font-factor, 1));
   line-height: 1.45;
   cursor: pointer;
 }
@@ -478,7 +478,7 @@
 .submitBtnSmall {
   padding: 7px 10px;
   border-radius: 7px;
-  font-size: 12px;
+  font-size: calc(12px * var(--user-font-factor, 1));
   cursor: pointer;
 }
 
@@ -495,8 +495,8 @@
 }
 
 .textarea {
-  font-family: "Segoe UI", Arial, sans-serif;
-  font-size: 14px;
+  font-family: var(--user-font-family, system-ui, sans-serif);
+  font-size: calc(14px * var(--user-font-factor, 1));
   line-height: 1.6;
   letter-spacing: .05px;
 }
@@ -522,7 +522,7 @@
 
 .oldCustomersHint {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--user-font-factor, 1));
 }
 
 .oldCustomerPicker {
@@ -540,7 +540,7 @@
   border-radius: 8px;
   background: var(--bg-panel);
   color: var(--text-main);
-  font-size: 18px;
+  font-size: calc(18px * var(--user-font-factor, 1));
   line-height: 1;
   cursor: pointer;
 }
@@ -595,7 +595,7 @@
   border-radius: 50%;
   background: var(--bg-hover);
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--user-font-factor, 1));
   font-weight: 600;
 }
 
@@ -608,7 +608,7 @@
 
 .oldCustomerInfo strong {
   color: var(--text-main);
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -617,7 +617,7 @@
 
 .oldCustomerInfo span {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--user-font-factor, 1));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -655,7 +655,7 @@
   color: var(--text-muted);
   border: 1px dashed var(--border-color);
   border-radius: 9px;
-  font-size: 12px;
+  font-size: calc(12px * var(--user-font-factor, 1));
   text-align: center;
 }
 

@@ -17,7 +17,7 @@
 }
 
 .panelTitle {
-  font-size: 11px;
+  font-size: calc(11px * var(--user-font-factor, 1));
   color: var(--text-muted);
   letter-spacing: 0.8px;
   text-transform: uppercase;
@@ -28,7 +28,7 @@
 
 .panelTitle a {
   color: var(--accent-blue);
-  font-size: 11px;
+  font-size: calc(11px * var(--user-font-factor, 1));
   text-decoration: none;
   cursor: pointer;
 }
@@ -48,13 +48,13 @@
 
 .panelItemName {
   color: var(--text-main);
-  font-size: 12px;
+  font-size: calc(12px * var(--user-font-factor, 1));
   font-weight: 500;
 }
 
 .panelItemSub {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--user-font-factor, 1));
   margin-top: 2px;
 }
 
@@ -67,7 +67,7 @@
   display: inline-block;
   background: var(--accent-amber-bg);
   color: var(--accent-amber);
-  font-size: 10px;
+  font-size: calc(10px * var(--user-font-factor, 1));
   padding: 1px 6px;
   border-radius: 20px;
   margin-left: 6px;
@@ -81,3 +81,15 @@
     border-top: 1px solid var(--border-color);
   }
 }
+.rightPanel{min-height:0;overflow:hidden;gap:0;padding:12px;box-sizing:border-box}
+.panelSection{height:50%;flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding-bottom:8px}
+.panelSection + .panelSection{padding-top:10px;border-top:1px solid var(--border-color)}
+.panelTitle{flex-shrink:0;min-height:26px;gap:4px}
+.panelScroll{overflow-y:auto;min-height:0;flex:1;display:flex;flex-direction:column;gap:6px;padding-right:2px}
+.panelItem{display:block;width:100%;text-align:left;flex-shrink:0}
+.panelItemSub{line-height:1.4;overflow-wrap:anywhere}
+.panelEmpty{font-size:calc(12px * var(--user-font-factor, 1));color:var(--text-muted);padding:12px 4px}
+
+/* Keep long complaints from expanding appointment/delivery cards. */
+.panelComplaint{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:anywhere;white-space:normal}
+.panelDate{display:block}

@@ -4,4 +4,5 @@ export interface Customer {
   firstName: string;
   lastName?: string | null;
   taxNumber?: string | null;
+  address?: string | null;
 }

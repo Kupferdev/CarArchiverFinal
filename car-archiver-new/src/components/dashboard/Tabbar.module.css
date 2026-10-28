@@ -8,6 +8,7 @@
   height: 38px;
   flex-shrink: 0;
   overflow-x: auto;
+  position: relative;
 }
 
 .tabHome {
@@ -33,10 +34,11 @@
   padding: 0 12px;
   cursor: pointer;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--user-font-factor, 1));
   border-bottom: 2px solid transparent;
   white-space: nowrap;
   position: relative;
+  flex-shrink: 0;
 }
 
 .tabActive {
@@ -55,19 +57,89 @@
   flex-shrink: 0;
 }
 
-.tabClose {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  font-size: 11px;
-  margin-left: 2px;
+.tabTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.tabClose:hover {
-  background: var(--bg-hover);
+.tabClose,.tabDirty{width:16px;height:16px;border-radius:50%;align-items:center;justify-content:center;margin-left:2px;flex-shrink:0}
+.tabClose{display:flex;color:var(--text-muted);font-size:calc(11px * var(--user-font-factor, 1))}
+.tabClose:hover{background:var(--bg-hover);color:var(--text-main)}
+.tabDirty{display:none;position:relative;pointer-events:none}
+.tabDirty::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--accent-blue)}
+/* VS Code: Kirli sekmelerde X yerine nokta; hover yapınca X görünsün. */
+.tab:has(.tabDirtyVisible):not(:hover) .tabClose{display:none}
+.tab:has(.tabDirtyVisible):not(:hover) .tabDirty{display:flex}
+
+.contextMenu {
+  position: fixed;
+  min-width: 224px;
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(137, 151, 192, 0.28);
+  background: #202640;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.42);
+  z-index: 90;
+}
+
+.contextMenuItem {
+  width: 100%;
+  border: 0;
+  background: transparent;
   color: var(--text-main);
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: calc(13px * var(--user-font-factor, 1));
+  cursor: pointer;
+}
+
+.contextMenuItem:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.contextMenuDanger {
+  color: #ff6b6b;
+}
+
+.contextMenuDanger:hover {
+  background: rgba(255, 107, 107, 0.1);
+}
+
+/* Compact opaque context menu; prevent auto-size from stretching to its containing panel. */
+.contextMenu{width:232px;min-width:0;max-width:calc(100vw - 24px);box-sizing:border-box;padding:5px;border-radius:10px;background:#202640;backdrop-filter:none}
+.contextMenuItem{display:block;box-sizing:border-box;width:100%;min-height:32px;padding:7px 10px;border-radius:7px;line-height:18px;font-size:calc(12px * var(--user-font-factor, 1));white-space:nowrap}
+
+.contextMenu,.contextMenu.contextMenu{background:var(--bg-card);border-color:var(--border-color);color:var(--text-main);box-shadow:0 18px 40px rgba(0,0,0,.24)}
+.contextMenuItem:hover{background:var(--bg-hover)}
+.contextMenuItem:disabled{opacity:.4;cursor:not-allowed}
+.pinButton{background:transparent;border:0;color:var(--accent-blue);cursor:pointer;font-size:calc(12px * var(--user-font-factor, 1));padding:0 2px}
+
+.pinButton{opacity:0;transition:opacity .15s ease}.tab:hover .pinButton,.pinButton:focus-visible,.pinButton.isPinned{opacity:1}.tab.pinned .tabClose{display:none}
+
+/* v34.5: independent scrolling tabs and permanently visible settings control. */
+.tabbar{overflow:visible;padding:0 10px 0 0;align-items:stretch;min-height:calc(38px * var(--user-icon-factor,1));height:auto;z-index:5}
+.tabScroll{display:flex;align-items:stretch;flex:1;gap:2px;min-width:0;overflow-x:auto;scrollbar-width:thin}
+.settingsGear{flex-shrink:0;align-self:center;margin-left:auto;min-height:calc(30px * var(--user-icon-factor,1));min-width:calc(34px * var(--user-icon-factor,1));padding:5px;border-radius:8px;border:1px solid var(--border-color);color:var(--text-main);background:var(--bg-card);cursor:pointer;font-size:calc(17px * var(--user-icon-factor,1));line-height:1}
+.settingsGear:hover{background:var(--bg-hover);border-color:var(--accent-blue)}
+.tab{min-height:calc(38px * var(--user-icon-factor,1));padding:0 calc(12px * var(--user-icon-factor,1));gap:calc(7px * var(--user-icon-factor,1))}
+.tabHome{min-width:calc(38px * var(--user-icon-factor,1));width:calc(38px * var(--user-icon-factor,1))}
+.tabIcon{width:calc(14px * var(--user-icon-factor,1));height:calc(14px * var(--user-icon-factor,1))}
+.tabClose,.tabDirty{min-width:calc(16px * var(--user-icon-factor,1));width:calc(16px * var(--user-icon-factor,1));height:calc(16px * var(--user-icon-factor,1))}
+
+/* Subtle icon-only Settings control; never looks like an outlined tile. */
+.settingsGear { border: 0; box-shadow: none; background: transparent; border-radius: 50%; }
+.settingsGear:hover, .settingsGear:focus-visible { border: 0; background: var(--bg-hover); color: var(--accent-blue); }
+
+/* Plain gear by default; squared hover hit target, no outlined tile. */
+.settingsGear { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.settingsGear:hover { border: 0; border-radius: 0; background: var(--bg-hover); }
+.settingsGear:focus-visible { border-radius: 0; outline: 2px solid var(--accent-blue); outline-offset: -2px; }
+
+/* Empty space on the tab strip is also a Windows caption.  Tabs, their close
+   buttons, the settings gear, and the context menu remain fully interactive. */
+.tabbar, .tabScroll { -webkit-app-region: drag; }
+.tabHome, .tab, .tab *, .settingsGear, .contextMenu, .contextMenu * {
+  -webkit-app-region: no-drag;
 }

@@ -21,6 +21,18 @@ import type { CreateServiceWithPartsRequest, UpdateServiceWithPartsRequest, Serv
 export interface FuelTypeOption { fuelTypeId: number; fuelTypeName: string; }
 export interface BodyTypeOption { bodyTypeId: number; bodyTypeName: string; }
 
+export interface ServiceMediaItem {
+  mediaId: number;
+  serviceId: number;
+  originalName: string;
+  mimeType: string;
+  bytes: number;
+  caption: string;
+  addedAt: string;
+}
+export interface TrashItem { trashId:number;entityType:"customer"|"car"|"service"|"photo";label:string;deletedAt:string;count:number; }
+export interface ArchiveActionResult { success: boolean; canceled?: boolean; message?: string; location?: string; folder?: string; restarting?: boolean; }
+
 export interface DashboardStats {
   customers: number;
   cars: number;
@@ -53,7 +65,8 @@ export interface CustomerProfileServiceDto {
   jobDuration: number | null;
   deliveryDate: Date | null;
   km: number | null;
-  complaints: string;
+  complaints: string | null;
+  advisorNotes?: string | null;
   extraRequests: string | null;
   faults: string[] | null;
   hasDamageOnReceive: boolean;
@@ -88,6 +101,24 @@ export type IpcResponseMap = {
   "setup-imported-data": string | null;
   "save-config": boolean;
   "get-config": AppConfig | null;
+  "set-startup-language": boolean;
+  "set-window-theme": boolean;
+  "service-document": {success: boolean;canceled?: boolean;message?: string};
+  "open-support-email": boolean;
+  "list-service-media": ServiceMediaItem[];
+  "add-service-media": ServiceMediaItem[];
+  "read-service-media": string;
+  "remove-service-media": boolean;
+  "list-trash": TrashItem[];
+  "restore-trash": {success:boolean;message?:string};
+  "purge-trash": {success:boolean;message?:string};
+  "restore-trash-batch": {success:boolean;message?:string};
+  "purge-trash-batch": {success:boolean;message?:string};
+  "backup-data": ArchiveActionResult;
+  "restore-data": ArchiveActionResult;
+  "cancel-restore-data": ArchiveActionResult;
+  "confirm-restore-data": ArchiveActionResult;
+  "export-data-csv": ArchiveActionResult;
   "get-dashboard-stats": DashboardStats;
   "get-all-customers": CustomerViewDto[];
   "add-customer": IApiResponse<number>;
@@ -105,6 +136,7 @@ export type IpcResponseMap = {
   "add-car": IApiResponse<Car | undefined>;
   "update-car": IApiResponse<Car | undefined>;
   "delete-car": IApiResponse<void>;
+  "delete-cars-bulk": IApiResponse<void>;
   "add-old-customer": IApiResponse<string>;
   "remove-old-customer": IApiResponse<void>;
   "get-all-services": IApiResponse<Service[]>;
@@ -125,6 +157,24 @@ export type IpcRequestMap = {
   "setup-imported-data": string;
   "save-config": AppConfig;
   "get-config": undefined;
+  "set-startup-language": string;
+  "set-window-theme": "navy" | "dark" | "light" | "dim";
+  "service-document": {html:string;filename:string;action:"pdf"|"print"};
+  "open-support-email": {subject:string;body:string};
+  "list-service-media": number;
+  "add-service-media": number;
+  "read-service-media": number;
+  "remove-service-media": number;
+  "list-trash": undefined;
+  "restore-trash": number;
+  "purge-trash": number;
+  "restore-trash-batch": number[];
+  "purge-trash-batch": number[];
+  "backup-data": undefined;
+  "restore-data": undefined;
+  "cancel-restore-data": undefined;
+  "confirm-restore-data": undefined;
+  "export-data-csv": undefined;
   "get-dashboard-stats": undefined;
   "get-all-customers": undefined;
   "add-customer": CreateCustomerRequest;
@@ -135,13 +185,14 @@ export type IpcRequestMap = {
   "delete-customers-bulk": BulkDeleteCustomersRequest;
   "get-all-brands": undefined;
   "add-brand": CreateBrandRequest;
-  "get-all-fuel-types": undefined;
-  "get-all-body-types": undefined;
+  "get-all-fuel-types": string | undefined;
+  "get-all-body-types": string | undefined;
   "get-all-cars": undefined;
   "get-car": number;
   "add-car": CreateCarRequest;
   "update-car": UpdateCarRequest;
-  "delete-car": number;
+  "delete-car": { id: number; deleteRelated: boolean };
+  "delete-cars-bulk": { ids: number[]; deleteRelated: boolean };
   "add-old-customer": { carId: number; customerId: number };
   "remove-old-customer": { carId: number; customerId: number };
   "get-all-services": undefined;

@@ -1,0 +1,15 @@
+en: 161/161 keys, 0 missing
+es: 19/161 keys, 142 missing
+fr: 19/161 keys, 142 missing
+de: 19/161 keys, 142 missing
+pt: 19/161 keys, 142 missing
+zh: 19/161 keys, 142 missing
+tr: 161/161 keys, 0 missing
+ja: 19/161 keys, 142 missing
+ko: 19/161 keys, 142 missing
+ru: 19/161 keys, 142 missing
+nl: 19/161 keys, 142 missing
+az: 19/161 keys, 142 missing
+it: 19/161 keys, 142 missing
+pl: 19/161 keys, 142 missing
+Missing key occurrences across configured locales: 1704

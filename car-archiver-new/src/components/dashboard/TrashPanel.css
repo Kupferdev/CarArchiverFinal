@@ -1,0 +1,16 @@
+/* Local palette tokens follow all four existing themes. */
+.trashPanel{padding:4px 0;color:var(--text-main)}
+.trashHeader{display:flex;align-items:start;justify-content:space-between;gap:12px}
+.trashHeader h3{margin:0 0 8px}.trashHeader p{color:var(--text-muted);margin:0 0 18px}
+.trashPanel button{border:1px solid var(--border-color);background:var(--bg-panel);color:var(--text-main);border-radius:8px;padding:9px 12px;cursor:pointer}
+.trashPanel button:disabled{opacity:.45;cursor:default}
+.trashToolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;border:1px solid var(--border-color);border-radius:10px;padding:12px;margin-bottom:12px}
+.trashToolbar label{display:flex;align-items:center;gap:8px;cursor:pointer}.trashToolbar span{color:var(--text-muted);font-size:12px}
+.trashPanel .trashDanger{border-color:#bd5151;color:#e77a7a}
+.trashRows{max-height:55vh;overflow:auto}.trashRow{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:14px 10px;border-bottom:1px solid var(--border-color)}
+.trashIdentity{flex:1 1 180px;min-width:0;overflow-wrap:anywhere}.trashIdentity strong{display:block}.trashIdentity small{display:block;color:var(--text-muted);margin-top:5px}
+.trashEmpty{color:var(--text-muted);text-align:center;padding:24px}.trashError{color:#e77a7a;overflow-wrap:anywhere}
+.trashModalShade{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:4100;display:flex;justify-content:center;align-items:center;padding:20px}
+.trashModal{width:min(460px,100%);background:var(--bg-card);border:1px solid var(--border-color);color:var(--text-main);border-radius:14px;padding:24px;box-shadow:0 24px 65px rgba(0,0,0,.35)}
+.trashModal h3{margin:0 0 14px}.trashModal p{line-height:1.5;color:var(--text-muted)}
+.trashModalActions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:20px}

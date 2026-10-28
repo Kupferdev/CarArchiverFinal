@@ -13,4 +13,3 @@ export interface Car {
   engineVolumeCc?: number | null;
   notes?: string | null;
 }
- 

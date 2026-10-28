@@ -1,3 +1,5 @@
+import { ProfileActions } from "../common/ProfileActions";
+import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import styles from "./CarProfile.module.css";
@@ -21,8 +23,8 @@ const getCustomerPhone = (customer: CustomerViewDto) => {
 const getCustomerEmail = (customer: CustomerViewDto) => customer.emails?.[0]?.address ?? null;
 
 const CarProfile: React.FC<{ carId: number }> = ({ carId }) => {
-  const { t } = useTranslation();
-  const { openTab, activeTabId, renameTab } = useTabStore();
+  const { t, i18n } = useTranslation();
+  const { openTab, activeTabId, renameTab, closeTab } = useTabStore();
   const { addToast } = useToastStore();
 
   const [car, setCar] = useState<Car | null>(null);
@@ -33,6 +35,8 @@ const CarProfile: React.FC<{ carId: number }> = ({ carId }) => {
   const [bodyType, setBodyType] = useState("-");
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -41,13 +45,13 @@ const CarProfile: React.FC<{ carId: number }> = ({ carId }) => {
           window.electron.ipcRenderer.invoke("get-car", carId),
           window.electron.ipcRenderer.invoke("get-all-brands"),
           window.electron.ipcRenderer.invoke("get-all-customers"),
-          window.electron.ipcRenderer.invoke("get-all-fuel-types"),
-          window.electron.ipcRenderer.invoke("get-all-body-types"),
+          window.electron.ipcRenderer.invoke("get-all-fuel-types", i18n.language),
+          window.electron.ipcRenderer.invoke("get-all-body-types", i18n.language),
           window.electron.ipcRenderer.invoke("get-services-by-car", carId),
         ]);
 
         if (!carRes.success || !carRes.data) {
-          addToast(carRes.message, "error");
+          addToast(t("carUnexpectedError"), "error");
           setLoading(false);
           return;
         }
@@ -89,7 +93,7 @@ const CarProfile: React.FC<{ carId: number }> = ({ carId }) => {
     };
 
     void load();
-  }, [activeTabId, addToast, carId, renameTab, t]);
+  }, [activeTabId, addToast, carId, i18n.language, renameTab, t]);
 
   const oldUsers = useMemo(() => {
     if (!car?.oldCustomerId) return [];
@@ -106,7 +110,7 @@ const CarProfile: React.FC<{ carId: number }> = ({ carId }) => {
   const openCustomerProfile = (selectedCustomer: CustomerViewDto) => {
     openTab({
       type: "customer",
-      title: `${selectedCustomer.fullName} Profili`,
+      title: selectedCustomer.fullName,
       entityId: selectedCustomer.id,
       isProfile: true,
     });
@@ -191,17 +195,11 @@ const CarProfile: React.FC<{ carId: number }> = ({ carId }) => {
           )}
         </div>
 
-        <button
-          className={styles.editButton}
-          onClick={() => openTab({ type: "car", title: t("carEditTitle"), entityId: carId })}
-          type="button"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-          </svg>
-          {t("carEdit")}
-        </button>
+        <ProfileActions
+          onEdit={() => openTab({ type: "car", title: t("carEditTitle"), entityId: carId })}
+          onDelete={() => setDeleteOpen(true)}
+          deleteLabel={t("carDeleteTitle")}
+        />
       </aside>
 
       <main className={styles.mainContent}>
@@ -253,7 +251,8 @@ const CarProfile: React.FC<{ carId: number }> = ({ carId }) => {
         <section className={styles.card}>
           <div className={styles.cardHeader}>
             <div className={styles.cardTitle}>{t("carServiceHistory")}</div>
-            <button className={styles.historyAddButton} type="button" onClick={() => openTab({ type: "service", title: t("serviceNewTitle"), entityId: 999, parentEntityId: carId })}>+ {t("serviceNewButton")}</button>
+            <div className={styles.historyActionGroup}><button className={styles.historyAddButton} type="button" onClick={() => openTab({ type: "service", title: `${car?.plateNumber ?? ''} Servis Kayıtları`, contextCarId: carId, contextLabel: car?.plateNumber ?? '' })}>{t('showAll')}</button>
+            <button className={styles.historyAddButton} type="button" onClick={() => openTab({ type: "service", title: t("serviceNewTitle"), entityId: 999, parentEntityId: carId })}>+ {t("serviceNewButton")}</button></div>
           </div>
           {services.length > 0 ? (
             <div className={styles.serviceList}>
@@ -266,7 +265,7 @@ const CarProfile: React.FC<{ carId: number }> = ({ carId }) => {
                 >
                   <div className={styles.serviceDate}>{service.applicationDate ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "short" }).format(new Date(service.applicationDate)) : "-"}</div>
                   <div className={styles.serviceMain}>
-                    <strong>{service.complaints}</strong>
+                    <strong>{service.complaints || "—"}</strong>
                     <span>{service.km == null ? "-" : `${formatKm(service.km)} km`}{service.totalCharge != null ? ` · ${new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(service.totalCharge)}` : ""}</span>
                   </div>
                   <span className={styles.serviceChevron}>›</span>
@@ -283,6 +282,22 @@ const CarProfile: React.FC<{ carId: number }> = ({ carId }) => {
           )}
         </section>
       </main>
+      {deleteOpen && <DeleteConfirmDialog
+        title={t("carDeleteTitle")}
+        onCancel={() => { if (!deleting) setDeleteOpen(false); }}
+        onConfirm={async () => {
+          if (deleting) return;
+          setDeleting(true);
+          try {
+            const result = await window.electron.ipcRenderer.invoke('delete-car', { id: carId, deleteRelated: true });
+            if (!result.success) { addToast(t("carUnexpectedError"), "error"); return; }
+            addToast(t('carDeleted'), 'success');
+            closeTab(activeTabId);
+          } catch { addToast(t('carUnexpectedError'), 'error'); }
+          finally { setDeleting(false); }
+        }}
+        busy={deleting}
+      >{t("carDeleteConfirmation", { plate: car.plateNumber })} — {t("carDeleteRelated")}</DeleteConfirmDialog>}
     </div>
   );
 };

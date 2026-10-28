@@ -10,7 +10,7 @@
 }
 
 .title {
-  font-size: 16px;
+  font-size: calc(16px * var(--user-font-factor, 1));
   font-weight: 500;
   color: var(--text-main);
 }
@@ -36,7 +36,7 @@
   background: var(--bg-panel);
   color: var(--text-main);
   width: 320px;
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
   outline: none;
   transition: all 0.2s ease;
 }
@@ -52,7 +52,7 @@
   color: white;
   border: none;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: calc(14px * var(--user-font-factor, 1));
   font-weight: 500;
   cursor: pointer;
   transition: opacity 0.2s;
@@ -106,7 +106,7 @@
 }
 
 .selectedCount {
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
   font-weight: 600;
 }
 
@@ -128,7 +128,7 @@
   top: 0;
   background: var(--bg-panel);
   padding: 12px 20px;
-  font-size: 12px;
+  font-size: calc(12px * var(--user-font-factor, 1));
   color: var(--text-muted);
   font-weight: 500;
   border-bottom: 0.5px solid var(--border-color);
@@ -137,7 +137,7 @@
 
 .table td {
   padding: 12px 20px;
-  font-size: 13px;
+  font-size: calc(13px * var(--user-font-factor, 1));
   color: var(--text-main);
   border-bottom: 0.5px solid var(--border-color);
 }
@@ -208,5 +208,5 @@
   padding: 40px;
   text-align: center;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: calc(14px * var(--user-font-factor, 1));
 }

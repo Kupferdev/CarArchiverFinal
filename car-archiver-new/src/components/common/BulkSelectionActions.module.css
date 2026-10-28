@@ -1,0 +1,9 @@
+
+.actions{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.button{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;background:transparent;color:var(--text-muted,#a1a1aa);border:1px solid var(--border-color,#2b2b40);border-radius:8px;cursor:pointer;transition:all .2s ease}
+.button:hover{color:var(--accent-blue,#3b82f6);border-color:var(--accent-blue,#3b82f6);background:rgba(59,130,246,.1)}
+.deleteButton{width:auto;padding:0 12px;gap:6px;border-color:#ef4444;background:rgba(239,68,68,.1);color:#ef4444}
+.deleteButton:hover{color:#fff;background:#ef4444;border-color:#ef4444}
+.cancelButton:hover{color:#ef4444;border-color:#ef4444;background:rgba(239,68,68,.1)}
+.count{font-size:calc(13px * var(--user-font-factor, 1));font-weight:600}
+.button:disabled{opacity:.5;cursor:wait}

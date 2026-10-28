@@ -1,7 +1,8 @@
-import { ipcMain, dialog, type IpcMainInvokeEvent } from 'electron';
+import { app, ipcMain, dialog, BrowserWindow, shell, type IpcMainInvokeEvent } from 'electron';
+import { isTrustedAppUrl } from './security';
 import fs from 'fs';
 import path from 'path';
-import { closeDb, CreateDefaultDb } from '../src/main/data/db';
+import { closeDb, CreateDefaultDb, getDb } from '../src/main/data/db';
 import { CreateDefaultDbTables } from '../src/main/data/setup';
 import { closeDrizzle, initDrizzle } from '../src/main/data/drizzle/drizzleDb';
 import { execFile } from 'child_process';
@@ -11,8 +12,6 @@ import { CustomersRepository } from '../src/main/data/drizzle/repositories';
 import { CarsRepository } from '../src/main/data/drizzle/repositories';
 import { ServicesRepository } from '../src/main/data/drizzle/repositories';
 import { BrandsRepository } from '../src/main/data/drizzle/repositories/brandsRepository';
-import { FuelTypesRepository } from '../src/main/data/drizzle/repositories/fuelTypesRepository';
-import { BodyTypesRepository } from '../src/main/data/drizzle/repositories/bodyTypesRepository';
 
 import { CustomerService } from "../src/services/customerService";
 import { BrandService, MAX_BRAND_NAME_LENGTH } from "../src/services/brandService";
@@ -28,6 +27,12 @@ import type { Service } from '../src/shared/types/service';
 import type { Part } from '../src/shared/types/part';
 import { ServiceService } from "../src/services/serviceService";
 import { PartsRepository } from "../src/main/data/drizzle/repositories/partsRepository";
+import { addServiceMedia, listServiceMedia, readServiceMedia } from '../src/main/data/serviceMedia';
+import {moveToTrash,listTrash,restoreTrash,purgeTrash,restoreTrashBatch,purgeTrashBatch} from '../src/main/data/trash';
+import { backupData, ensureNoBackupInProgress } from '../src/main/data/dataBackup';
+import { prepareRestore, validateRestoreBackup } from '../src/main/data/dataRestore';
+import { getActiveDbPath } from '../src/main/data/db';
+import { exportRecords } from '../src/main/data/exportData';
 
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -67,6 +72,7 @@ function parseCustomerRequest(payload: unknown): CreateCustomerRequest {
     lastName: requireString(payload.lastName, "lastName"),
     nationalId: requireString(payload.nationalId, "nationalId"),
     taxNumber: requireString(payload.taxNumber, "taxNumber"),
+    address: payload.address == null ? "" : requireString(payload.address, "address"),
     phones: phones.map((phone, index) => {
       if (!isRecord(phone)) throw new Error(`Invalid phone at index ${index}.`);
       return {
@@ -209,19 +215,22 @@ function parseServiceRequest(payload: unknown): CreateServiceWithPartsRequest {
   const raw = payload.service;
   const carId = requireNumber(raw.carId, "carId");
   const customerId = raw.customerId === null || raw.customerId === undefined || raw.customerId === "" ? null : requireNumber(raw.customerId, "customerId");
-  const complaints = requireString(raw.complaints, "complaints", false).trim();
-  if (complaints.length > 4000) throw new Error("Complaints cannot exceed 4000 characters.");
+  const complaints = raw.complaints == null || raw.complaints === "" ? null : requireString(raw.complaints, "complaints").trim() || null;
+  if (complaints && complaints.length > 4000) throw new Error("Complaints cannot exceed 4000 characters.");
+  const advisorNotes = raw.advisorNotes == null ? null : requireString(raw.advisorNotes, "advisorNotes").trim() || null;
+  if (advisorNotes && advisorNotes.length > 10000) throw new Error("Advisor notes cannot exceed 10000 characters.");
   const extraRequests = raw.extraRequests === null || raw.extraRequests === undefined ? null : requireString(raw.extraRequests, "extraRequests").trim() || null;
   if (extraRequests && extraRequests.length > 4000) throw new Error("Extra requests cannot exceed 4000 characters.");
 
   const parseStringArray = (value: unknown, field: string, maxItems: number, maxLength: number) => {
     if (value === null || value === undefined || value === "") return [];
     if (!Array.isArray(value)) throw new Error(`Invalid ${field}.`);
+    if (value.length > maxItems) throw new Error(`${field} has too many entries (maximum ${maxItems}).`);
     return value.map((item, index) => {
       const text = requireString(item, `${field}[${index}]`, false).trim();
       if (text.length > maxLength) throw new Error(`${field}[${index}] is too long.`);
       return text;
-    }).filter(Boolean).slice(0, maxItems);
+    }).filter(Boolean);
   };
 
   const jobDuration = raw.jobDuration === null || raw.jobDuration === undefined || raw.jobDuration === "" ? null : Number(raw.jobDuration);
@@ -237,6 +246,7 @@ function parseServiceRequest(payload: unknown): CreateServiceWithPartsRequest {
     km: parseOptionalNonNegativeNumber(raw.km, "km"),
     complaints,
     extraRequests,
+    advisorNotes,
     faults: parseStringArray(raw.faults, "faults", 30, 500),
     hasDamageOnReceive: raw.hasDamageOnReceive === true,
     damageOnReceive: parseStringArray(raw.damageOnReceive, "damageOnReceive", 30, 500),
@@ -252,12 +262,20 @@ function parseServiceRequest(payload: unknown): CreateServiceWithPartsRequest {
     if (!isRecord(item)) throw new Error(`Invalid part at index ${index}.`);
     const partName = requireString(item.partName, `parts[${index}].partName`, false).trim();
     if (partName.length > 200) throw new Error(`parts[${index}].partName is too long.`);
-    return {
-      partName,
-      partTax: parseOptionalNonNegativeNumber(item.partTax, `parts[${index}].partTax`),
-      partPrice: parseOptionalNonNegativeNumber(item.partPrice, `parts[${index}].partPrice`),
-    };
-  }).filter((part) => part.partName);
+    const quantity = item.quantity;
+    const unitPriceKurus = item.unitPriceKurus;
+    if (typeof quantity !== "number" || !Number.isSafeInteger(quantity) || quantity <= 0) {
+      throw new Error(`parts[${index}].quantity must be a positive whole number.`);
+    }
+    if (typeof unitPriceKurus !== "number" || !Number.isSafeInteger(unitPriceKurus) || unitPriceKurus < 0) {
+      throw new Error(`parts[${index}].unitPriceKurus must be a non-negative whole number.`);
+    }
+    if (!Number.isSafeInteger(quantity * unitPriceKurus)) {
+      throw new Error(`parts[${index}] price total is too large.`);
+    }
+    const partId = item.partId == null ? undefined : requireNumber(item.partId, `parts[${index}].partId`);
+    return { partId, partName, quantity, unitPriceKurus };
+  });
 
   return { service, parts };
 }
@@ -324,15 +342,30 @@ function requireApprovedDirectory(value: unknown): string {
   return normalizedPath;
 }
 
+// Every IPC channel validates its sender in the main process, not just preload.
+// A compromised foreign window must never inherit local database/file permissions.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function secureHandle(channel: string, listener: (event: IpcMainInvokeEvent, ...args: any[]) => any): void {
+  ipcMain.handle(channel, (event, ...args: unknown[]) => {
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    const trusted = owner !== null && !owner.isDestroyed()
+      && event.senderFrame === event.sender.mainFrame
+      && isTrustedAppUrl(event.senderFrame.url, process.env['VITE_DEV_SERVER_URL'],
+        path.join(process.env.APP_ROOT || app.getAppPath(), 'dist'));
+    if (!trusted) throw new Error('IPC sender is not a trusted application page.');
+    return listener(event, ...args);
+  });
+}
+
 export function registerIpcHandlers() {
 
   // 1. Config Check
-  ipcMain.handle('check-config', async () => {
+  secureHandle('check-config', async () => {
     return hasConfig();
   });
 
   // 2. Directory Selection Dialog
-  ipcMain.handle('select-directory', async () => {
+  secureHandle('select-directory', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory'],
     });
@@ -344,7 +377,7 @@ export function registerIpcHandlers() {
   });
 
   // 3. Import Validation (is there a .sqlite file?)
-  ipcMain.handle('verify-import-path', async (_event: IpcMainInvokeEvent, rawFolderPath: unknown) => {
+  secureHandle('verify-import-path', async (_event: IpcMainInvokeEvent, rawFolderPath: unknown) => {
     const folderPath = requireApprovedDirectory(rawFolderPath);
     const dbName = DATABASE_FILE_NAME;
     const dbPath = path.join(folderPath, dbName);
@@ -357,7 +390,7 @@ export function registerIpcHandlers() {
   });
 
   // 4. New Setup: Create Folder and Media Structure
-  ipcMain.handle('setup-new-data-structure', async (_event: IpcMainInvokeEvent, rawSelectedRoot: unknown) => {
+  secureHandle('setup-new-data-structure', async (_event: IpcMainInvokeEvent, rawSelectedRoot: unknown) => {
     try {
       const selectedRoot = requireApprovedDirectory(rawSelectedRoot);
       const mainFolderName = 'CarServiceArchiver';
@@ -410,7 +443,7 @@ export function registerIpcHandlers() {
   });
 
   // 5. Import an existing database file
-  ipcMain.handle('setup-imported-data', async (_event: IpcMainInvokeEvent, rawDbPath: unknown) => {
+  secureHandle('setup-imported-data', async (_event: IpcMainInvokeEvent, rawDbPath: unknown) => {
     try {
       const normalizedDbPath = requireApprovedDatabasePath(rawDbPath);
 
@@ -435,7 +468,7 @@ export function registerIpcHandlers() {
   });
 
   // 5. Save Config
-  ipcMain.handle('save-config', async (_event: IpcMainInvokeEvent, configData: unknown) => {
+  secureHandle('save-config', async (_event: IpcMainInvokeEvent, configData: unknown) => {
     try {
       const config = parseAppConfig(configData);
       const normalizedDbPath = requireApprovedDatabasePath(config.savePath);
@@ -451,13 +484,47 @@ export function registerIpcHandlers() {
     }
   });
 
+  // Persist display language independently of config.json (which is guarded by DB validation).
+  // This permits the splash to use the exact language selected in Settings on next launch.
+  secureHandle('set-startup-language', async (_event: IpcMainInvokeEvent, language: unknown) => {
+    const supported = ['tr','en','es','fr','de','pt','zh','ja','ko','ru','nl','az','it','pl'];
+    if (typeof language !== 'string' || !supported.includes(language)) return false;
+    try {
+      fs.writeFileSync(path.join(app.getPath('userData'), 'startup-language.json'),
+        JSON.stringify({ language }), { encoding: 'utf8', mode: 0o600 });
+      return true;
+    } catch (error) { console.error('Could not save startup language:', error); return false; }
+  });
+
   // 6. Get Config
-  ipcMain.handle('get-config', async () => {
+  secureHandle('get-config', async () => {
     return getConfig();
   });
 
+  secureHandle('set-window-theme', (event: IpcMainInvokeEvent, theme: unknown) => {
+    if (typeof theme !== 'string' || !['navy','dark','light','dim'].includes(theme)) return false;
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window || process.platform !== 'win32') return false;
+    const colors: Record<string, { color: string; symbolColor: string }> = {
+      navy: { color: '#151b35', symbolColor: '#e8eaff' },
+      dark: { color: '#12151b', symbolColor: '#f0f3f7' },
+      light: { color: '#ffffff', symbolColor: '#111827' },
+      dim: { color: '#30343d', symbolColor: '#e4e6eb' },
+    };
+    window.setTitleBarOverlay({ ...colors[theme], height: 30 });
+    window.setBackgroundColor(colors[theme].color);
+    // The native Windows frame is created before React can read localStorage.
+    // Persist the selected palette for the next BrowserWindow creation too.
+    try {
+      fs.writeFileSync(path.join(app.getPath('userData'), 'window-theme.json'), JSON.stringify(theme), 'utf8');
+    } catch (error) {
+      console.error('Could not persist window titlebar theme:', error);
+    }
+    return true;
+  });
+
   // 7. Get Dashboard Stats
-  ipcMain.handle('get-dashboard-stats', async () => {
+  secureHandle('get-dashboard-stats', async () => {
     try {
       // Repository'leri ayağa kaldırıyoruz
       const customersRepo = new CustomersRepository();
@@ -484,7 +551,7 @@ export function registerIpcHandlers() {
   });
 
 // 8. Get All Customers (Telefon ve E-postalar Dahil)
-  ipcMain.handle('get-all-customers', async () => {
+  secureHandle('get-all-customers', async () => {
     try {
       const customersRepo = new CustomersRepository();
       const response = await customersRepo.getAllCustomersWithDetails();
@@ -499,7 +566,8 @@ export function registerIpcHandlers() {
   });
 
 // 9. Add New Customer (Üç Tabloya Birden İlişkili Kayıt)
-  ipcMain.handle('add-customer', async (_event: IpcMainInvokeEvent, rawPayload: unknown) => {
+  secureHandle('add-customer', async (_event: IpcMainInvokeEvent, rawPayload: unknown) => {
+    ensureNoBackupInProgress();
     try {
       const customersRepo = new CustomersRepository();
       const phoneNumbersRepo = new PhoneNumbersRepository();
@@ -514,7 +582,8 @@ export function registerIpcHandlers() {
         firstName: payload.firstName,
         lastName: payload.lastName,
         nationalId: payload.nationalId,
-        taxNumber: payload.taxNumber
+        taxNumber: payload.taxNumber,
+        address: payload.address
       };
 
       const phoneNumbers = (payload.phones ?? []).map((phone) => ({
@@ -536,7 +605,7 @@ export function registerIpcHandlers() {
   });
 
   // 10. Get Full Customer Profile
-  ipcMain.handle('get-customer-profile', async (_event: IpcMainInvokeEvent, rawCustomerId: unknown) => {
+  secureHandle('get-customer-profile', async (_event: IpcMainInvokeEvent, rawCustomerId: unknown) => {
     try {
       const customerId = requireNumber(rawCustomerId, 'customer id');
       const customersRepo = new CustomersRepository();
@@ -550,48 +619,96 @@ export function registerIpcHandlers() {
   });
 
   // Müşteri Düzenleme Formu İçin Veri Çekme
-  ipcMain.handle('get-customer-edit', async (_event: IpcMainInvokeEvent, rawCustomerId: unknown) => {
+  secureHandle('get-customer-edit', async (_event: IpcMainInvokeEvent, rawCustomerId: unknown) => {
     const customerId = requireNumber(rawCustomerId, 'customer id');
     return await new CustomersRepository().getCustomerForEdit(customerId);
   });
 
 // Müşteri Güncelleme
-  ipcMain.handle('update-customer', async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+  secureHandle('update-customer', async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    ensureNoBackupInProgress();
     const request = parseUpdateCustomerRequest(rawRequest);
     return await new CustomersRepository().updateCustomerFull(request.id, request.data);
   });
 
   // Müşteri Silme Kanalı
-  ipcMain.handle('delete-customer', async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+  secureHandle('delete-customer', async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    ensureNoBackupInProgress();
     const request = parseDeleteCustomerRequest(rawRequest);
-    return await new CustomersRepository().deleteCustomer(request.id, request.deleteRelated);
+    try {moveToTrash('customer',[request.id],request.deleteRelated);return ServiceResponse.success(null,'Moved to Trash.');}catch(error){return ServiceResponse.error(error,'Customer could not be moved to Trash.');}
   });
 
   // Toplu Müşteri Silme Kanalı
-  ipcMain.handle('delete-customers-bulk', async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+  secureHandle('delete-customers-bulk', async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    ensureNoBackupInProgress();
     const request = parseBulkDeleteRequest(rawRequest);
-    return await new CustomersRepository().deleteCustomersBulk(request.ids, request.deleteRelated);
+    try {moveToTrash('customer',request.ids,request.deleteRelated);return ServiceResponse.success(null,'Moved to Trash.');}catch(error){return ServiceResponse.error(error,'Customers could not be moved to Trash.');}
+  });
+
+  // Print only a local, generated HTML service form. The renderer displays its own A4 preview.
+  secureHandle('service-document', async (event: IpcMainInvokeEvent, payload: unknown) => {
+    if (!isRecord(payload) || typeof payload.html !== 'string' || payload.html.length > 2_000_000 || !['pdf', 'print'].includes(String(payload.action))) {
+      return { success: false, message: 'Invalid document.' };
+    }
+    const parent = BrowserWindow.fromWebContents(event.sender);
+    const printWindow = new BrowserWindow({ show: false, parent: parent ?? undefined, webPreferences: { sandbox: true, nodeIntegration: false, contextIsolation: true, javascript: false, webSecurity: true } });
+    try {
+      await printWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(payload.html));
+      await new Promise(resolve => setTimeout(resolve, 300));
+      if (payload.action === 'pdf') {
+        const filename = typeof payload.filename === 'string' ? Array.from(payload.filename, character => (character.charCodeAt(0) < 32 || /[\\/:*?"<>|]/.test(character)) ? '_' : character).join('').slice(0, 140) : 'Servis Kaydı.pdf';
+        const selected = await dialog.showSaveDialog(parent ?? printWindow, {
+          defaultPath: filename.endsWith('.pdf') ? filename : filename + '.pdf',
+          filters: [{ name: 'PDF', extensions: ['pdf'] }],
+        });
+        if (selected.canceled || !selected.filePath) return { success: true, canceled: true };
+        const pdf = await printWindow.webContents.printToPDF({ pageSize: 'A4', printBackground: true });
+        await fs.promises.writeFile(selected.filePath, pdf);
+        return { success: true, canceled: false };
+      }
+      await new Promise<void>((resolve, reject) => {
+        printWindow.webContents.print({ silent: false, printBackground: true }, (success, reason) => {
+          if (success || reason === 'Print job canceled') resolve();
+          else reject(new Error(reason || 'Printing failed'));
+        });
+      });
+      return { success: true, canceled: false };
+    } catch (error) {
+      return { success: false, message: getErrorMessage(error) };
+    } finally {
+      if (!printWindow.isDestroyed()) printWindow.close();
+    }
   });
 
   // Yakıt tipleri / kasa tipleri
-  ipcMain.handle("get-all-fuel-types", async () => {
+  secureHandle("get-all-fuel-types", async (_event, requestedLanguage?: string) => {
     try {
-      return await new FuelTypesRepository().getAll();
+      const locale = typeof requestedLanguage === 'string' && /^[a-z]{2}$/.test(requestedLanguage) ? requestedLanguage : 'en';
+      const rows = getDb().prepare(`SELECT f.fuelTypeId, COALESCE(loc.translatedName, en.translatedName, f.fuelTypeName) AS fuelTypeName
+        FROM FuelTypes f LEFT JOIN (SELECT fuelTypeId, MAX(translatedName) translatedName FROM FuelTypeTranslations WHERE languageCode=? GROUP BY fuelTypeId) loc ON loc.fuelTypeId=f.fuelTypeId
+        LEFT JOIN (SELECT fuelTypeId, MAX(translatedName) translatedName FROM FuelTypeTranslations WHERE languageCode='en' GROUP BY fuelTypeId) en ON en.fuelTypeId=f.fuelTypeId
+        ORDER BY f.fuelTypeId`).all(locale);
+      return ServiceResponse.success(rows);
     } catch (error: unknown) {
       return ServiceResponse.error(error, "Fuel types could not be loaded.");
     }
   });
 
-  ipcMain.handle("get-all-body-types", async () => {
+  secureHandle("get-all-body-types", async (_event, requestedLanguage?: string) => {
     try {
-      return await new BodyTypesRepository().getAll();
+      const locale = typeof requestedLanguage === 'string' && /^[a-z]{2}$/.test(requestedLanguage) ? requestedLanguage : 'en';
+      const rows = getDb().prepare(`SELECT b.bodyTypeId, COALESCE(loc.translatedName, en.translatedName, b.bodyTypeName) AS bodyTypeName
+        FROM BodyTypes b LEFT JOIN (SELECT bodyTypeId, MAX(translatedName) translatedName FROM BodyTypeTranslations WHERE languageCode=? GROUP BY bodyTypeId) loc ON loc.bodyTypeId=b.bodyTypeId
+        LEFT JOIN (SELECT bodyTypeId, MAX(translatedName) translatedName FROM BodyTypeTranslations WHERE languageCode='en' GROUP BY bodyTypeId) en ON en.bodyTypeId=b.bodyTypeId
+        ORDER BY b.bodyTypeId`).all(locale);
+      return ServiceResponse.success(rows);
     } catch (error: unknown) {
       return ServiceResponse.error(error, "Body types could not be loaded.");
     }
   });
 
   // Araç listesi
-  ipcMain.handle('get-all-cars', async () => {
+  secureHandle('get-all-cars', async () => {
     try {
       const result = await new CarsRepository().getAll();
       return result;
@@ -601,7 +718,7 @@ export function registerIpcHandlers() {
   });
 
   // Tek araç
-  ipcMain.handle('get-car', async (_event: IpcMainInvokeEvent, rawCarId: unknown) => {
+  secureHandle('get-car', async (_event: IpcMainInvokeEvent, rawCarId: unknown) => {
     try {
       const carId = requireNumber(rawCarId, 'car id');
       return await new CarsRepository().getById(carId);
@@ -611,7 +728,8 @@ export function registerIpcHandlers() {
   });
 
   // Yeni araç
-  ipcMain.handle('add-car', async (_event: IpcMainInvokeEvent, rawPayload: unknown) => {
+  secureHandle('add-car', async (_event: IpcMainInvokeEvent, rawPayload: unknown) => {
+    ensureNoBackupInProgress();
     try {
       const data = parseCarData(rawPayload);
       return await new CarsRepository().create(data);
@@ -621,7 +739,8 @@ export function registerIpcHandlers() {
   });
 
   // Araç güncelle
-  ipcMain.handle('update-car', async (_event: IpcMainInvokeEvent, rawPayload: unknown) => {
+  secureHandle('update-car', async (_event: IpcMainInvokeEvent, rawPayload: unknown) => {
+    ensureNoBackupInProgress();
     try {
       const request = parseUpdateCarRequest(rawPayload);
       const repository = new CarsRepository();
@@ -633,17 +752,26 @@ export function registerIpcHandlers() {
     }
   });
 
-  // Araç sil
-  ipcMain.handle('delete-car', async (_event: IpcMainInvokeEvent, rawCarId: unknown) => {
+  // Araç silme işlemlerinde servislerin CASCADE ile silinmesi ancak açık onayla mümkündür.
+  secureHandle('delete-car', async (_event: IpcMainInvokeEvent, payload: unknown) => {
+    ensureNoBackupInProgress();
     try {
-      const carId = requireNumber(rawCarId, 'car id');
-      return await new CarsRepository().delete(carId);
-    } catch (error: unknown) {
-      return ServiceResponse.error(error, "Car could not be deleted.");
-    }
+      if (!isRecord(payload) || typeof payload.deleteRelated !== 'boolean') throw new Error('Invalid car delete request.');
+      const id = requireNumber(payload.id, 'car id');
+      moveToTrash('car',[id],payload.deleteRelated); return ServiceResponse.success(undefined,'Moved to Trash.');
+    } catch (error: unknown) { return ServiceResponse.error(error, 'Car could not be deleted.'); }
+  });
+  secureHandle('delete-cars-bulk', async (_event: IpcMainInvokeEvent, payload: unknown) => {
+    ensureNoBackupInProgress();
+    try {
+      if (!isRecord(payload) || !Array.isArray(payload.ids) || !payload.ids.length || typeof payload.deleteRelated !== 'boolean') throw new Error('Invalid bulk car delete request.');
+      const ids = payload.ids.map((id: unknown) => requireNumber(id, 'car id'));
+      moveToTrash('car',ids,payload.deleteRelated); return ServiceResponse.success(undefined,'Moved to Trash.');
+    } catch (error: unknown) { return ServiceResponse.error(error, 'Cars could not be deleted.'); }
   });
 
-  ipcMain.handle('add-old-customer', async (_event: IpcMainInvokeEvent, rawPayload: unknown) => {
+  secureHandle('add-old-customer', async (_event: IpcMainInvokeEvent, rawPayload: unknown) => {
+    ensureNoBackupInProgress();
     try {
       if (!isRecord(rawPayload)) throw new Error("Invalid old customer payload.");
       const carId = requireNumber(rawPayload.carId, "car id");
@@ -654,7 +782,8 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('remove-old-customer', async (_event: IpcMainInvokeEvent, rawPayload: unknown) => {
+  secureHandle('remove-old-customer', async (_event: IpcMainInvokeEvent, rawPayload: unknown) => {
+    ensureNoBackupInProgress();
     try {
       if (!isRecord(rawPayload)) throw new Error("Invalid old customer payload.");
       const carId = requireNumber(rawPayload.carId, "car id");
@@ -666,7 +795,7 @@ export function registerIpcHandlers() {
   });
 
   // Servis kayıtları
-  ipcMain.handle("get-all-services", async () => {
+  secureHandle("get-all-services", async () => {
     try {
       return await new ServiceService(new ServicesRepository(), new PartsRepository()).getAll();
     } catch (error: unknown) {
@@ -674,7 +803,7 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle("get-service", async (_event: IpcMainInvokeEvent, rawServiceId: unknown) => {
+  secureHandle("get-service", async (_event: IpcMainInvokeEvent, rawServiceId: unknown) => {
     try {
       return await new ServiceService(new ServicesRepository(), new PartsRepository()).getDetails(requireNumber(rawServiceId, "service id"));
     } catch (error: unknown) {
@@ -682,7 +811,7 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle("get-services-by-car", async (_event: IpcMainInvokeEvent, rawCarId: unknown) => {
+  secureHandle("get-services-by-car", async (_event: IpcMainInvokeEvent, rawCarId: unknown) => {
     try {
       return await new ServiceService(new ServicesRepository(), new PartsRepository()).getByCarId(requireNumber(rawCarId, "car id"));
     } catch (error: unknown) {
@@ -690,7 +819,7 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle("get-services-by-customer", async (_event: IpcMainInvokeEvent, rawCustomerId: unknown) => {
+  secureHandle("get-services-by-customer", async (_event: IpcMainInvokeEvent, rawCustomerId: unknown) => {
     try {
       return await new ServiceService(new ServicesRepository(), new PartsRepository()).getByCustomerId(requireNumber(rawCustomerId, "customer id"));
     } catch (error: unknown) {
@@ -698,7 +827,7 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle("get-parts-by-service", async (_event: IpcMainInvokeEvent, rawServiceId: unknown) => {
+  secureHandle("get-parts-by-service", async (_event: IpcMainInvokeEvent, rawServiceId: unknown) => {
     try {
       return await new PartsRepository().getByServiceId(requireNumber(rawServiceId, "service id"));
     } catch (error: unknown) {
@@ -706,7 +835,8 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle("add-service", async (_event: IpcMainInvokeEvent, rawPayload: unknown) => {
+  secureHandle("add-service", async (_event: IpcMainInvokeEvent, rawPayload: unknown) => {
+    ensureNoBackupInProgress();
     try {
       const payload = parseServiceRequest(rawPayload);
       const parts: Part[] = payload.parts.map((part) => ({ carId: payload.service.carId, serviceId: 0, ...part }));
@@ -717,7 +847,8 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle("update-service", async (_event: IpcMainInvokeEvent, rawPayload: unknown) => {
+  secureHandle("update-service", async (_event: IpcMainInvokeEvent, rawPayload: unknown) => {
+    ensureNoBackupInProgress();
     try {
       const payload = parseUpdateServiceRequest(rawPayload);
       const parts: Part[] = payload.parts.map((part) => ({ carId: payload.service.carId, serviceId: payload.id, ...part }));
@@ -728,16 +859,128 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle("delete-service", async (_event: IpcMainInvokeEvent, rawServiceId: unknown) => {
+  secureHandle("delete-service", async (_event: IpcMainInvokeEvent, rawServiceId: unknown) => {
+    ensureNoBackupInProgress();
     try {
-      return await new ServiceService(new ServicesRepository(), new PartsRepository()).deleteService(requireNumber(rawServiceId, "service id"));
+      moveToTrash('service',[requireNumber(rawServiceId, 'service id')]); return ServiceResponse.success(undefined,'Moved to Trash.');
     } catch (error: unknown) {
       return ServiceResponse.error(error, "Service could not be deleted.");
     }
   });
 
+  // v35: files never cross the renderer as arbitrary filesystem paths.
+  // An OS picker in the main process supplies the only import paths.
+  secureHandle('list-service-media', (_event, rawId: unknown) =>
+    listServiceMedia(requireNumber(rawId, 'service id')));
+  secureHandle('add-service-media', async (event, rawId: unknown) => {
+    const serviceId = requireNumber(rawId, 'service id');
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    const options = { properties: ['openFile' as const, 'multiSelections' as const],
+      filters: [{name:'Images',extensions:['jpg','jpeg','png','webp']}] };
+    const result = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options);
+    return result.canceled ? listServiceMedia(serviceId) : addServiceMedia(serviceId, result.filePaths);
+  });
+  secureHandle('read-service-media', (_event, rawId: unknown) =>
+    readServiceMedia(requireNumber(rawId, 'media id')));
+  secureHandle('remove-service-media', (_event, rawId: unknown) =>
+    (moveToTrash('photo',[requireNumber(rawId, 'media id')]),true));
+  secureHandle('list-trash', () => listTrash());
+  secureHandle('restore-trash', (_event, rawId:unknown) => {
+    try {restoreTrash(requireNumber(rawId,'trash id'));return {success:true};}
+    catch(error){return {success:false,message:getErrorMessage(error)};}
+  });
+  secureHandle('purge-trash', (_event, rawId:unknown) => {
+    try {purgeTrash(requireNumber(rawId,'trash id'));return {success:true};}
+    catch(error){return {success:false,message:getErrorMessage(error)};}
+  });
+  secureHandle('restore-trash-batch', (_event, rawIds:unknown) => {
+    try {restoreTrashBatch(rawIds as number[]);return {success:true};}
+    catch(error){return {success:false,message:getErrorMessage(error)};}
+  });
+  secureHandle('purge-trash-batch', (_event, rawIds:unknown) => {
+    try {purgeTrashBatch(rawIds as number[]);return {success:true};}
+    catch(error){return {success:false,message:getErrorMessage(error)};}
+  });
+  secureHandle('backup-data', async (event) => {
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    const options = { properties: ['openDirectory' as const, 'createDirectory' as const] };
+    const selected = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options);
+    if (selected.canceled || !selected.filePaths[0]) return {success:false,canceled:true};
+    try { const location = await backupData(selected.filePaths[0]); return {success:true,location}; }
+    catch (error) { return {success:false,message:getErrorMessage(error)}; }
+  });
+
+  // A verified selection is bound to the invoking renderer until explicit confirmation.
+  const restoreSelection = new Map<number, string>();
+  secureHandle('restore-data', async (event) => {
+    ensureNoBackupInProgress();
+    const livePath = getActiveDbPath();
+    if (!livePath) return {success:false,message:'Database is not open.'};
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    const picker = {properties:['openDirectory' as const]};
+    const chosen = owner ? await dialog.showOpenDialog(owner,picker) : await dialog.showOpenDialog(picker);
+    if (chosen.canceled || !chosen.filePaths[0]) return {success:false,canceled:true};
+    try {
+      validateRestoreBackup(chosen.filePaths[0]);
+      restoreSelection.set(event.sender.id, chosen.filePaths[0]);
+      event.sender.once('destroyed', () => {restoreSelection.delete(event.sender.id);});
+      return {success:true,folder:chosen.filePaths[0]};
+    } catch(error) {return {success:false,message:getErrorMessage(error)};}
+  });
+
+  secureHandle('cancel-restore-data', event => {
+    restoreSelection.delete(event.sender.id);
+    return {success:true};
+  });
+
+  secureHandle('confirm-restore-data', async event => {
+    ensureNoBackupInProgress();
+    const selected = restoreSelection.get(event.sender.id);
+    restoreSelection.delete(event.sender.id);
+    const livePath = getActiveDbPath();
+    if (!selected || !livePath) return {success:false,message:'No verified backup selection.'};
+    try {
+      // Never overwrite a live SQLite connection: actual replacement runs on next launch.
+      prepareRestore(selected,app.getPath('userData'),livePath);
+      if (app.isPackaged) {
+        // Relaunch only a standalone packaged app. During `npm run dev`, the Vite
+        // server belongs to the parent npm process and would die with Electron.
+        setTimeout(() => {
+          try {
+            closeDrizzle();
+            closeDb();
+            app.relaunch();
+            app.exit(0);
+          } catch (error) {
+            console.error('Could not relaunch after restore:', error);
+            app.exit(1);
+          }
+        }, 350);
+      }
+      // In development keep the current connection open; the user closes the
+      // dev session normally and re-runs npm run dev to apply pending restore.
+      return {success:true,restarting:app.isPackaged};
+    } catch(error) {return {success:false,message:getErrorMessage(error)};}
+  });
+
+  secureHandle('open-support-email', async (_event, raw:unknown) => {
+    if (!isRecord(raw)) return false;
+    const subject=requireString(raw.subject,'subject').slice(0,200);
+    const body=requireString(raw.body,'body').slice(0,6000);
+    const link=`mailto:carservicearchiver.support@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    return shell.openExternal(link).then(()=>true).catch(()=>false);
+  });
+  secureHandle('export-data-csv', async (event) => {
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    const options = { properties: ['openDirectory' as const, 'createDirectory' as const] };
+    const selected = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options);
+    if (selected.canceled || !selected.filePaths[0]) return {success:false,canceled:true};
+    try { return {success:true,location:exportRecords(selected.filePaths[0])}; }
+    catch (error) { return {success:false,message:getErrorMessage(error)}; }
+  });
+
   // Araç markalarını getir
-  ipcMain.handle('get-all-brands', async () => {
+  secureHandle('get-all-brands', async () => {
     try {
       const brandService = new BrandService(new BrandsRepository());
       return await brandService.getAllBrands();
@@ -748,7 +991,8 @@ export function registerIpcHandlers() {
   });
 
   // Yeni marka ekle veya mevcut markayı döndür
-  ipcMain.handle('add-brand', async (_event: IpcMainInvokeEvent, rawPayload: unknown) => {
+  secureHandle('add-brand', async (_event: IpcMainInvokeEvent, rawPayload: unknown) => {
+    ensureNoBackupInProgress();
     try {
       const payload = parseCreateBrandRequest(rawPayload);
       const brandService = new BrandService(new BrandsRepository());

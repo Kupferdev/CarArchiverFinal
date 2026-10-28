@@ -15,7 +15,7 @@ export function createServicesTable() {
             jobDuration INTEGER NULL,
             deliveryDate DATETIME NULL,
             km REAL NULL,
-            complaints TEXT NOT NULL,
+            complaints TEXT NULL,
             extraRequests TEXT NULL,
             faults JSON NULL,
             hasDamageOnReceive BOOLEAN NOT NULL,

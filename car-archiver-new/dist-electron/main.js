@@ -2,18 +2,22 @@ var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha, _ia, _ja, _ka, _la, _ma, _na, _oa, _pa, _qa, _ra, _sa, _ta, _ua, _va, _wa, _xa, _ya, _za, _Aa, _Ba, _Ca, _Da, _Ea, _Fa, _Ga, _Ha, _Ia, _Ja, _Ka, _La, _Ma, _Na, _Oa, _Pa, _Qa, _Ra, _Sa, _Ta, _Ua, _Va, _Wa, _Xa, _Ya, _Za, __a, _$a, _ab, _bb, _cb, _db, _eb, _fb, _gb, _hb, _ib, _jb, _kb, _lb, _mb, _nb, _ob, _pb, _qb, _rb, _sb, _tb, _ub, _vb, _wb, _xb, _yb, _zb, _Ab, _Bb, _Cb, _Db, _Eb, _Fb, _Gb, _Hb, _Ib, _Jb, _Kb, _Lb, _Mb, _Nb, _Ob, _Pb, _Qb, _Rb, _Sb, _Tb, _Ub, _Vb, _Wb, _Xb, _Yb, _Zb, __b, _$b, _ac, _bc, _cc;
-import { app, ipcMain, dialog, BrowserWindow } from "electron";
-import { fileURLToPath } from "node:url";
-import path$1 from "node:path";
 import fs$1 from "node:fs";
+import path$1 from "node:path";
+import Client from "better-sqlite3";
 import fs from "fs";
 import path from "path";
-import Client from "better-sqlite3";
+import { randomUUID } from "node:crypto";
+import { app, ipcMain, BrowserWindow, dialog, shell, session, Menu } from "electron";
+import { fileURLToPath } from "node:url";
 import { execFile } from "child_process";
 let dbInstance = null;
 let activeDbPath = null;
 function normalizeDbPath(dbPath) {
   return path.normalize(path.resolve(dbPath));
+}
+function getActiveDbPath() {
+  return activeDbPath;
 }
 function CreateDefaultDb(dbPath) {
   const dbPathFinal = normalizeDbPath(dbPath);
@@ -51,6 +55,335 @@ function getDb() {
     throw new Error("SQLite engine has not been initialized yet! Please call CreateDefaultDb() first.");
   }
   return dbInstance;
+}
+let backupRunning = false;
+function ensureNoBackupInProgress() {
+  if (backupRunning) throw new Error("A backup is running. Try again after it completes.");
+}
+async function backupData(destinationParent) {
+  ensureNoBackupInProgress();
+  backupRunning = true;
+  try {
+    const liveDbPath = getActiveDbPath();
+    if (!liveDbPath) throw new Error("Database is not open.");
+    const safeParent = path$1.resolve(destinationParent);
+    const sourceRoot = path$1.dirname(liveDbPath);
+    const media = path$1.join(sourceRoot, "media");
+    if (safeParent === sourceRoot || safeParent.startsWith(sourceRoot + path$1.sep)) {
+      throw new Error("Choose a folder outside the active CarArchiver data directory.");
+    }
+    const stamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+    const name = `CarArchiver-backup-${stamp}-${randomUUID().slice(0, 8)}`;
+    const temporary = path$1.join(safeParent, `${name}.partial`);
+    const final = path$1.join(safeParent, name);
+    fs$1.mkdirSync(temporary, { recursive: false });
+    try {
+      await getDb().backup(path$1.join(temporary, "data_carArchiver.sqlite"));
+      const snapshot = path$1.join(temporary, "data_carArchiver.sqlite");
+      const size = fs$1.statSync(snapshot).size;
+      if (!size) throw new Error("Database backup is empty.");
+      if (fs$1.existsSync(media)) fs$1.cpSync(media, path$1.join(temporary, "media"), { recursive: true, errorOnExist: true, force: false });
+      else fs$1.mkdirSync(path$1.join(temporary, "media"));
+      fs$1.writeFileSync(path$1.join(temporary, "backup-manifest.json"), JSON.stringify({
+        kind: "CarArchiverBackup",
+        formatVersion: 1,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        databaseFile: "data_carArchiver.sqlite",
+        mediaFolder: "media"
+      }, null, 2), "utf8");
+      fs$1.renameSync(temporary, final);
+      return final;
+    } catch (error) {
+      fs$1.rmSync(temporary, { recursive: true, force: true });
+      throw error;
+    }
+  } finally {
+    backupRunning = false;
+  }
+}
+const MEDIA_KEY = /^services\/[1-9]\d*\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:jpg|png|webp)$/;
+function resolveManagedMediaFile(mediaRoot2, relative) {
+  if (typeof relative !== "string" || !MEDIA_KEY.test(relative)) throw new Error("Unsafe media file path.");
+  const root = path$1.resolve(mediaRoot2);
+  const file = path$1.resolve(root, ...relative.split("/"));
+  if (!file.startsWith(root + path$1.sep)) throw new Error("Unsafe media file path.");
+  const keys = [root, path$1.join(root, "services"), path$1.join(root, "services", relative.split("/")[1]), file];
+  for (let index = 0; index < keys.length; index++) {
+    try {
+      const item = fs$1.lstatSync(keys[index]);
+      if (item.isSymbolicLink()) throw new Error("Symbolic links are not allowed in managed media.");
+      if (index < keys.length - 1 && !item.isDirectory()) throw new Error("Invalid managed media directory.");
+    } catch (error) {
+      if (error.code === "ENOENT") break;
+      throw error;
+    }
+  }
+  return file;
+}
+const INSERT_ORDER = ["Customers", "Cars", "Services", "PhoneNumbers", "Emails", "Parts", "ServiceMedia"];
+const PK = { Customers: "customerId", Cars: "carId", Services: "serviceId", Parts: "partId", ServiceMedia: "mediaId", PhoneNumbers: "phoneNumberId", Emails: "emailId" };
+const TABLES = new Set(INSERT_ORDER);
+function idsValid(ids) {
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 500 || new Set(ids).size !== ids.length || ids.some((id) => !Number.isSafeInteger(id) || id <= 0))
+    throw new Error("Invalid record selection.");
+}
+function rows(db, table, field, ids) {
+  if (!ids.length) return [];
+  if (!TABLES.has(table) || !Object.values(PK).includes(field) && !["customerId", "carId", "serviceId"].includes(field)) throw new Error("Invalid database column.");
+  return db.prepare(`SELECT * FROM ${table} WHERE ${field} IN (${ids.map(() => "?").join(",")})`).all(...ids);
+}
+function idList(items, pk) {
+  return items.map((x) => Number(x[pk]));
+}
+function combine(a, b) {
+  return [.../* @__PURE__ */ new Set([...a, ...b])];
+}
+function collectServices(db, s, serviceIds) {
+  const services = rows(db, "Services", "serviceId", serviceIds);
+  const ids = idList(services, "serviceId");
+  s.rows.Services = services;
+  s.rows.Parts = rows(db, "Parts", "serviceId", ids);
+  s.rows.ServiceMedia = rows(db, "ServiceMedia", "serviceId", ids);
+}
+function addTrash(db, kind, label, snapshot) {
+  db.prepare("INSERT INTO TrashItems (entityType,label,snapshot) VALUES (?,?,?)").run(kind, label.slice(0, 220), JSON.stringify(snapshot));
+}
+function assertPresent(actual, ids) {
+  if (actual.length !== ids.length) throw new Error("One or more selected records no longer exist. No records were deleted.");
+}
+function deleteByIds(db, table, pk, ids) {
+  if (!ids.length) return;
+  db.prepare(`DELETE FROM ${table} WHERE ${pk} IN (${ids.map(() => "?").join(",")})`).run(...ids);
+}
+function moveToTrash(kind, selection, deleteRelated = false) {
+  ensureNoBackupInProgress();
+  idsValid(selection);
+  const db = getDb();
+  db.transaction(() => {
+    const snapshot = { rows: {} };
+    let label = "";
+    if (kind === "customer") {
+      const customers = rows(db, "Customers", "customerId", selection);
+      assertPresent(customers, selection);
+      snapshot.rows.Customers = customers;
+      snapshot.rows.PhoneNumbers = rows(db, "PhoneNumbers", "customerId", selection);
+      snapshot.rows.Emails = rows(db, "Emails", "customerId", selection);
+      const ownedCars = rows(db, "Cars", "customerId", selection);
+      const directServices = rows(db, "Services", "customerId", selection);
+      const linkedServices = rows(db, "Services", "carId", idList(ownedCars, "carId"));
+      if (deleteRelated) {
+        snapshot.rows.Cars = ownedCars;
+        collectServices(db, snapshot, combine(idList(directServices, "serviceId"), idList(linkedServices, "serviceId")));
+      } else {
+        snapshot.links = { cars: ownedCars.map((car) => ({ id: Number(car.carId), customerId: Number(car.customerId) })), services: directServices.map((service) => ({ id: Number(service.serviceId), customerId: Number(service.customerId) })) };
+      }
+      label = customers.length === 1 ? String(customers[0].firstName ?? "Customer") + " " + String(customers[0].lastName ?? "") : `${customers.length} customers · ${customers.slice(0, 3).map((c) => String(c.firstName || "") + " " + String(c.lastName || "")).join(", ")}`;
+      if (deleteRelated) {
+        deleteByIds(db, "Services", "serviceId", idList(snapshot.rows.Services || [], "serviceId"));
+        deleteByIds(db, "Cars", "carId", idList(ownedCars, "carId"));
+      }
+      deleteByIds(db, "Customers", "customerId", selection);
+    } else if (kind === "car") {
+      const cars = rows(db, "Cars", "carId", selection);
+      assertPresent(cars, selection);
+      snapshot.rows.Cars = cars;
+      const associated = rows(db, "Services", "carId", selection);
+      collectServices(db, snapshot, idList(associated, "serviceId"));
+      label = cars.length === 1 ? String(cars[0].plateNumber ?? "Vehicle") : `${cars.length} vehicles · ${cars.slice(0, 3).map((c) => String(c.plateNumber || "—")).join(", ")}`;
+      deleteByIds(db, "Cars", "carId", selection);
+    } else if (kind === "service") {
+      const services = rows(db, "Services", "serviceId", selection);
+      assertPresent(services, selection);
+      collectServices(db, snapshot, selection);
+      const plateRows = db.prepare(`SELECT s.serviceId,c.plateNumber,cu.firstName,cu.lastName FROM Services s
+        LEFT JOIN Cars c ON c.carId=s.carId LEFT JOIN Customers cu ON cu.customerId=s.customerId
+        WHERE s.serviceId IN (${selection.map(() => "?").join(",")})`).all(...selection);
+      label = plateRows.length === 1 ? `Service · ${plateRows[0].plateNumber || "—"}${plateRows[0].firstName ? " · " + plateRows[0].firstName + " " + (plateRows[0].lastName || "") : ""}` : `${selection.length} services · ${plateRows.slice(0, 3).map((r) => r.plateNumber || "—").join(", ")}`;
+      deleteByIds(db, "Services", "serviceId", selection);
+    } else {
+      const media = rows(db, "ServiceMedia", "mediaId", selection);
+      assertPresent(media, selection);
+      snapshot.rows.ServiceMedia = media;
+      label = media.length === 1 ? String(media[0].originalName ?? "Photo") : `${media.length} photos`;
+      deleteByIds(db, "ServiceMedia", "mediaId", selection);
+    }
+    addTrash(db, kind, label.trim(), snapshot);
+  })();
+}
+function listTrash() {
+  return getDb().prepare(`SELECT trashId, entityType, label, deletedAt,
+     1 AS count FROM TrashItems ORDER BY trashId DESC LIMIT 1000`).all();
+}
+function readTrash(db, id) {
+  if (!Number.isSafeInteger(id) || id <= 0) throw new Error("Invalid trash item ID.");
+  const row = db.prepare("SELECT snapshot,entityType FROM TrashItems WHERE trashId=?").get(id);
+  if (!row) throw new Error("Trash entry not found.");
+  const snapshot = JSON.parse(row.snapshot);
+  if (!snapshot || typeof snapshot !== "object" || !snapshot.rows) throw new Error("Damaged trash snapshot.");
+  return { snapshot, entityType: row.entityType };
+}
+function fileForRelative(relative) {
+  const dbPath = getActiveDbPath();
+  if (!dbPath) throw new Error("Database not opened.");
+  return resolveManagedMediaFile(path$1.join(path$1.dirname(dbPath), "media"), relative);
+}
+function restoreTrash(id) {
+  ensureNoBackupInProgress();
+  const db = getDb();
+  db.transaction(() => {
+    const { snapshot } = readTrash(db, id);
+    const allRows = snapshot.rows;
+    for (const table of INSERT_ORDER) {
+      const records = allRows[table] || [];
+      for (const row of records) {
+        if (!row || typeof row !== "object") throw new Error("Damaged trash snapshot.");
+        const key = row[PK[table]];
+        if (!Number.isSafeInteger(key) || Number(key) <= 0) throw new Error("Damaged row identifier.");
+        if (db.prepare(`SELECT 1 FROM ${table} WHERE ${PK[table]}=?`).get(key))
+          throw new Error(`Restore blocked: existing ${table} record has the same ID. Nothing changed.`);
+        if (table === "ServiceMedia" && !fs$1.existsSync(fileForRelative(String(row.relativePath))))
+          throw new Error("Restore blocked: a photo file is missing. Nothing changed.");
+      }
+    }
+    for (const table of INSERT_ORDER) {
+      for (const row of allRows[table] || []) {
+        const cols = Object.keys(row);
+        if (cols.length === 0 || cols.some((c) => !/^\w+$/.test(c))) throw new Error("Unsafe snapshot column.");
+        db.prepare(`INSERT INTO ${table} (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`).run(...cols.map((c) => row[c]));
+      }
+    }
+    if (snapshot.links) {
+      for (const link of snapshot.links.cars) {
+        const current = db.prepare("SELECT customerId FROM Cars WHERE carId=?").get(link.id);
+        if (!current) throw new Error("Restore blocked: previously linked vehicle no longer exists. Nothing changed.");
+        if (current.customerId !== null) throw new Error("Restore blocked: vehicle has a new customer.");
+        db.prepare("UPDATE Cars SET customerId=? WHERE carId=?").run(link.customerId, link.id);
+      }
+      for (const link of snapshot.links.services) {
+        const current = db.prepare("SELECT customerId FROM Services WHERE serviceId=?").get(link.id);
+        if (!current) throw new Error("Restore blocked: previously linked service no longer exists. Nothing changed.");
+        if (current.customerId !== null) throw new Error("Restore blocked: service has a new customer.");
+        db.prepare("UPDATE Services SET customerId=? WHERE serviceId=?").run(link.customerId, link.id);
+      }
+    }
+    db.prepare("DELETE FROM TrashItems WHERE trashId=?").run(id);
+    const problems = db.pragma("foreign_key_check");
+    if (problems.length) throw new Error("Restore blocked: foreign key consistency check failed.");
+  })();
+}
+function retainedMediaPaths(db) {
+  const retained = /* @__PURE__ */ new Set();
+  for (const row of db.prepare("SELECT relativePath FROM ServiceMedia").all())
+    retained.add(row.relativePath);
+  for (const row of db.prepare("SELECT snapshot FROM TrashItems").all()) {
+    const snapshot = JSON.parse(row.snapshot);
+    for (const media of snapshot.rows.ServiceMedia || []) retained.add(String(media.relativePath));
+  }
+  return retained;
+}
+function queueCleanup(db, referenced) {
+  const retained = retainedMediaPaths(db);
+  const insert = db.prepare("INSERT OR IGNORE INTO PendingMediaDeletes (relativePath) VALUES (?)");
+  for (const relative of referenced) {
+    if (!retained.has(relative)) {
+      fileForRelative(relative);
+      insert.run(relative);
+    }
+  }
+}
+function retryPendingMediaDeletes() {
+  ensureNoBackupInProgress();
+  const db = getDb();
+  const pending = db.prepare("SELECT relativePath FROM PendingMediaDeletes").all();
+  let deleted = 0;
+  for (const { relativePath } of pending) {
+    try {
+      if (retainedMediaPaths(db).has(relativePath)) {
+        db.prepare("DELETE FROM PendingMediaDeletes WHERE relativePath=?").run(relativePath);
+        continue;
+      }
+      fs$1.rmSync(fileForRelative(relativePath), { force: true });
+      db.prepare("DELETE FROM PendingMediaDeletes WHERE relativePath=?").run(relativePath);
+      deleted++;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      db.prepare(`UPDATE PendingMediaDeletes SET attempts=attempts+1,
+        lastAttemptAt=CURRENT_TIMESTAMP,lastError=? WHERE relativePath=?`).run(message.slice(0, 400), relativePath);
+      console.error("Deferred media cleanup will retry:", relativePath, message);
+    }
+  }
+  return { deleted, pending: db.prepare("SELECT COUNT(*) AS n FROM PendingMediaDeletes").get().n };
+}
+function purgeTrash(id) {
+  ensureNoBackupInProgress();
+  const db = getDb();
+  db.transaction(() => {
+    const { snapshot } = readTrash(db, id);
+    const referenced = new Set((snapshot.rows.ServiceMedia || []).map((row) => String(row.relativePath)));
+    db.prepare("DELETE FROM TrashItems WHERE trashId=?").run(id);
+    queueCleanup(db, referenced);
+  })();
+  retryPendingMediaDeletes();
+}
+function restoreTrashBatch(ids) {
+  ensureNoBackupInProgress();
+  idsValid(ids);
+  const db = getDb();
+  db.transaction(() => {
+    const priority = { customer: 0, car: 1, service: 2, photo: 3 };
+    const ordered = ids.map((id) => ({ id, kind: readTrash(db, id).entityType })).sort((a, b) => priority[a.kind] - priority[b.kind]);
+    for (const item of ordered) restoreTrash(item.id);
+  })();
+}
+function purgeTrashBatch(ids) {
+  ensureNoBackupInProgress();
+  idsValid(ids);
+  const db = getDb();
+  db.transaction(() => {
+    const referenced = /* @__PURE__ */ new Set();
+    for (const id of ids) {
+      const { snapshot } = readTrash(db, id);
+      for (const row of snapshot.rows.ServiceMedia || []) referenced.add(String(row.relativePath));
+    }
+    const placeholders = ids.map(() => "?").join(",");
+    db.prepare(`DELETE FROM TrashItems WHERE trashId IN (${placeholders})`).run(...ids);
+    queueCleanup(db, referenced);
+  })();
+  retryPendingMediaDeletes();
+}
+function isTrustedAppUrl(url, devServerUrl, rendererDir) {
+  try {
+    const target = new URL(url);
+    if (devServerUrl) {
+      const allowed = new URL(devServerUrl);
+      return (allowed.protocol === "http:" || allowed.protocol === "https:") && target.origin === allowed.origin && target.protocol === allowed.protocol && target.pathname === allowed.pathname && target.search === allowed.search;
+    }
+    if (target.protocol !== "file:") return false;
+    const requested = path$1.resolve(fileURLToPath(target));
+    const expected = path$1.resolve(rendererDir, "index.html");
+    return process.platform === "win32" ? requested.toLowerCase() === expected.toLowerCase() : requested === expected;
+  } catch {
+    return false;
+  }
+}
+function isPermittedRendererRequest(requestUrl, devServerUrl) {
+  let target;
+  try {
+    target = new URL(requestUrl);
+  } catch {
+    return false;
+  }
+  if (!["http:", "https:", "ws:", "wss:"].includes(target.protocol)) return true;
+  if (!devServerUrl) return false;
+  try {
+    const dev = new URL(devServerUrl);
+    if (!["localhost", "127.0.0.1", "[::1]"].includes(dev.hostname) || !["http:", "https:"].includes(dev.protocol)) return false;
+    if (target.host !== dev.host) return false;
+    if (target.protocol === dev.protocol) return true;
+    return dev.protocol === "http:" && target.protocol === "ws:" || dev.protocol === "https:" && target.protocol === "wss:";
+  } catch {
+    return false;
+  }
 }
 const entityKind = Symbol.for("drizzle:entityKind");
 function is(value, type) {
@@ -2089,7 +2422,7 @@ function extractUsedTable(table) {
   return [];
 }
 class SQLiteDeleteBase extends (_fb = QueryPromise, _eb = entityKind, _fb) {
-  constructor(table, session, dialect, withList) {
+  constructor(table, session2, dialect, withList) {
     super();
     /** @internal */
     __publicField(this, "config");
@@ -2106,7 +2439,7 @@ class SQLiteDeleteBase extends (_fb = QueryPromise, _eb = entityKind, _fb) {
       return this._prepare().values(placeholderValues);
     });
     this.table = table;
-    this.session = session;
+    this.session = session2;
     this.dialect = dialect;
     this.config = { table, withList };
   }
@@ -2287,7 +2620,7 @@ class SQLiteDialect {
     this.casing = new CasingCache(config == null ? void 0 : config.casing);
   }
   escapeName(name) {
-    return `"${name}"`;
+    return `"${name.replace(/"/g, '""')}"`;
   }
   escapeParam(_num) {
     return "?";
@@ -2307,7 +2640,14 @@ class SQLiteDialect {
     withSqlChunks.push(sql` `);
     return sql.join(withSqlChunks);
   }
-  buildDeleteQuery({ table, where, returning, withList, limit, orderBy }) {
+  buildDeleteQuery({
+    table,
+    where,
+    returning,
+    withList,
+    limit,
+    orderBy
+  }) {
     const withSql = this.buildWithCTE(withList);
     const returningSql = returning ? sql` returning ${this.buildSelection(returning, { isSingleTable: true })}` : void 0;
     const whereSql = where ? sql` where ${where}` : void 0;
@@ -2324,19 +2664,31 @@ class SQLiteDialect {
       }
     );
     const setSize = columnNames.length;
-    return sql.join(columnNames.flatMap((colName, i) => {
-      var _a2;
-      const col = tableColumns[colName];
-      const onUpdateFnResult = (_a2 = col.onUpdateFn) == null ? void 0 : _a2.call(col);
-      const value = set[colName] ?? (is(onUpdateFnResult, SQL) ? onUpdateFnResult : sql.param(onUpdateFnResult, col));
-      const res = sql`${sql.identifier(this.casing.getColumnCasing(col))} = ${value}`;
-      if (i < setSize - 1) {
-        return [res, sql.raw(", ")];
-      }
-      return [res];
-    }));
+    return sql.join(
+      columnNames.flatMap((colName, i) => {
+        var _a2;
+        const col = tableColumns[colName];
+        const onUpdateFnResult = (_a2 = col.onUpdateFn) == null ? void 0 : _a2.call(col);
+        const value = set[colName] ?? (is(onUpdateFnResult, SQL) ? onUpdateFnResult : sql.param(onUpdateFnResult, col));
+        const res = sql`${sql.identifier(this.casing.getColumnCasing(col))} = ${value}`;
+        if (i < setSize - 1) {
+          return [res, sql.raw(", ")];
+        }
+        return [res];
+      })
+    );
   }
-  buildUpdateQuery({ table, set, where, returning, withList, joins, from, limit, orderBy }) {
+  buildUpdateQuery({
+    table,
+    set,
+    where,
+    returning,
+    withList,
+    joins,
+    from,
+    limit,
+    orderBy
+  }) {
     const withSql = this.buildWithCTE(withList);
     const setSql = this.buildUpdateSet(table, set);
     const fromSql = from && sql.join([sql.raw(" from "), this.buildFromTable(from)]);
@@ -2387,7 +2739,9 @@ class SQLiteDialect {
         const tableName = field.table[Table.Symbol.Name];
         if (field.columnType === "SQLiteNumericBigInt") {
           if (isSingleTable) {
-            chunk.push(sql`cast(${sql.identifier(this.casing.getColumnCasing(field))} as text)`);
+            chunk.push(
+              sql`cast(${sql.identifier(this.casing.getColumnCasing(field))} as text)`
+            );
           } else {
             chunk.push(
               sql`cast(${sql.identifier(tableName)}.${sql.identifier(this.casing.getColumnCasing(field))} as text)`
@@ -2397,7 +2751,9 @@ class SQLiteDialect {
           if (isSingleTable) {
             chunk.push(sql.identifier(this.casing.getColumnCasing(field)));
           } else {
-            chunk.push(sql`${sql.identifier(tableName)}.${sql.identifier(this.casing.getColumnCasing(field))}`);
+            chunk.push(
+              sql`${sql.identifier(tableName)}.${sql.identifier(this.casing.getColumnCasing(field))}`
+            );
           }
         }
       } else if (is(field, Subquery)) {
@@ -2434,7 +2790,9 @@ class SQLiteDialect {
           const origTableName = table[SQLiteTable.Symbol.OriginalName];
           const alias = tableName === origTableName ? void 0 : joinMeta.alias;
           joinsArray.push(
-            sql`${sql.raw(joinMeta.joinType)} join ${tableSchema ? sql`${sql.identifier(tableSchema)}.` : void 0}${sql.identifier(origTableName)}${alias && sql` ${sql.identifier(alias)}`}${onSql}`
+            sql`${sql.raw(joinMeta.joinType)} join ${tableSchema ? sql`${sql.identifier(tableSchema)}.` : void 0}${sql.identifier(
+              origTableName
+            )}${alias && sql` ${sql.identifier(alias)}`}${onSql}`
           );
         } else {
           joinsArray.push(
@@ -2465,7 +2823,9 @@ class SQLiteDialect {
   }
   buildFromTable(table) {
     if (is(table, Table) && table[Table.Symbol.IsAlias]) {
-      return sql`${sql`${sql.identifier(table[Table.Symbol.Schema] ?? "")}.`.if(table[Table.Symbol.Schema])}${sql.identifier(table[Table.Symbol.OriginalName])} ${sql.identifier(table[Table.Symbol.Name])}`;
+      return sql`${sql`${sql.identifier(table[Table.Symbol.Schema] ?? "")}.`.if(table[Table.Symbol.Schema])}${sql.identifier(
+        table[Table.Symbol.OriginalName]
+      )} ${sql.identifier(table[Table.Symbol.Name])}`;
     }
     return table;
   }
@@ -2491,7 +2851,9 @@ class SQLiteDialect {
       ))(f.field.table)) {
         const tableName = getTableName(f.field.table);
         throw new Error(
-          `Your "${f.path.join("->")}" field references a column "${tableName}"."${f.field.name}", but the table "${tableName}" is not part of the query! Did you forget to join it?`
+          `Your "${f.path.join(
+            "->"
+          )}" field references a column "${tableName}"."${f.field.name}", but the table "${tableName}" is not part of the query! Did you forget to join it?`
         );
       }
     }
@@ -2551,7 +2913,9 @@ class SQLiteDialect {
           for (let i = 0; i < singleOrderBy.queryChunks.length; i++) {
             const chunk = singleOrderBy.queryChunks[i];
             if (is(chunk, SQLiteColumn)) {
-              singleOrderBy.queryChunks[i] = sql.identifier(this.casing.getColumnCasing(chunk));
+              singleOrderBy.queryChunks[i] = sql.identifier(
+                this.casing.getColumnCasing(chunk)
+              );
             }
           }
           orderByValues.push(sql`${singleOrderBy}`);
@@ -2566,7 +2930,14 @@ class SQLiteDialect {
     const offsetSql = offset ? sql` offset ${offset}` : void 0;
     return sql`${leftChunk}${operatorChunk}${rightChunk}${orderBySql}${limitSql}${offsetSql}`;
   }
-  buildInsertQuery({ table, values: valuesOrSelect, onConflict, returning, withList, select }) {
+  buildInsertQuery({
+    table,
+    values: valuesOrSelect,
+    onConflict,
+    returning,
+    withList,
+    select
+  }) {
     const valuesSqlList = [];
     const columns = table[Table.Symbol.Columns];
     const colEntries = Object.entries(columns).filter(
@@ -2652,7 +3023,10 @@ class SQLiteDialect {
       }));
     } else {
       const aliasedColumns = Object.fromEntries(
-        Object.entries(tableConfig.columns).map(([key, value]) => [key, aliasedTableColumn(value, tableAlias)])
+        Object.entries(tableConfig.columns).map(([key, value]) => [
+          key,
+          aliasedTableColumn(value, tableAlias)
+        ])
       );
       if (config.where) {
         const whereSql = typeof config.where === "function" ? config.where(aliasedColumns, getOperators()) : config.where;
@@ -2677,7 +3051,9 @@ class SQLiteDialect {
           selectedColumns = isIncludeMode ? selectedColumns.filter((c) => {
             var _a2;
             return ((_a2 = config.columns) == null ? void 0 : _a2[c]) === true;
-          }) : Object.keys(tableConfig.columns).filter((key) => !selectedColumns.includes(key));
+          }) : Object.keys(tableConfig.columns).filter(
+            (key) => !selectedColumns.includes(key)
+          );
         }
       } else {
         selectedColumns = Object.keys(tableConfig.columns);
@@ -2688,7 +3064,13 @@ class SQLiteDialect {
       }
       let selectedRelations = [];
       if (config.with) {
-        selectedRelations = Object.entries(config.with).filter((entry) => !!entry[1]).map(([tsKey, queryConfig]) => ({ tsKey, queryConfig, relation: tableConfig.relations[tsKey] }));
+        selectedRelations = Object.entries(config.with).filter(
+          (entry) => !!entry[1]
+        ).map(([tsKey, queryConfig]) => ({
+          tsKey,
+          queryConfig,
+          relation: tableConfig.relations[tsKey]
+        }));
       }
       let extras;
       if (config.extras) {
@@ -2727,14 +3109,21 @@ class SQLiteDialect {
         queryConfig: selectedRelationConfigValue,
         relation
       } of selectedRelations) {
-        const normalizedRelation = normalizeRelation(schema, tableNamesMap, relation);
+        const normalizedRelation = normalizeRelation(
+          schema,
+          tableNamesMap,
+          relation
+        );
         const relationTableName = getTableUniqueName(relation.referencedTable);
         const relationTableTsName = tableNamesMap[relationTableName];
         const relationTableAlias = `${tableAlias}_${selectedRelationTsKey}`;
         const joinOn2 = and(
           ...normalizedRelation.fields.map(
             (field2, i) => eq(
-              aliasedTableColumn(normalizedRelation.references[i], relationTableAlias),
+              aliasedTableColumn(
+                normalizedRelation.references[i],
+                relationTableAlias
+              ),
               aliasedTableColumn(field2, tableAlias)
             )
           )
@@ -2778,14 +3167,16 @@ class SQLiteDialect {
       if (is(nestedQueryRelation, Many)) {
         field = sql`coalesce(json_group_array(${field}), json_array())`;
       }
-      const nestedSelection = [{
-        dbKey: "data",
-        tsKey: "data",
-        field: field.as("data"),
-        isJson: true,
-        relationTableTsKey: tableConfig.tsName,
-        selection
-      }];
+      const nestedSelection = [
+        {
+          dbKey: "data",
+          tsKey: "data",
+          field: field.as("data"),
+          isJson: true,
+          relationTableTsKey: tableConfig.tsName,
+          selection
+        }
+      ];
       const needsSubquery = limit !== void 0 || offset !== void 0 || orderBy.length > 0;
       if (needsSubquery) {
         result = this.buildSelectQuery({
@@ -2849,7 +3240,7 @@ class SQLiteDialect {
 }
 __publicField(SQLiteDialect, _nb, "SQLiteDialect");
 class SQLiteSyncDialect extends (_pb = SQLiteDialect, _ob = entityKind, _pb) {
-  migrate(migrations, session, config) {
+  migrate(migrations, session2, config) {
     const migrationsTable = config === void 0 ? "__drizzle_migrations" : typeof config === "string" ? "__drizzle_migrations" : config.migrationsTable ?? "__drizzle_migrations";
     const migrationTableCreate = sql`
 			CREATE TABLE IF NOT EXISTS ${sql.identifier(migrationsTable)} (
@@ -2858,26 +3249,28 @@ class SQLiteSyncDialect extends (_pb = SQLiteDialect, _ob = entityKind, _pb) {
 				created_at numeric
 			)
 		`;
-    session.run(migrationTableCreate);
-    const dbMigrations = session.values(
+    session2.run(migrationTableCreate);
+    const dbMigrations = session2.values(
       sql`SELECT id, hash, created_at FROM ${sql.identifier(migrationsTable)} ORDER BY created_at DESC LIMIT 1`
     );
     const lastDbMigration = dbMigrations[0] ?? void 0;
-    session.run(sql`BEGIN`);
+    session2.run(sql`BEGIN`);
     try {
       for (const migration of migrations) {
         if (!lastDbMigration || Number(lastDbMigration[2]) < migration.folderMillis) {
           for (const stmt of migration.sql) {
-            session.run(sql.raw(stmt));
+            session2.run(sql.raw(stmt));
           }
-          session.run(
-            sql`INSERT INTO ${sql.identifier(migrationsTable)} ("hash", "created_at") VALUES(${migration.hash}, ${migration.folderMillis})`
+          session2.run(
+            sql`INSERT INTO ${sql.identifier(
+              migrationsTable
+            )} ("hash", "created_at") VALUES(${migration.hash}, ${migration.folderMillis})`
           );
         }
       }
-      session.run(sql`COMMIT`);
+      session2.run(sql`COMMIT`);
     } catch (e) {
-      session.run(sql`ROLLBACK`);
+      session2.run(sql`ROLLBACK`);
       throw e;
     }
   }
@@ -2934,7 +3327,7 @@ class SQLiteSelectBuilder {
 }
 __publicField(SQLiteSelectBuilder, _rb, "SQLiteSelectBuilder");
 class SQLiteSelectQueryBuilderBase extends (_tb = TypedQueryBuilder, _sb = entityKind, _tb) {
-  constructor({ table, fields, isPartialSelect, session, dialect, withList, distinct }) {
+  constructor({ table, fields, isPartialSelect, session: session2, dialect, withList, distinct }) {
     super();
     __publicField(this, "_");
     /** @internal */
@@ -3197,7 +3590,7 @@ class SQLiteSelectQueryBuilderBase extends (_tb = TypedQueryBuilder, _sb = entit
       setOperators: []
     };
     this.isPartialSelect = isPartialSelect;
-    this.session = session;
+    this.session = session2;
     this.dialect = dialect;
     this._ = {
       selectedFields: fields,
@@ -3628,9 +4021,9 @@ class QueryBuilder {
 __publicField(QueryBuilder, _wb, "SQLiteQueryBuilder");
 _xb = entityKind;
 class SQLiteInsertBuilder {
-  constructor(table, session, dialect, withList) {
+  constructor(table, session2, dialect, withList) {
     this.table = table;
-    this.session = session;
+    this.session = session2;
     this.dialect = dialect;
     this.withList = withList;
   }
@@ -3662,7 +4055,7 @@ class SQLiteInsertBuilder {
 }
 __publicField(SQLiteInsertBuilder, _xb, "SQLiteInsertBuilder");
 class SQLiteInsertBase extends (_zb = QueryPromise, _yb = entityKind, _zb) {
-  constructor(table, values, session, dialect, withList, select) {
+  constructor(table, values, session2, dialect, withList, select) {
     super();
     /** @internal */
     __publicField(this, "config");
@@ -3678,7 +4071,7 @@ class SQLiteInsertBase extends (_zb = QueryPromise, _yb = entityKind, _zb) {
     __publicField(this, "values", (placeholderValues) => {
       return this._prepare().values(placeholderValues);
     });
-    this.session = session;
+    this.session = session2;
     this.dialect = dialect;
     this.config = { table, values, withList, select };
   }
@@ -3800,9 +4193,9 @@ class SQLiteInsertBase extends (_zb = QueryPromise, _yb = entityKind, _zb) {
 __publicField(SQLiteInsertBase, _yb, "SQLiteInsert");
 _Ab = entityKind;
 class SQLiteUpdateBuilder {
-  constructor(table, session, dialect, withList) {
+  constructor(table, session2, dialect, withList) {
     this.table = table;
-    this.session = session;
+    this.session = session2;
     this.dialect = dialect;
     this.withList = withList;
   }
@@ -3818,7 +4211,7 @@ class SQLiteUpdateBuilder {
 }
 __publicField(SQLiteUpdateBuilder, _Ab, "SQLiteUpdateBuilder");
 class SQLiteUpdateBase extends (_Cb = QueryPromise, _Bb = entityKind, _Cb) {
-  constructor(table, set, session, dialect, withList) {
+  constructor(table, set, session2, dialect, withList) {
     super();
     /** @internal */
     __publicField(this, "config");
@@ -3838,7 +4231,7 @@ class SQLiteUpdateBase extends (_Cb = QueryPromise, _Bb = entityKind, _Cb) {
     __publicField(this, "values", (placeholderValues) => {
       return this._prepare().values(placeholderValues);
     });
-    this.session = session;
+    this.session = session2;
     this.dialect = dialect;
     this.config = { set, table, withList, joins: [] };
   }
@@ -4008,7 +4401,7 @@ __publicField(_SQLiteCountBuilder, _Eb, "SQLiteCountBuilderAsync");
 let SQLiteCountBuilder = _SQLiteCountBuilder;
 _Gb = entityKind;
 class RelationalQueryBuilder {
-  constructor(mode, fullSchema, schema, tableNamesMap, table, tableConfig, dialect, session) {
+  constructor(mode, fullSchema, schema, tableNamesMap, table, tableConfig, dialect, session2) {
     this.mode = mode;
     this.fullSchema = fullSchema;
     this.schema = schema;
@@ -4016,7 +4409,7 @@ class RelationalQueryBuilder {
     this.table = table;
     this.tableConfig = tableConfig;
     this.dialect = dialect;
-    this.session = session;
+    this.session = session2;
   }
   findMany(config) {
     return this.mode === "sync" ? new SQLiteSyncRelationalQuery(
@@ -4067,7 +4460,7 @@ class RelationalQueryBuilder {
 }
 __publicField(RelationalQueryBuilder, _Gb, "SQLiteAsyncRelationalQueryBuilder");
 class SQLiteRelationalQuery extends (_Ib = QueryPromise, _Hb = entityKind, _Ib) {
-  constructor(fullSchema, schema, tableNamesMap, table, tableConfig, dialect, session, config, mode) {
+  constructor(fullSchema, schema, tableNamesMap, table, tableConfig, dialect, session2, config, mode) {
     super();
     /** @internal */
     __publicField(this, "mode");
@@ -4077,7 +4470,7 @@ class SQLiteRelationalQuery extends (_Ib = QueryPromise, _Hb = entityKind, _Ib) 
     this.table = table;
     this.tableConfig = tableConfig;
     this.dialect = dialect;
-    this.session = session;
+    this.session = session2;
     this.config = config;
     this.mode = mode;
   }
@@ -4102,13 +4495,13 @@ class SQLiteRelationalQuery extends (_Ib = QueryPromise, _Hb = entityKind, _Ib) 
       this.mode === "first" ? "get" : "all",
       true,
       (rawRows, mapColumnValue) => {
-        const rows = rawRows.map(
+        const rows2 = rawRows.map(
           (row) => mapRelationalRow(this.schema, this.tableConfig, row, query.selection, mapColumnValue)
         );
         if (this.mode === "first") {
-          return rows[0];
+          return rows2[0];
         }
-        return rows;
+        return rows2;
       }
     );
   }
@@ -4177,7 +4570,7 @@ class SQLiteRaw extends (_Mb = QueryPromise, _Lb = entityKind, _Mb) {
 __publicField(SQLiteRaw, _Lb, "SQLiteRaw");
 _Nb = entityKind;
 class BaseSQLiteDatabase {
-  constructor(resultKind, dialect, session, schema) {
+  constructor(resultKind, dialect, session2, schema) {
     __publicField(this, "query");
     /**
      * Creates a subquery that defines a temporary named result set as a CTE.
@@ -4232,7 +4625,7 @@ class BaseSQLiteDatabase {
     __publicField(this, "$cache");
     this.resultKind = resultKind;
     this.dialect = dialect;
-    this.session = session;
+    this.session = session2;
     this._ = schema ? {
       schema: schema.schema,
       fullSchema: schema.fullSchema,
@@ -4254,7 +4647,7 @@ class BaseSQLiteDatabase {
           schema.fullSchema[tableName],
           columns,
           dialect,
-          session
+          session2
         );
       }
     }
@@ -4678,8 +5071,8 @@ class SQLiteSession {
 }
 __publicField(SQLiteSession, _Ub, "SQLiteSession");
 class SQLiteTransaction extends (_Wb = BaseSQLiteDatabase, _Vb = entityKind, _Wb) {
-  constructor(resultType, dialect, session, schema, nestedIndex = 0) {
-    super(resultType, dialect, session, schema);
+  constructor(resultType, dialect, session2, schema, nestedIndex = 0) {
+    super(resultType, dialect, session2, schema);
     this.schema = schema;
     this.nestedIndex = nestedIndex;
   }
@@ -4758,11 +5151,11 @@ class PreparedQuery extends (_ac = SQLitePreparedQuery, _$b = entityKind, _ac) {
       logger.logQuery(query.sql, params);
       return stmt.all(...params);
     }
-    const rows = this.values(placeholderValues);
+    const rows2 = this.values(placeholderValues);
     if (customResultMapper) {
-      return customResultMapper(rows);
+      return customResultMapper(rows2);
     }
-    return rows.map((row) => mapResultRow(fields, row, joinsNotNullableMap));
+    return rows2.map((row) => mapResultRow(fields, row, joinsNotNullableMap));
   }
   get(placeholderValues) {
     const params = fillPlaceholders(this.query.params, placeholderValues ?? {});
@@ -4814,8 +5207,8 @@ function construct(client, config = {}) {
       tableNamesMap: tablesConfig.tableNamesMap
     };
   }
-  const session = new BetterSQLiteSession(client, dialect, schema, { logger });
-  const db = new BetterSQLite3Database("sync", dialect, session, schema);
+  const session2 = new BetterSQLiteSession(client, dialect, schema, { logger });
+  const db = new BetterSQLite3Database("sync", dialect, session2, schema);
   db.$client = client;
   return db;
 }
@@ -5162,24 +5555,16 @@ async function createFuelTypesTable() {
   }
 }
 function createPartsTable() {
-  const db = getDb();
-  const createPartTableSql = `
-    CREATE TABLE IF NOT EXISTS Parts(
-        partId INTEGER PRIMARY KEY AUTOINCREMENT,
-        carId INTEGER NOT NULL,
-        serviceId INTEGER NOT NULL,
-        partName TEXT NOT NULL,
-        partTax REAL NULL,
-        partPrice REAL NULL
-    );
-`;
-  try {
-    db.exec(createPartTableSql);
-    console.log("❇️ Parts table created");
-  } catch (err) {
-    console.log("🆘 Parts table not created", err.message);
-    throw err;
-  }
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS Parts (
+      partId INTEGER PRIMARY KEY AUTOINCREMENT,
+      carId INTEGER NOT NULL REFERENCES Cars(carId) ON DELETE CASCADE,
+      serviceId INTEGER NOT NULL REFERENCES Services(serviceId) ON DELETE CASCADE,
+      partName TEXT NOT NULL CHECK(length(trim(partName)) > 0),
+      quantity INTEGER NOT NULL DEFAULT 1 CHECK(quantity > 0),
+      unitPriceKurus INTEGER NOT NULL DEFAULT 0 CHECK(unitPriceKurus >= 0)
+    )
+  `);
 }
 function createServicesTable() {
   const db = getDb();
@@ -5193,7 +5578,7 @@ function createServicesTable() {
             jobDuration INTEGER NULL,
             deliveryDate DATETIME NULL,
             km REAL NULL,
-            complaints TEXT NOT NULL,
+            complaints TEXT NULL,
             extraRequests TEXT NULL,
             faults JSON NULL,
             hasDamageOnReceive BOOLEAN NOT NULL,
@@ -5507,12 +5892,12 @@ async function createBodyTypesTranslationsTable() {
     throw err;
   }
 }
-const CURRENT_SCHEMA_VERSION = 6;
-const ATOMIC_MIGRATIONS = /* @__PURE__ */ new Set([1, 4, 6]);
+const CURRENT_SCHEMA_VERSION = 12;
+const ATOMIC_MIGRATIONS = /* @__PURE__ */ new Set([1, 4, 6, 9, 10, 11, 12]);
 function tableHasForeignKey(tableName, fromColumn, targetTable, onDelete) {
   const db = getDb();
-  const rows = db.pragma(`foreign_key_list(${tableName})`);
-  return rows.some(
+  const rows2 = db.pragma(`foreign_key_list(${tableName})`);
+  return rows2.some(
     (row) => row.from === fromColumn && row.table === targetTable && row.on_delete.toUpperCase() === onDelete.toUpperCase()
   );
 }
@@ -5722,6 +6107,76 @@ function migrateCarBrandAndModel() {
     );
   }
 }
+function migratePartsQuantityAndPrice() {
+  const db = getDb();
+  const columns = db.pragma("table_info(Parts)");
+  const names = new Set(columns.map((column) => column.name));
+  if (names.has("quantity") && names.has("unitPriceKurus") && !names.has("partTax")) return;
+  const hasOldPrice = names.has("partPrice");
+  const invalidReferences = db.prepare(`
+    SELECT COUNT(*) AS n FROM Parts p
+    LEFT JOIN Services s ON s.serviceId = p.serviceId
+    LEFT JOIN Cars c ON c.carId = p.carId
+    WHERE s.serviceId IS NULL OR c.carId IS NULL OR s.carId != p.carId
+  `).get();
+  if (invalidReferences.n) throw new Error(`Cannot migrate Parts: ${invalidReferences.n} invalid service/car link(s).`);
+  db.pragma("foreign_keys = OFF");
+  try {
+    db.transaction(() => {
+      db.exec(`
+        CREATE TABLE Parts_new (
+          partId INTEGER PRIMARY KEY AUTOINCREMENT,
+          carId INTEGER NOT NULL REFERENCES Cars(carId) ON DELETE CASCADE,
+          serviceId INTEGER NOT NULL REFERENCES Services(serviceId) ON DELETE CASCADE,
+          partName TEXT NOT NULL CHECK(length(trim(partName)) > 0),
+          quantity INTEGER NOT NULL DEFAULT 1 CHECK(quantity > 0),
+          unitPriceKurus INTEGER NOT NULL DEFAULT 0 CHECK(unitPriceKurus >= 0)
+        );
+        INSERT INTO Parts_new (partId, carId, serviceId, partName, quantity, unitPriceKurus)
+        SELECT partId, carId, serviceId, partName,
+          ${names.has("quantity") ? "quantity" : "1"},
+          ${names.has("unitPriceKurus") ? "unitPriceKurus" : hasOldPrice ? "CAST(ROUND(COALESCE(partPrice, 0) * 100) AS INTEGER)" : "0"}
+        FROM Parts;
+        DROP TABLE Parts;
+        ALTER TABLE Parts_new RENAME TO Parts;
+      `);
+    })();
+  } finally {
+    db.pragma("foreign_keys = ON");
+  }
+  if (db.pragma("foreign_key_check").length) throw new Error("Parts migration failed foreign key verification.");
+}
+function migrateOptionalServiceComplaints() {
+  const db = getDb();
+  const complaintColumn = db.pragma("table_info(Services)").find((c) => c.name === "complaints");
+  if (!complaintColumn) throw new Error("Services.complaints column is missing.");
+  if (!complaintColumn.notnull) return;
+  const originalSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'Services'").get();
+  if (!(originalSchema == null ? void 0 : originalSchema.sql)) throw new Error("Services SQL schema is missing.");
+  const nullableSchema = originalSchema.sql.replace(/^(\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?)(["`[]?Services["`\]]?)/i, "$1Services_new").replace(/(\bcomplaints\s+TEXT)\s+NOT\s+NULL\b/i, "$1");
+  if (nullableSchema === originalSchema.sql || !/\bCREATE\s+TABLE\s+Services_new\b/i.test(nullableSchema)) {
+    throw new Error("Unexpected Services schema; refusing to rebuild.");
+  }
+  const columns = db.pragma("table_info(Services)").map((c) => `"${c.name.replace(/"/g, '""')}"`).join(", ");
+  const originalCount = db.prepare("SELECT COUNT(*) AS n FROM Services").get().n;
+  const dependents = db.prepare("SELECT type, sql FROM sqlite_master WHERE tbl_name = 'Services' AND type IN ('index','trigger') AND sql IS NOT NULL").all();
+  db.pragma("foreign_keys = OFF");
+  try {
+    db.transaction(() => {
+      db.exec(nullableSchema);
+      db.exec(`INSERT INTO Services_new (${columns}) SELECT ${columns} FROM Services`);
+      db.exec("DROP TABLE Services");
+      db.exec("ALTER TABLE Services_new RENAME TO Services");
+      for (const entry of dependents) db.exec(entry.sql);
+      const errors = db.pragma("foreign_key_check");
+      if (errors.length) throw new Error("Services complaint migration failed foreign-key verification.");
+      const countBefore = db.prepare("SELECT COUNT(*) AS n FROM Services").get().n;
+      if (countBefore !== originalCount) throw new Error("Service rows changed during complaint migration.");
+    })();
+  } finally {
+    db.pragma("foreign_keys = ON");
+  }
+}
 async function runMigration(version) {
   switch (version) {
     case 1:
@@ -5761,6 +6216,56 @@ async function runMigration(version) {
         }
       }
       break;
+    case 7:
+      migratePartsQuantityAndPrice();
+      break;
+    case 8:
+      migrateOptionalServiceComplaints();
+      break;
+    case 9: {
+      const db = getDb();
+      const customerColumns = db.pragma("table_info(Customers)");
+      const serviceColumns = db.pragma("table_info(Services)");
+      if (!customerColumns.some((column) => column.name === "address")) db.exec("ALTER TABLE Customers ADD COLUMN address TEXT NULL");
+      if (!serviceColumns.some((column) => column.name === "advisorNotes")) db.exec("ALTER TABLE Services ADD COLUMN advisorNotes TEXT NULL");
+      break;
+    }
+    case 10: {
+      getDb().exec(`
+        CREATE TABLE IF NOT EXISTS ServiceMedia (
+          mediaId INTEGER PRIMARY KEY AUTOINCREMENT,
+          serviceId INTEGER NOT NULL REFERENCES Services(serviceId) ON DELETE CASCADE,
+          relativePath TEXT NOT NULL UNIQUE,
+          originalName TEXT NOT NULL,
+          mimeType TEXT NOT NULL,
+          bytes INTEGER NOT NULL CHECK(bytes > 0),
+          caption TEXT NOT NULL DEFAULT '',
+          addedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_ServiceMedia_service ON ServiceMedia(serviceId);
+      `);
+      break;
+    }
+    case 11: {
+      getDb().exec(`CREATE TABLE IF NOT EXISTS TrashItems (
+        trashId INTEGER PRIMARY KEY AUTOINCREMENT,
+        entityType TEXT NOT NULL CHECK(entityType IN ('customer','car','service','photo')),
+        label TEXT NOT NULL,
+        snapshot TEXT NOT NULL,
+        deletedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );`);
+      break;
+    }
+    case 12: {
+      getDb().exec(`CREATE TABLE IF NOT EXISTS PendingMediaDeletes (
+        relativePath TEXT PRIMARY KEY,
+        createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        lastAttemptAt TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        lastError TEXT
+      );`);
+      break;
+    }
     default:
       throw new Error(`Unknown database migration: ${version}`);
   }
@@ -6019,7 +6524,8 @@ const Customers = sqliteTable("Customers", {
   nationalId: text("nationalId"),
   firstName: text("firstName").notNull(),
   lastName: text("lastName"),
-  taxNumber: text("taxNumber")
+  taxNumber: text("taxNumber"),
+  address: text("address")
 });
 const Cars = sqliteTable("Cars", {
   carId: integer("carId").primaryKey({ autoIncrement: true }),
@@ -6036,9 +6542,52 @@ const Cars = sqliteTable("Cars", {
   engineVolumeCc: integer("engineVolumeCc"),
   notes: text("notes")
 });
+const Services = sqliteTable("Services", {
+  serviceId: integer("serviceId").primaryKey({ autoIncrement: true }),
+  carId: integer("carId").notNull().references(() => Cars.carId, { onDelete: "cascade" }),
+  customerId: integer("customerId").references(() => Customers.customerId, { onDelete: "set null" }),
+  applicationDate: integer("applicationDate", { mode: "timestamp" }),
+  appointmentDate: integer("appointmentDate", { mode: "timestamp" }),
+  // Job duration in whole MINUTES (a length of time, not a point in time).
+  jobDuration: integer("jobDuration"),
+  deliveryDate: integer("deliveryDate", { mode: "timestamp" }),
+  km: real("km"),
+  complaints: text("complaints"),
+  extraRequests: text("extraRequests"),
+  advisorNotes: text("advisorNotes"),
+  faults: text("faults", { mode: "json" }).$type().default([]),
+  hasDamageOnReceive: integer("hasDamageOnReceive", { mode: "boolean" }).notNull().default(false),
+  damageOnReceive: text("damageOnReceive", { mode: "json" }).$type().default([]),
+  hasDamageDuringRepair: integer("hasDamageDuringRepair", { mode: "boolean" }).default(false),
+  damageDuringRepair: text("damageDuringRepair", { mode: "json" }).$type().default([]),
+  laborCharge: real("laborCharge"),
+  totalCharge: real("totalCharge"),
+  targetDeliveryDate: integer("targetDeliveryDate", { mode: "timestamp" }),
+  isDelivered: integer("isDelivered", { mode: "boolean" }).default(false)
+});
 class CarsRepository extends BaseRepository {
   constructor() {
     super(Cars, "carId");
+  }
+  // A car with service history cannot be deleted unless explicitly authorized.
+  async deleteCarsWithServicesChoice(ids, deleteRelated) {
+    try {
+      if (!ids.length || ids.some((id) => !Number.isSafeInteger(id) || id <= 0) || new Set(ids).size !== ids.length) {
+        return ServiceResponse.fail("Invalid car selection.");
+      }
+      useDb().transaction((tx) => {
+        const matches = tx.select({ carId: Cars.carId }).from(Cars).where(inArray(Cars.carId, ids)).all();
+        if (matches.length !== ids.length) throw new Error("Araçlardan biri bulunamadı; hiçbir kayıt silinmedi.");
+        if (!deleteRelated) {
+          const attached = tx.select({ serviceId: Services.serviceId }).from(Services).where(inArray(Services.carId, ids)).limit(1).all();
+          if (attached.length) throw new Error("Araçlara bağlı servis kayıtları bulunuyor. Silmek için bağlı servisleri de sil seçeneğini işaretleyin.");
+        }
+        tx.delete(Cars).where(inArray(Cars.carId, ids)).run();
+      });
+      return ServiceResponse.success(void 0, "Vehicles deleted.");
+    } catch (error) {
+      return this.handleError(error, "Failed to delete vehicles.");
+    }
   }
   async getByCustomerId(customerId) {
     try {
@@ -6152,8 +6701,8 @@ class CarsRepository extends BaseRepository {
         return ServiceResponse.fail("Car not found.", "NOT_FOUND");
       }
       const currentIds = car.oldCustomerId ?? [];
-      const idList = currentIds.map((id) => Number(id)).filter(Number.isInteger);
-      return ServiceResponse.success(idList, "Old customers retrieved successfully.");
+      const idList2 = currentIds.map((id) => Number(id)).filter(Number.isInteger);
+      return ServiceResponse.success(idList2, "Old customers retrieved successfully.");
     } catch (err) {
       return this.handleError(err, "Failed to get old customers.");
     }
@@ -6246,28 +6795,6 @@ class CarsRepository extends BaseRepository {
     }
   }
 }
-const Services = sqliteTable("Services", {
-  serviceId: integer("serviceId").primaryKey({ autoIncrement: true }),
-  carId: integer("carId").notNull().references(() => Cars.carId, { onDelete: "cascade" }),
-  customerId: integer("customerId").references(() => Customers.customerId, { onDelete: "set null" }),
-  applicationDate: integer("applicationDate", { mode: "timestamp" }),
-  appointmentDate: integer("appointmentDate", { mode: "timestamp" }),
-  // Job duration in whole MINUTES (a length of time, not a point in time).
-  jobDuration: integer("jobDuration"),
-  deliveryDate: integer("deliveryDate", { mode: "timestamp" }),
-  km: real("km"),
-  complaints: text("complaints").notNull(),
-  extraRequests: text("extraRequests"),
-  faults: text("faults", { mode: "json" }).$type().default([]),
-  hasDamageOnReceive: integer("hasDamageOnReceive", { mode: "boolean" }).notNull().default(false),
-  damageOnReceive: text("damageOnReceive", { mode: "json" }).$type().default([]),
-  hasDamageDuringRepair: integer("hasDamageDuringRepair", { mode: "boolean" }).default(false),
-  damageDuringRepair: text("damageDuringRepair", { mode: "json" }).$type().default([]),
-  laborCharge: real("laborCharge"),
-  totalCharge: real("totalCharge"),
-  targetDeliveryDate: integer("targetDeliveryDate", { mode: "timestamp" }),
-  isDelivered: integer("isDelivered", { mode: "boolean" }).default(false)
-});
 const PhoneNumbers = sqliteTable("PhoneNumbers", {
   phoneNumberId: integer("phoneNumberId").primaryKey({ autoIncrement: true }),
   customerId: integer("customerId").notNull().references(() => Customers.customerId, { onDelete: "cascade" }),
@@ -6383,6 +6910,7 @@ class CustomersRepository extends BaseRepository {
         fullName: `${customer.firstName} ${customer.lastName || ""}`.trim(),
         nationalId: customer.nationalId || "",
         taxNumber: customer.taxNumber || "",
+        address: customer.address || "",
         phones: (phonesByCustomer.get(customer.customerId) ?? []).map((phone) => ({
           countryCode: phone.countryCode,
           number: phone.phoneNumber
@@ -6424,7 +6952,8 @@ class CustomersRepository extends BaseRepository {
           firstName: data.firstName,
           lastName: data.lastName,
           nationalId: data.nationalId,
-          taxNumber: data.taxNumber
+          taxNumber: data.taxNumber,
+          address: data.address ?? null
         }).where(eq(Customers.customerId, customerId)).returning({ customerId: Customers.customerId }).get();
         if (!updatedCustomer) {
           throw new Error("Customer not found.");
@@ -6583,11 +7112,11 @@ class PhoneNumbersRepository extends BaseRepository {
 }
 const Parts = sqliteTable("Parts", {
   partId: integer("partId").primaryKey({ autoIncrement: true }),
-  carId: integer("carId").notNull(),
-  serviceId: integer("serviceId").notNull(),
+  carId: integer("carId").notNull().references(() => Cars.carId, { onDelete: "cascade" }),
+  serviceId: integer("serviceId").notNull().references(() => Services.serviceId, { onDelete: "cascade" }),
   partName: text("partName").notNull(),
-  partTax: real("partTax"),
-  partPrice: real("partPrice")
+  quantity: integer("quantity").notNull().default(1),
+  unitPriceKurus: integer("unitPriceKurus").notNull().default(0)
 });
 class PartsRepository extends BaseRepository {
   constructor() {
@@ -6651,16 +7180,6 @@ class ServicesRepository extends BaseRepository {
     } catch (err) {
       return this.handleError(err, "Failed to fetch service history by customer.");
     }
-  }
-}
-class BodyTypesRepository extends BaseRepository {
-  constructor() {
-    super(BodyTypes, "bodyTypeId");
-  }
-}
-class FuelTypesRepository extends BaseRepository {
-  constructor() {
-    super(FuelTypes, "fuelTypeId");
   }
 }
 class CustomerService {
@@ -6784,59 +7303,86 @@ class BrandService {
 }
 class ServiceService {
   constructor(servicesRepository, partsRepository) {
-    __publicField(this, "servicesRepository");
-    __publicField(this, "partsRepository");
     this.servicesRepository = servicesRepository;
     this.partsRepository = partsRepository;
   }
   async createService(service, parts = []) {
-    const serviceResult = await this.servicesRepository.create(service);
-    if (!serviceResult.success || !serviceResult.data) return serviceResult;
-    const createdParts = [];
-    for (const part of parts) {
-      const result = await this.partsRepository.create({ ...part, serviceId: serviceResult.data.serviceId });
-      if (!result.success || !result.data) {
-        for (const created of createdParts) {
-          if (created.partId) await this.partsRepository.delete(created.partId);
+    if (parts.some((part) => part.partId != null)) return ServiceResponse.fail("New service parts must not have existing IDs.");
+    try {
+      const result = useDb().transaction((tx) => {
+        validatePartEntries(parts);
+        const { serviceId: _id, ...values } = service;
+        const createdService = tx.insert(Services).values(values).returning().get();
+        const createdParts = parts.map(({ partId: _partId, ...part }) => {
+          return tx.insert(Parts).values({ ...part, carId: createdService.carId, serviceId: createdService.serviceId }).returning().get();
+        });
+        if (createdService.km !== null && Number.isFinite(createdService.km) && createdService.km >= 0) {
+          const car = tx.select({ km: Cars.km }).from(Cars).where(eq(Cars.carId, createdService.carId)).get();
+          if (car && (car.km === null || createdService.km > car.km)) {
+            tx.update(Cars).set({ km: createdService.km }).where(eq(Cars.carId, createdService.carId)).run();
+          }
         }
-        await this.servicesRepository.delete(serviceResult.data.serviceId);
-        return ServiceResponse.error(new Error(result.message), "Service and parts could not be created together.");
-      }
-      createdParts.push(result.data);
+        return { service: createdService, parts: createdParts };
+      });
+      return ServiceResponse.success(result, "Service created successfully.");
+    } catch (error) {
+      return ServiceResponse.error(error, "Service and parts could not be created together.");
     }
-    return ServiceResponse.success({ service: serviceResult.data, parts: createdParts }, "Service created successfully.");
   }
   async updateService(serviceId, service, parts = []) {
-    const serviceResult = await this.servicesRepository.update(serviceId, service);
-    if (!serviceResult.success || !serviceResult.data) return serviceResult;
-    const oldParts = await this.partsRepository.getByServiceId(serviceId);
-    if (!oldParts.success) return ServiceResponse.error(new Error(oldParts.message), "Service parts could not be loaded.");
-    const deletedParts = await this.partsRepository.deleteByServiceId(serviceId);
-    if (!deletedParts.success) return ServiceResponse.error(new Error(deletedParts.message), "Service parts could not be replaced.");
-    const createdParts = [];
-    for (const part of parts) {
-      const result = await this.partsRepository.create(part);
-      if (!result.success || !result.data) {
-        for (const created of createdParts) if (created.partId) await this.partsRepository.delete(created.partId);
-        for (const old of oldParts.data ?? []) {
-          await this.partsRepository.create({
-            carId: old.carId,
-            serviceId: old.serviceId,
-            partName: old.partName,
-            partTax: old.partTax,
-            partPrice: old.partPrice
-          });
+    try {
+      const result = useDb().transaction((tx) => {
+        validatePartEntries(parts);
+        const { serviceId: _id, ...values } = service;
+        const updated = tx.update(Services).set(values).where(eq(Services.serviceId, serviceId)).returning().get();
+        if (!updated) throw new Error("Service not found.");
+        const existing = tx.select().from(Parts).where(eq(Parts.serviceId, serviceId)).all();
+        const existingIds = new Set(existing.map((part) => part.partId));
+        const incomingIds = /* @__PURE__ */ new Set();
+        for (const part of parts) {
+          if (part.partId == null) continue;
+          if (!Number.isSafeInteger(part.partId) || !existingIds.has(part.partId) || incomingIds.has(part.partId)) {
+            throw new Error("Invalid or duplicate part ID for this service.");
+          }
+          incomingIds.add(part.partId);
         }
-        return ServiceResponse.error(new Error(result.message), "Service parts could not be updated.");
-      }
-      createdParts.push(result.data);
+        for (const old of existing) {
+          if (!incomingIds.has(old.partId)) tx.delete(Parts).where(eq(Parts.partId, old.partId)).run();
+        }
+        const savedParts = parts.map((part) => {
+          const values2 = {
+            carId: updated.carId,
+            serviceId,
+            partName: part.partName,
+            quantity: part.quantity,
+            unitPriceKurus: part.unitPriceKurus
+          };
+          if (part.partId != null) {
+            return tx.update(Parts).set(values2).where(eq(Parts.partId, part.partId)).returning().get();
+          }
+          return tx.insert(Parts).values(values2).returning().get();
+        });
+        if (updated.km !== null && Number.isFinite(updated.km) && updated.km >= 0) {
+          const car = tx.select({ km: Cars.km }).from(Cars).where(eq(Cars.carId, updated.carId)).get();
+          if (car && (car.km === null || updated.km > car.km)) {
+            tx.update(Cars).set({ km: updated.km }).where(eq(Cars.carId, updated.carId)).run();
+          }
+        }
+        return { service: updated, parts: savedParts };
+      });
+      return ServiceResponse.success(result, "Service updated successfully.");
+    } catch (error) {
+      return ServiceResponse.error(error, "Service and parts could not be updated together.");
     }
-    return ServiceResponse.success({ service: serviceResult.data, parts: createdParts }, "Service updated successfully.");
   }
   async deleteService(serviceId) {
-    const partsResult = await this.partsRepository.deleteByServiceId(serviceId);
-    if (!partsResult.success) return partsResult;
-    return this.servicesRepository.delete(serviceId);
+    try {
+      const deleted = useDb().transaction((tx) => tx.delete(Services).where(eq(Services.serviceId, serviceId)).returning().get());
+      if (!deleted) return ServiceResponse.fail("Service not found.");
+      return ServiceResponse.success(void 0, "Service deleted successfully.");
+    } catch (error) {
+      return ServiceResponse.error(error, "Service could not be deleted.");
+    }
   }
   async getDetails(serviceId) {
     const serviceResult = await this.servicesRepository.getById(serviceId);
@@ -6856,6 +7402,225 @@ class ServiceService {
   }
   async getPartsByService(serviceId) {
     return this.partsRepository.getByServiceId(serviceId);
+  }
+}
+function validatePartEntries(parts) {
+  for (const part of parts) {
+    if (!part.partName.trim() || part.partName.length > 200) throw new Error("Invalid part name.");
+    if (!Number.isSafeInteger(part.quantity) || part.quantity < 1) throw new Error("Part quantity must be positive whole number.");
+    if (!Number.isSafeInteger(part.unitPriceKurus) || part.unitPriceKurus < 0 || !Number.isSafeInteger(part.quantity * part.unitPriceKurus)) throw new Error("Invalid part price.");
+  }
+}
+const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
+const MAX_IMAGES_PER_SERVICE = 500;
+const FORMATS = /* @__PURE__ */ new Map([
+  ["image/jpeg", { ext: ".jpg", prefix: Buffer.from([255, 216, 255]) }],
+  ["image/png", { ext: ".png", prefix: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]) }],
+  ["image/webp", { ext: ".webp", prefix: Buffer.from("RIFF") }]
+]);
+function mediaRoot() {
+  const dbPath = getActiveDbPath();
+  if (!dbPath) throw new Error("Database not opened.");
+  return path$1.join(path$1.dirname(dbPath), "media");
+}
+function serviceDir(serviceId) {
+  return path$1.join(mediaRoot(), "services", String(serviceId));
+}
+function safeFile(relativePath) {
+  return resolveManagedMediaFile(mediaRoot(), relativePath);
+}
+function checkService(serviceId) {
+  if (!Number.isSafeInteger(serviceId) || serviceId <= 0) throw new Error("Invalid service ID.");
+  const row = getDb().prepare("SELECT serviceId FROM Services WHERE serviceId = ?").get(serviceId);
+  if (!row) throw new Error("Service not found.");
+}
+function inspectImage(filepath) {
+  const stat = fs$1.statSync(filepath);
+  if (!stat.isFile() || stat.size < 12 || stat.size > MAX_IMAGE_BYTES) throw new Error("Image exceeds the 16 MB limit or is invalid.");
+  const fd = fs$1.openSync(filepath, "r");
+  const signature = Buffer.alloc(16);
+  try {
+    fs$1.readSync(fd, signature, 0, signature.length, 0);
+  } finally {
+    fs$1.closeSync(fd);
+  }
+  for (const [mime, format] of FORMATS) {
+    if (!signature.subarray(0, format.prefix.length).equals(format.prefix)) continue;
+    if (mime === "image/webp" && signature.toString("ascii", 8, 12) !== "WEBP") continue;
+    return { ext: format.ext, mime, bytes: stat.size };
+  }
+  throw new Error("Only JPEG, PNG, and WebP images are supported.");
+}
+function listServiceMedia(serviceId) {
+  checkService(serviceId);
+  return getDb().prepare(`SELECT mediaId, serviceId, originalName, mimeType, bytes, caption, addedAt
+     FROM ServiceMedia WHERE serviceId = ? ORDER BY addedAt, mediaId`).all(serviceId);
+}
+function addServiceMedia(serviceId, filePaths) {
+  ensureNoBackupInProgress();
+  checkService(serviceId);
+  const db = getDb();
+  if (filePaths.length > 100) throw new Error("Too many images selected.");
+  const count = db.prepare("SELECT COUNT(*) AS n FROM ServiceMedia WHERE serviceId = ?").get(serviceId).n;
+  if (count + filePaths.length > MAX_IMAGES_PER_SERVICE) throw new Error("Maximum 500 images per service.");
+  const dir = serviceDir(serviceId);
+  safeFile(`services/${serviceId}/${randomUUID()}.jpg`);
+  fs$1.mkdirSync(dir, { recursive: true });
+  const rootReal = fs$1.realpathSync(mediaRoot());
+  const dirReal = fs$1.realpathSync(dir);
+  if (!dirReal.startsWith(rootReal + path$1.sep)) throw new Error("Invalid media directory.");
+  const copied = [];
+  try {
+    db.transaction(() => {
+      for (const source of filePaths) {
+        const info = inspectImage(source);
+        const key = `${randomUUID()}${info.ext}`;
+        const relativePath = `services/${serviceId}/${key}`;
+        const finalPath = safeFile(relativePath);
+        fs$1.copyFileSync(source, finalPath, fs$1.constants.COPYFILE_EXCL);
+        copied.push(finalPath);
+        db.prepare(`INSERT INTO ServiceMedia (serviceId, relativePath, originalName, mimeType, bytes)
+          VALUES (?, ?, ?, ?, ?)`).run(serviceId, relativePath, path$1.basename(source).slice(0, 220), info.mime, info.bytes);
+      }
+    })();
+  } catch (error) {
+    for (const filepath of copied) fs$1.rmSync(filepath, { force: true });
+    throw error;
+  }
+  return listServiceMedia(serviceId);
+}
+function fetchMetadata(mediaId) {
+  if (!Number.isSafeInteger(mediaId) || mediaId <= 0) throw new Error("Invalid media ID.");
+  const row = getDb().prepare("SELECT relativePath, mimeType FROM ServiceMedia WHERE mediaId = ?").get(mediaId);
+  if (!row) throw new Error("Media not found.");
+  return row;
+}
+function readServiceMedia(mediaId) {
+  const row = fetchMetadata(mediaId);
+  const file = safeFile(row.relativePath);
+  if (fs$1.statSync(file).size > MAX_IMAGE_BYTES) throw new Error("Image exceeds allowed size.");
+  return `data:${row.mimeType};base64,${fs$1.readFileSync(file).toString("base64")}`;
+}
+const MANIFEST = "backup-manifest.json";
+const DATABASE_FILE = "data_carArchiver.sqlite";
+const RESTORE_MARKER = "pending-restore.json";
+function verifyDirectory(folder) {
+  var _a2;
+  const backup = path$1.resolve(folder);
+  const metadata = JSON.parse(fs$1.readFileSync(path$1.join(backup, MANIFEST), "utf8"));
+  if (metadata.kind !== "CarArchiverBackup" || metadata.formatVersion !== 1 || metadata.databaseFile !== DATABASE_FILE || metadata.mediaFolder !== "media") {
+    throw new Error("Unsupported backup format.");
+  }
+  const database = path$1.join(backup, DATABASE_FILE);
+  const media = path$1.join(backup, "media");
+  if (!fs$1.statSync(database).isFile() || !fs$1.statSync(media).isDirectory() || fs$1.lstatSync(database).isSymbolicLink() || fs$1.lstatSync(media).isSymbolicLink()) throw new Error("Incomplete or unsafe backup.");
+  const walk = (dir) => {
+    for (const name of fs$1.readdirSync(dir)) {
+      const item = path$1.join(dir, name);
+      const entry = fs$1.lstatSync(item);
+      if (entry.isSymbolicLink() || !entry.isDirectory() && !entry.isFile()) throw new Error("Backup has unsupported links or files.");
+      if (entry.isDirectory()) walk(item);
+    }
+  };
+  walk(media);
+  const test = new Client(database, { readonly: true, fileMustExist: true });
+  try {
+    const result = test.pragma("quick_check");
+    if (result.length !== 1 || ((_a2 = result[0]) == null ? void 0 : _a2.quick_check) !== "ok") throw new Error("Backup database integrity check failed.");
+    for (const table of ["Customers", "Cars", "Services", "Parts", "ServiceMedia"]) {
+      if (!test.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table)) throw new Error(`Missing backup table: ${table}`);
+    }
+  } finally {
+    test.close();
+  }
+  return { database, media };
+}
+function validateRestoreBackup(backupFolder) {
+  verifyDirectory(backupFolder);
+}
+function prepareRestore(backupFolder, userData, liveDbPath) {
+  const source = path$1.resolve(backupFolder);
+  const liveRoot = path$1.dirname(path$1.resolve(liveDbPath));
+  if (source === liveRoot || source.startsWith(liveRoot + path$1.sep)) throw new Error("Backup must be outside the live data folder.");
+  verifyDirectory(source);
+  const marker = path$1.join(userData, RESTORE_MARKER);
+  fs$1.writeFileSync(marker, JSON.stringify({ backupFolder: source, liveDbPath: path$1.resolve(liveDbPath) }), { flag: "wx" });
+}
+function applyPendingRestore(userData, configuredDbPath) {
+  const marker = path$1.join(userData, RESTORE_MARKER);
+  if (!fs$1.existsSync(marker)) return null;
+  const intent = JSON.parse(fs$1.readFileSync(marker, "utf8"));
+  const liveDb = path$1.resolve(configuredDbPath);
+  if (intent.liveDbPath !== liveDb || typeof intent.backupFolder !== "string") throw new Error("Pending restore path does not match configured database.");
+  const validated = verifyDirectory(intent.backupFolder);
+  const root = path$1.dirname(liveDb);
+  const token = `${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}`;
+  const rescue = path$1.join(root, `CarArchiver-before-restore-${token}`);
+  const stage = path$1.join(root, `.restore-staging-${token}`);
+  fs$1.mkdirSync(rescue);
+  fs$1.mkdirSync(stage);
+  const liveMedia = path$1.join(root, "media");
+  const stagedDb = path$1.join(stage, path$1.basename(liveDb));
+  const stagedMedia = path$1.join(stage, "media");
+  const movedSidecars = [];
+  let movedMedia = false;
+  let installedDb = false;
+  let installedMedia = false;
+  try {
+    fs$1.copyFileSync(validated.database, stagedDb, fs$1.constants.COPYFILE_EXCL);
+    fs$1.cpSync(validated.media, stagedMedia, { recursive: true, errorOnExist: true, force: false });
+    for (const suffix of ["", "-wal", "-shm", "-journal"]) {
+      const old = liveDb + suffix;
+      if (fs$1.existsSync(old)) {
+        fs$1.renameSync(old, path$1.join(rescue, path$1.basename(old)));
+        movedSidecars.push(suffix);
+      }
+    }
+    if (fs$1.existsSync(liveMedia)) {
+      fs$1.renameSync(liveMedia, path$1.join(rescue, "media"));
+      movedMedia = true;
+    }
+    fs$1.renameSync(stagedDb, liveDb);
+    installedDb = true;
+    fs$1.renameSync(stagedMedia, liveMedia);
+    installedMedia = true;
+    fs$1.rmSync(marker);
+    return rescue;
+  } catch (error) {
+    if (installedDb) fs$1.rmSync(liveDb, { force: true });
+    if (installedMedia) fs$1.rmSync(liveMedia, { recursive: true, force: true });
+    for (const suffix of movedSidecars) {
+      const original = path$1.join(rescue, path$1.basename(liveDb + suffix));
+      if (fs$1.existsSync(original)) fs$1.renameSync(original, liveDb + suffix);
+    }
+    if (movedMedia && fs$1.existsSync(path$1.join(rescue, "media"))) fs$1.renameSync(path$1.join(rescue, "media"), liveMedia);
+    throw error;
+  } finally {
+    fs$1.rmSync(stage, { recursive: true, force: true });
+  }
+}
+function cell(value) {
+  const content = value == null ? "" : String(value);
+  const safe = /^[\s]*[=+@\-\t\r]/.test(content) ? `'${content}` : content;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+function exportRecords(destinationParent) {
+  const root = path$1.resolve(destinationParent);
+  const folder = path$1.join(root, `CarArchiver-CSV-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 6)}`);
+  fs$1.mkdirSync(folder);
+  try {
+    for (const table of ["Customers", "Cars", "Services"]) {
+      const columns = getDb().pragma(`table_info(${table})`).map((col) => col.name);
+      const rows2 = getDb().prepare(`SELECT * FROM ${table}`).all();
+      const csv = [columns.map(cell).join(","), ...rows2.map((row) => columns.map((col) => cell(row[col])).join(","))].join("\r\n");
+      fs$1.writeFileSync(path$1.join(folder, `${table}.csv`), `\uFEFF${csv}\r
+`, "utf8");
+    }
+    fs$1.writeFileSync(path$1.join(folder, "README.txt"), "CarArchiver CSV export. Files may contain sensitive customer information. Store securely. Image files are not included; use Backup for complete transfer.\r\n");
+    return folder;
+  } catch (error) {
+    fs$1.rmSync(folder, { recursive: true, force: true });
+    throw error;
   }
 }
 function isRecord(value) {
@@ -6888,6 +7653,7 @@ function parseCustomerRequest(payload) {
     lastName: requireString(payload.lastName, "lastName"),
     nationalId: requireString(payload.nationalId, "nationalId"),
     taxNumber: requireString(payload.taxNumber, "taxNumber"),
+    address: payload.address == null ? "" : requireString(payload.address, "address"),
     phones: phones.map((phone, index) => {
       if (!isRecord(phone)) throw new Error(`Invalid phone at index ${index}.`);
       return {
@@ -7004,18 +7770,21 @@ function parseServiceRequest(payload) {
   const raw = payload.service;
   const carId = requireNumber(raw.carId, "carId");
   const customerId = raw.customerId === null || raw.customerId === void 0 || raw.customerId === "" ? null : requireNumber(raw.customerId, "customerId");
-  const complaints = requireString(raw.complaints, "complaints", false).trim();
-  if (complaints.length > 4e3) throw new Error("Complaints cannot exceed 4000 characters.");
+  const complaints = raw.complaints == null || raw.complaints === "" ? null : requireString(raw.complaints, "complaints").trim() || null;
+  if (complaints && complaints.length > 4e3) throw new Error("Complaints cannot exceed 4000 characters.");
+  const advisorNotes = raw.advisorNotes == null ? null : requireString(raw.advisorNotes, "advisorNotes").trim() || null;
+  if (advisorNotes && advisorNotes.length > 1e4) throw new Error("Advisor notes cannot exceed 10000 characters.");
   const extraRequests = raw.extraRequests === null || raw.extraRequests === void 0 ? null : requireString(raw.extraRequests, "extraRequests").trim() || null;
   if (extraRequests && extraRequests.length > 4e3) throw new Error("Extra requests cannot exceed 4000 characters.");
   const parseStringArray = (value, field, maxItems, maxLength) => {
     if (value === null || value === void 0 || value === "") return [];
     if (!Array.isArray(value)) throw new Error(`Invalid ${field}.`);
+    if (value.length > maxItems) throw new Error(`${field} has too many entries (maximum ${maxItems}).`);
     return value.map((item, index) => {
       const text2 = requireString(item, `${field}[${index}]`, false).trim();
       if (text2.length > maxLength) throw new Error(`${field}[${index}] is too long.`);
       return text2;
-    }).filter(Boolean).slice(0, maxItems);
+    }).filter(Boolean);
   };
   const jobDuration = raw.jobDuration === null || raw.jobDuration === void 0 || raw.jobDuration === "" ? null : Number(raw.jobDuration);
   if (jobDuration !== null && (!Number.isInteger(jobDuration) || jobDuration < 0)) throw new Error("Invalid job duration.");
@@ -7029,6 +7798,7 @@ function parseServiceRequest(payload) {
     km: parseOptionalNonNegativeNumber(raw.km, "km"),
     complaints,
     extraRequests,
+    advisorNotes,
     faults: parseStringArray(raw.faults, "faults", 30, 500),
     hasDamageOnReceive: raw.hasDamageOnReceive === true,
     damageOnReceive: parseStringArray(raw.damageOnReceive, "damageOnReceive", 30, 500),
@@ -7043,12 +7813,20 @@ function parseServiceRequest(payload) {
     if (!isRecord(item)) throw new Error(`Invalid part at index ${index}.`);
     const partName = requireString(item.partName, `parts[${index}].partName`, false).trim();
     if (partName.length > 200) throw new Error(`parts[${index}].partName is too long.`);
-    return {
-      partName,
-      partTax: parseOptionalNonNegativeNumber(item.partTax, `parts[${index}].partTax`),
-      partPrice: parseOptionalNonNegativeNumber(item.partPrice, `parts[${index}].partPrice`)
-    };
-  }).filter((part) => part.partName);
+    const quantity = item.quantity;
+    const unitPriceKurus = item.unitPriceKurus;
+    if (typeof quantity !== "number" || !Number.isSafeInteger(quantity) || quantity <= 0) {
+      throw new Error(`parts[${index}].quantity must be a positive whole number.`);
+    }
+    if (typeof unitPriceKurus !== "number" || !Number.isSafeInteger(unitPriceKurus) || unitPriceKurus < 0) {
+      throw new Error(`parts[${index}].unitPriceKurus must be a non-negative whole number.`);
+    }
+    if (!Number.isSafeInteger(quantity * unitPriceKurus)) {
+      throw new Error(`parts[${index}] price total is too large.`);
+    }
+    const partId = item.partId == null ? void 0 : requireNumber(item.partId, `parts[${index}].partId`);
+    return { partId, partName, quantity, unitPriceKurus };
+  });
   return { service, parts };
 }
 function parseUpdateServiceRequest(payload) {
@@ -7098,11 +7876,23 @@ function requireApprovedDirectory(value) {
   }
   return normalizedPath;
 }
+function secureHandle(channel, listener) {
+  ipcMain.handle(channel, (event, ...args) => {
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    const trusted = owner !== null && !owner.isDestroyed() && event.senderFrame === event.sender.mainFrame && isTrustedAppUrl(
+      event.senderFrame.url,
+      process.env["VITE_DEV_SERVER_URL"],
+      path.join(process.env.APP_ROOT || app.getAppPath(), "dist")
+    );
+    if (!trusted) throw new Error("IPC sender is not a trusted application page.");
+    return listener(event, ...args);
+  });
+}
 function registerIpcHandlers() {
-  ipcMain.handle("check-config", async () => {
+  secureHandle("check-config", async () => {
     return hasConfig();
   });
-  ipcMain.handle("select-directory", async () => {
+  secureHandle("select-directory", async () => {
     const result = await dialog.showOpenDialog({
       properties: ["openDirectory"]
     });
@@ -7111,7 +7901,7 @@ function registerIpcHandlers() {
     approvedDirectories.add(selectedPath);
     return selectedPath;
   });
-  ipcMain.handle("verify-import-path", async (_event, rawFolderPath) => {
+  secureHandle("verify-import-path", async (_event, rawFolderPath) => {
     const folderPath = requireApprovedDirectory(rawFolderPath);
     const dbName = DATABASE_FILE_NAME;
     const dbPath = path.join(folderPath, dbName);
@@ -7121,7 +7911,7 @@ function registerIpcHandlers() {
     }
     return null;
   });
-  ipcMain.handle("setup-new-data-structure", async (_event, rawSelectedRoot) => {
+  secureHandle("setup-new-data-structure", async (_event, rawSelectedRoot) => {
     try {
       const selectedRoot = requireApprovedDirectory(rawSelectedRoot);
       const mainFolderName = "CarServiceArchiver";
@@ -7161,7 +7951,7 @@ function registerIpcHandlers() {
       return null;
     }
   });
-  ipcMain.handle("setup-imported-data", async (_event, rawDbPath) => {
+  secureHandle("setup-imported-data", async (_event, rawDbPath) => {
     try {
       const normalizedDbPath = requireApprovedDatabasePath(rawDbPath);
       if (!approvedDatabaseFiles.has(normalizedDbPath)) {
@@ -7181,7 +7971,7 @@ function registerIpcHandlers() {
       return null;
     }
   });
-  ipcMain.handle("save-config", async (_event, configData) => {
+  secureHandle("save-config", async (_event, configData) => {
     try {
       const config = parseAppConfig(configData);
       const normalizedDbPath = requireApprovedDatabasePath(config.savePath);
@@ -7196,10 +7986,44 @@ function registerIpcHandlers() {
       return false;
     }
   });
-  ipcMain.handle("get-config", async () => {
+  secureHandle("set-startup-language", async (_event, language) => {
+    const supported = ["tr", "en", "es", "fr", "de", "pt", "zh", "ja", "ko", "ru", "nl", "az", "it", "pl"];
+    if (typeof language !== "string" || !supported.includes(language)) return false;
+    try {
+      fs.writeFileSync(
+        path.join(app.getPath("userData"), "startup-language.json"),
+        JSON.stringify({ language }),
+        { encoding: "utf8", mode: 384 }
+      );
+      return true;
+    } catch (error) {
+      console.error("Could not save startup language:", error);
+      return false;
+    }
+  });
+  secureHandle("get-config", async () => {
     return getConfig();
   });
-  ipcMain.handle("get-dashboard-stats", async () => {
+  secureHandle("set-window-theme", (event, theme) => {
+    if (typeof theme !== "string" || !["navy", "dark", "light", "dim"].includes(theme)) return false;
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window || process.platform !== "win32") return false;
+    const colors = {
+      navy: { color: "#151b35", symbolColor: "#e8eaff" },
+      dark: { color: "#12151b", symbolColor: "#f0f3f7" },
+      light: { color: "#ffffff", symbolColor: "#111827" },
+      dim: { color: "#30343d", symbolColor: "#e4e6eb" }
+    };
+    window.setTitleBarOverlay({ ...colors[theme], height: 30 });
+    window.setBackgroundColor(colors[theme].color);
+    try {
+      fs.writeFileSync(path.join(app.getPath("userData"), "window-theme.json"), JSON.stringify(theme), "utf8");
+    } catch (error) {
+      console.error("Could not persist window titlebar theme:", error);
+    }
+    return true;
+  });
+  secureHandle("get-dashboard-stats", async () => {
     try {
       const customersRepo = new CustomersRepository();
       const carsRepo = new CarsRepository();
@@ -7219,7 +8043,7 @@ function registerIpcHandlers() {
       return { services: 0, customers: 0, cars: 0 };
     }
   });
-  ipcMain.handle("get-all-customers", async () => {
+  secureHandle("get-all-customers", async () => {
     try {
       const customersRepo = new CustomersRepository();
       const response = await customersRepo.getAllCustomersWithDetails();
@@ -7232,7 +8056,8 @@ function registerIpcHandlers() {
       return [];
     }
   });
-  ipcMain.handle("add-customer", async (_event, rawPayload) => {
+  secureHandle("add-customer", async (_event, rawPayload) => {
+    ensureNoBackupInProgress();
     try {
       const customersRepo = new CustomersRepository();
       const phoneNumbersRepo = new PhoneNumbersRepository();
@@ -7243,7 +8068,8 @@ function registerIpcHandlers() {
         firstName: payload.firstName,
         lastName: payload.lastName,
         nationalId: payload.nationalId,
-        taxNumber: payload.taxNumber
+        taxNumber: payload.taxNumber,
+        address: payload.address
       };
       const phoneNumbers = (payload.phones ?? []).map((phone) => ({
         countryCode: phone.countryCode,
@@ -7259,7 +8085,7 @@ function registerIpcHandlers() {
       return ServiceResponse.error(error, "Customer could not be created.");
     }
   });
-  ipcMain.handle("get-customer-profile", async (_event, rawCustomerId) => {
+  secureHandle("get-customer-profile", async (_event, rawCustomerId) => {
     try {
       const customerId = requireNumber(rawCustomerId, "customer id");
       const customersRepo = new CustomersRepository();
@@ -7270,37 +8096,93 @@ function registerIpcHandlers() {
       return ServiceResponse.error(error, "Customer profile could not be loaded.");
     }
   });
-  ipcMain.handle("get-customer-edit", async (_event, rawCustomerId) => {
+  secureHandle("get-customer-edit", async (_event, rawCustomerId) => {
     const customerId = requireNumber(rawCustomerId, "customer id");
     return await new CustomersRepository().getCustomerForEdit(customerId);
   });
-  ipcMain.handle("update-customer", async (_event, rawRequest) => {
+  secureHandle("update-customer", async (_event, rawRequest) => {
+    ensureNoBackupInProgress();
     const request = parseUpdateCustomerRequest(rawRequest);
     return await new CustomersRepository().updateCustomerFull(request.id, request.data);
   });
-  ipcMain.handle("delete-customer", async (_event, rawRequest) => {
+  secureHandle("delete-customer", async (_event, rawRequest) => {
+    ensureNoBackupInProgress();
     const request = parseDeleteCustomerRequest(rawRequest);
-    return await new CustomersRepository().deleteCustomer(request.id, request.deleteRelated);
-  });
-  ipcMain.handle("delete-customers-bulk", async (_event, rawRequest) => {
-    const request = parseBulkDeleteRequest(rawRequest);
-    return await new CustomersRepository().deleteCustomersBulk(request.ids, request.deleteRelated);
-  });
-  ipcMain.handle("get-all-fuel-types", async () => {
     try {
-      return await new FuelTypesRepository().getAll();
+      moveToTrash("customer", [request.id], request.deleteRelated);
+      return ServiceResponse.success(null, "Moved to Trash.");
+    } catch (error) {
+      return ServiceResponse.error(error, "Customer could not be moved to Trash.");
+    }
+  });
+  secureHandle("delete-customers-bulk", async (_event, rawRequest) => {
+    ensureNoBackupInProgress();
+    const request = parseBulkDeleteRequest(rawRequest);
+    try {
+      moveToTrash("customer", request.ids, request.deleteRelated);
+      return ServiceResponse.success(null, "Moved to Trash.");
+    } catch (error) {
+      return ServiceResponse.error(error, "Customers could not be moved to Trash.");
+    }
+  });
+  secureHandle("service-document", async (event, payload) => {
+    if (!isRecord(payload) || typeof payload.html !== "string" || payload.html.length > 2e6 || !["pdf", "print"].includes(String(payload.action))) {
+      return { success: false, message: "Invalid document." };
+    }
+    const parent = BrowserWindow.fromWebContents(event.sender);
+    const printWindow = new BrowserWindow({ show: false, parent: parent ?? void 0, webPreferences: { sandbox: true, nodeIntegration: false, contextIsolation: true, javascript: false, webSecurity: true } });
+    try {
+      await printWindow.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(payload.html));
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      if (payload.action === "pdf") {
+        const filename = typeof payload.filename === "string" ? Array.from(payload.filename, (character) => character.charCodeAt(0) < 32 || /[\\/:*?"<>|]/.test(character) ? "_" : character).join("").slice(0, 140) : "Servis Kaydı.pdf";
+        const selected = await dialog.showSaveDialog(parent ?? printWindow, {
+          defaultPath: filename.endsWith(".pdf") ? filename : filename + ".pdf",
+          filters: [{ name: "PDF", extensions: ["pdf"] }]
+        });
+        if (selected.canceled || !selected.filePath) return { success: true, canceled: true };
+        const pdf = await printWindow.webContents.printToPDF({ pageSize: "A4", printBackground: true });
+        await fs.promises.writeFile(selected.filePath, pdf);
+        return { success: true, canceled: false };
+      }
+      await new Promise((resolve, reject) => {
+        printWindow.webContents.print({ silent: false, printBackground: true }, (success, reason) => {
+          if (success || reason === "Print job canceled") resolve();
+          else reject(new Error(reason || "Printing failed"));
+        });
+      });
+      return { success: true, canceled: false };
+    } catch (error) {
+      return { success: false, message: getErrorMessage(error) };
+    } finally {
+      if (!printWindow.isDestroyed()) printWindow.close();
+    }
+  });
+  secureHandle("get-all-fuel-types", async (_event, requestedLanguage) => {
+    try {
+      const locale = typeof requestedLanguage === "string" && /^[a-z]{2}$/.test(requestedLanguage) ? requestedLanguage : "en";
+      const rows2 = getDb().prepare(`SELECT f.fuelTypeId, COALESCE(loc.translatedName, en.translatedName, f.fuelTypeName) AS fuelTypeName
+        FROM FuelTypes f LEFT JOIN (SELECT fuelTypeId, MAX(translatedName) translatedName FROM FuelTypeTranslations WHERE languageCode=? GROUP BY fuelTypeId) loc ON loc.fuelTypeId=f.fuelTypeId
+        LEFT JOIN (SELECT fuelTypeId, MAX(translatedName) translatedName FROM FuelTypeTranslations WHERE languageCode='en' GROUP BY fuelTypeId) en ON en.fuelTypeId=f.fuelTypeId
+        ORDER BY f.fuelTypeId`).all(locale);
+      return ServiceResponse.success(rows2);
     } catch (error) {
       return ServiceResponse.error(error, "Fuel types could not be loaded.");
     }
   });
-  ipcMain.handle("get-all-body-types", async () => {
+  secureHandle("get-all-body-types", async (_event, requestedLanguage) => {
     try {
-      return await new BodyTypesRepository().getAll();
+      const locale = typeof requestedLanguage === "string" && /^[a-z]{2}$/.test(requestedLanguage) ? requestedLanguage : "en";
+      const rows2 = getDb().prepare(`SELECT b.bodyTypeId, COALESCE(loc.translatedName, en.translatedName, b.bodyTypeName) AS bodyTypeName
+        FROM BodyTypes b LEFT JOIN (SELECT bodyTypeId, MAX(translatedName) translatedName FROM BodyTypeTranslations WHERE languageCode=? GROUP BY bodyTypeId) loc ON loc.bodyTypeId=b.bodyTypeId
+        LEFT JOIN (SELECT bodyTypeId, MAX(translatedName) translatedName FROM BodyTypeTranslations WHERE languageCode='en' GROUP BY bodyTypeId) en ON en.bodyTypeId=b.bodyTypeId
+        ORDER BY b.bodyTypeId`).all(locale);
+      return ServiceResponse.success(rows2);
     } catch (error) {
       return ServiceResponse.error(error, "Body types could not be loaded.");
     }
   });
-  ipcMain.handle("get-all-cars", async () => {
+  secureHandle("get-all-cars", async () => {
     try {
       const result = await new CarsRepository().getAll();
       return result;
@@ -7308,7 +8190,7 @@ function registerIpcHandlers() {
       return ServiceResponse.error(error, "Cars could not be loaded.");
     }
   });
-  ipcMain.handle("get-car", async (_event, rawCarId) => {
+  secureHandle("get-car", async (_event, rawCarId) => {
     try {
       const carId = requireNumber(rawCarId, "car id");
       return await new CarsRepository().getById(carId);
@@ -7316,7 +8198,8 @@ function registerIpcHandlers() {
       return ServiceResponse.error(error, "Car could not be loaded.");
     }
   });
-  ipcMain.handle("add-car", async (_event, rawPayload) => {
+  secureHandle("add-car", async (_event, rawPayload) => {
+    ensureNoBackupInProgress();
     try {
       const data = parseCarData(rawPayload);
       return await new CarsRepository().create(data);
@@ -7324,7 +8207,8 @@ function registerIpcHandlers() {
       return ServiceResponse.error(error, "Car could not be created.");
     }
   });
-  ipcMain.handle("update-car", async (_event, rawPayload) => {
+  secureHandle("update-car", async (_event, rawPayload) => {
+    ensureNoBackupInProgress();
     try {
       const request = parseUpdateCarRequest(rawPayload);
       const repository = new CarsRepository();
@@ -7333,15 +8217,30 @@ function registerIpcHandlers() {
       return ServiceResponse.error(error, "Car could not be updated.");
     }
   });
-  ipcMain.handle("delete-car", async (_event, rawCarId) => {
+  secureHandle("delete-car", async (_event, payload) => {
+    ensureNoBackupInProgress();
     try {
-      const carId = requireNumber(rawCarId, "car id");
-      return await new CarsRepository().delete(carId);
+      if (!isRecord(payload) || typeof payload.deleteRelated !== "boolean") throw new Error("Invalid car delete request.");
+      const id = requireNumber(payload.id, "car id");
+      moveToTrash("car", [id], payload.deleteRelated);
+      return ServiceResponse.success(void 0, "Moved to Trash.");
     } catch (error) {
       return ServiceResponse.error(error, "Car could not be deleted.");
     }
   });
-  ipcMain.handle("add-old-customer", async (_event, rawPayload) => {
+  secureHandle("delete-cars-bulk", async (_event, payload) => {
+    ensureNoBackupInProgress();
+    try {
+      if (!isRecord(payload) || !Array.isArray(payload.ids) || !payload.ids.length || typeof payload.deleteRelated !== "boolean") throw new Error("Invalid bulk car delete request.");
+      const ids = payload.ids.map((id) => requireNumber(id, "car id"));
+      moveToTrash("car", ids, payload.deleteRelated);
+      return ServiceResponse.success(void 0, "Moved to Trash.");
+    } catch (error) {
+      return ServiceResponse.error(error, "Cars could not be deleted.");
+    }
+  });
+  secureHandle("add-old-customer", async (_event, rawPayload) => {
+    ensureNoBackupInProgress();
     try {
       if (!isRecord(rawPayload)) throw new Error("Invalid old customer payload.");
       const carId = requireNumber(rawPayload.carId, "car id");
@@ -7351,7 +8250,8 @@ function registerIpcHandlers() {
       return ServiceResponse.error(error, "Old customer could not be added.");
     }
   });
-  ipcMain.handle("remove-old-customer", async (_event, rawPayload) => {
+  secureHandle("remove-old-customer", async (_event, rawPayload) => {
+    ensureNoBackupInProgress();
     try {
       if (!isRecord(rawPayload)) throw new Error("Invalid old customer payload.");
       const carId = requireNumber(rawPayload.carId, "car id");
@@ -7361,42 +8261,43 @@ function registerIpcHandlers() {
       return ServiceResponse.error(error, "Old customer could not be removed.");
     }
   });
-  ipcMain.handle("get-all-services", async () => {
+  secureHandle("get-all-services", async () => {
     try {
       return await new ServiceService(new ServicesRepository(), new PartsRepository()).getAll();
     } catch (error) {
       return ServiceResponse.error(error, "Services could not be loaded.");
     }
   });
-  ipcMain.handle("get-service", async (_event, rawServiceId) => {
+  secureHandle("get-service", async (_event, rawServiceId) => {
     try {
       return await new ServiceService(new ServicesRepository(), new PartsRepository()).getDetails(requireNumber(rawServiceId, "service id"));
     } catch (error) {
       return ServiceResponse.error(error, "Service could not be loaded.");
     }
   });
-  ipcMain.handle("get-services-by-car", async (_event, rawCarId) => {
+  secureHandle("get-services-by-car", async (_event, rawCarId) => {
     try {
       return await new ServiceService(new ServicesRepository(), new PartsRepository()).getByCarId(requireNumber(rawCarId, "car id"));
     } catch (error) {
       return ServiceResponse.error(error, "Car service history could not be loaded.");
     }
   });
-  ipcMain.handle("get-services-by-customer", async (_event, rawCustomerId) => {
+  secureHandle("get-services-by-customer", async (_event, rawCustomerId) => {
     try {
       return await new ServiceService(new ServicesRepository(), new PartsRepository()).getByCustomerId(requireNumber(rawCustomerId, "customer id"));
     } catch (error) {
       return ServiceResponse.error(error, "Customer service history could not be loaded.");
     }
   });
-  ipcMain.handle("get-parts-by-service", async (_event, rawServiceId) => {
+  secureHandle("get-parts-by-service", async (_event, rawServiceId) => {
     try {
       return await new PartsRepository().getByServiceId(requireNumber(rawServiceId, "service id"));
     } catch (error) {
       return ServiceResponse.error(error, "Service parts could not be loaded.");
     }
   });
-  ipcMain.handle("add-service", async (_event, rawPayload) => {
+  secureHandle("add-service", async (_event, rawPayload) => {
+    ensureNoBackupInProgress();
     try {
       const payload = parseServiceRequest(rawPayload);
       const parts = payload.parts.map((part) => ({ carId: payload.service.carId, serviceId: 0, ...part }));
@@ -7406,7 +8307,8 @@ function registerIpcHandlers() {
       return ServiceResponse.error(error, "Service could not be created.");
     }
   });
-  ipcMain.handle("update-service", async (_event, rawPayload) => {
+  secureHandle("update-service", async (_event, rawPayload) => {
+    ensureNoBackupInProgress();
     try {
       const payload = parseUpdateServiceRequest(rawPayload);
       const parts = payload.parts.map((part) => ({ carId: payload.service.carId, serviceId: payload.id, ...part }));
@@ -7416,14 +8318,142 @@ function registerIpcHandlers() {
       return ServiceResponse.error(error, "Service could not be updated.");
     }
   });
-  ipcMain.handle("delete-service", async (_event, rawServiceId) => {
+  secureHandle("delete-service", async (_event, rawServiceId) => {
+    ensureNoBackupInProgress();
     try {
-      return await new ServiceService(new ServicesRepository(), new PartsRepository()).deleteService(requireNumber(rawServiceId, "service id"));
+      moveToTrash("service", [requireNumber(rawServiceId, "service id")]);
+      return ServiceResponse.success(void 0, "Moved to Trash.");
     } catch (error) {
       return ServiceResponse.error(error, "Service could not be deleted.");
     }
   });
-  ipcMain.handle("get-all-brands", async () => {
+  secureHandle("list-service-media", (_event, rawId) => listServiceMedia(requireNumber(rawId, "service id")));
+  secureHandle("add-service-media", async (event, rawId) => {
+    const serviceId = requireNumber(rawId, "service id");
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    const options = {
+      properties: ["openFile", "multiSelections"],
+      filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "webp"] }]
+    };
+    const result = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options);
+    return result.canceled ? listServiceMedia(serviceId) : addServiceMedia(serviceId, result.filePaths);
+  });
+  secureHandle("read-service-media", (_event, rawId) => readServiceMedia(requireNumber(rawId, "media id")));
+  secureHandle("remove-service-media", (_event, rawId) => (moveToTrash("photo", [requireNumber(rawId, "media id")]), true));
+  secureHandle("list-trash", () => listTrash());
+  secureHandle("restore-trash", (_event, rawId) => {
+    try {
+      restoreTrash(requireNumber(rawId, "trash id"));
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: getErrorMessage(error) };
+    }
+  });
+  secureHandle("purge-trash", (_event, rawId) => {
+    try {
+      purgeTrash(requireNumber(rawId, "trash id"));
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: getErrorMessage(error) };
+    }
+  });
+  secureHandle("restore-trash-batch", (_event, rawIds) => {
+    try {
+      restoreTrashBatch(rawIds);
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: getErrorMessage(error) };
+    }
+  });
+  secureHandle("purge-trash-batch", (_event, rawIds) => {
+    try {
+      purgeTrashBatch(rawIds);
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: getErrorMessage(error) };
+    }
+  });
+  secureHandle("backup-data", async (event) => {
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    const options = { properties: ["openDirectory", "createDirectory"] };
+    const selected = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options);
+    if (selected.canceled || !selected.filePaths[0]) return { success: false, canceled: true };
+    try {
+      const location = await backupData(selected.filePaths[0]);
+      return { success: true, location };
+    } catch (error) {
+      return { success: false, message: getErrorMessage(error) };
+    }
+  });
+  const restoreSelection = /* @__PURE__ */ new Map();
+  secureHandle("restore-data", async (event) => {
+    ensureNoBackupInProgress();
+    const livePath = getActiveDbPath();
+    if (!livePath) return { success: false, message: "Database is not open." };
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    const picker = { properties: ["openDirectory"] };
+    const chosen = owner ? await dialog.showOpenDialog(owner, picker) : await dialog.showOpenDialog(picker);
+    if (chosen.canceled || !chosen.filePaths[0]) return { success: false, canceled: true };
+    try {
+      validateRestoreBackup(chosen.filePaths[0]);
+      restoreSelection.set(event.sender.id, chosen.filePaths[0]);
+      event.sender.once("destroyed", () => {
+        restoreSelection.delete(event.sender.id);
+      });
+      return { success: true, folder: chosen.filePaths[0] };
+    } catch (error) {
+      return { success: false, message: getErrorMessage(error) };
+    }
+  });
+  secureHandle("cancel-restore-data", (event) => {
+    restoreSelection.delete(event.sender.id);
+    return { success: true };
+  });
+  secureHandle("confirm-restore-data", async (event) => {
+    ensureNoBackupInProgress();
+    const selected = restoreSelection.get(event.sender.id);
+    restoreSelection.delete(event.sender.id);
+    const livePath = getActiveDbPath();
+    if (!selected || !livePath) return { success: false, message: "No verified backup selection." };
+    try {
+      prepareRestore(selected, app.getPath("userData"), livePath);
+      if (app.isPackaged) {
+        setTimeout(() => {
+          try {
+            closeDrizzle();
+            closeDb();
+            app.relaunch();
+            app.exit(0);
+          } catch (error) {
+            console.error("Could not relaunch after restore:", error);
+            app.exit(1);
+          }
+        }, 350);
+      }
+      return { success: true, restarting: app.isPackaged };
+    } catch (error) {
+      return { success: false, message: getErrorMessage(error) };
+    }
+  });
+  secureHandle("open-support-email", async (_event, raw) => {
+    if (!isRecord(raw)) return false;
+    const subject = requireString(raw.subject, "subject").slice(0, 200);
+    const body = requireString(raw.body, "body").slice(0, 6e3);
+    const link = `mailto:carservicearchiver.support@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    return shell.openExternal(link).then(() => true).catch(() => false);
+  });
+  secureHandle("export-data-csv", async (event) => {
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    const options = { properties: ["openDirectory", "createDirectory"] };
+    const selected = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options);
+    if (selected.canceled || !selected.filePaths[0]) return { success: false, canceled: true };
+    try {
+      return { success: true, location: exportRecords(selected.filePaths[0]) };
+    } catch (error) {
+      return { success: false, message: getErrorMessage(error) };
+    }
+  });
+  secureHandle("get-all-brands", async () => {
     try {
       const brandService = new BrandService(new BrandsRepository());
       return await brandService.getAllBrands();
@@ -7432,7 +8462,8 @@ function registerIpcHandlers() {
       return ServiceResponse.error(error, "Brands could not be loaded.");
     }
   });
-  ipcMain.handle("add-brand", async (_event, rawPayload) => {
+  secureHandle("add-brand", async (_event, rawPayload) => {
+    ensureNoBackupInProgress();
     try {
       const payload = parseCreateBrandRequest(rawPayload);
       const brandService = new BrandService(new BrandsRepository());
@@ -7451,22 +8482,151 @@ const MAIN_DIST = path$1.join(process.env.APP_ROOT, "dist-electron");
 const RENDERER_DIST = path$1.join(process.env.APP_ROOT, "dist");
 const VITE_PUBLIC = VITE_DEV_SERVER_URL ? path$1.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
 process.env.VITE_PUBLIC = VITE_PUBLIC;
-let win;
-function createWindow() {
-  win = new BrowserWindow({
-    icon: path$1.join(VITE_PUBLIC, "electron-vite.svg"),
-    webPreferences: {
-      preload: path$1.join(__dirname$1, "preload.mjs")
+let win = null;
+let showingStartup = true;
+const WINDOW_STATE_FILE = "window-state.json";
+const DEFAULT_WINDOW_SIZE = { width: 1440, height: 920 };
+const WINDOW_THEME_FILE = "window-theme.json";
+const WINDOW_THEME_COLORS = {
+  navy: { color: "#151b35", symbolColor: "#e8eaff" },
+  dark: { color: "#12151b", symbolColor: "#f0f3f7" },
+  light: { color: "#ffffff", symbolColor: "#111827" },
+  dim: { color: "#30343d", symbolColor: "#e4e6eb" }
+};
+function getInitialWindowTheme() {
+  try {
+    const theme = JSON.parse(fs$1.readFileSync(path$1.join(app.getPath("userData"), WINDOW_THEME_FILE), "utf8"));
+    if (typeof theme === "string" && Object.prototype.hasOwnProperty.call(WINDOW_THEME_COLORS, theme)) {
+      return WINDOW_THEME_COLORS[theme];
     }
+  } catch {
+  }
+  return WINDOW_THEME_COLORS.navy;
+}
+function getWindowStatePath() {
+  return path$1.join(app.getPath("userData"), WINDOW_STATE_FILE);
+}
+function loadWindowState() {
+  var _a2, _b2;
+  try {
+    const raw = fs$1.readFileSync(getWindowStatePath(), "utf8");
+    const parsed = JSON.parse(raw);
+    if (!((_a2 = parsed == null ? void 0 : parsed.bounds) == null ? void 0 : _a2.width) || !((_b2 = parsed == null ? void 0 : parsed.bounds) == null ? void 0 : _b2.height)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+function saveWindowState(window) {
+  try {
+    const bounds = window.getBounds();
+    const payload = {
+      bounds,
+      isMaximized: window.isMaximized()
+    };
+    fs$1.writeFileSync(getWindowStatePath(), JSON.stringify(payload, null, 2), "utf8");
+  } catch (error) {
+    console.error("Could not persist window state:", error);
+  }
+}
+const splashCopy = {
+  tr: ["Yerel servis kayıtları", "Uygulama başlatılıyor…", "Uygulama hazırlanıyor…", "Bekleyen yedek kontrol ediliyor…", "Yerel veritabanı açılıyor…", "Veritabanı yapısı kontrol ediliyor…", "Arayüz yükleniyor…", "Başlatma beklenenden uzun sürdü. Uygulama günlüklerini kontrol edin."],
+  en: ["Local service records", "Starting application…", "Preparing application…", "Checking pending backup restoration…", "Opening local database…", "Checking database structure…", "Loading interface…", "Startup is taking longer than expected. Check application logs."],
+  es: ["Registros locales del taller", "Iniciando aplicación…", "Preparando aplicación…", "Comprobando restauración pendiente…", "Abriendo base de datos local…", "Comprobando estructura de datos…", "Cargando interfaz…", "El inicio tarda más de lo esperado. Revise los registros."],
+  fr: ["Dossiers locaux de l’atelier", "Démarrage de l’application…", "Préparation de l’application…", "Vérification de la sauvegarde à restaurer…", "Ouverture de la base locale…", "Vérification de la base de données…", "Chargement de l’interface…", "Démarrage plus long que prévu. Vérifiez les journaux."],
+  de: ["Lokale Servicedaten", "Anwendung wird gestartet…", "Anwendung wird vorbereitet…", "Ausstehende Wiederherstellung wird geprüft…", "Lokale Datenbank wird geöffnet…", "Datenbankstruktur wird geprüft…", "Oberfläche wird geladen…", "Start dauert länger als erwartet. Prüfen Sie die Protokolle."],
+  pt: ["Registos locais de oficina", "A iniciar a aplicação…", "A preparar a aplicação…", "A verificar restauro pendente…", "A abrir base de dados local…", "A verificar estrutura da base…", "A carregar interface…", "O arranque está a demorar. Consulte os registos."],
+  zh: ["本地维修记录", "正在启动应用…", "正在准备应用…", "正在检查待恢复的备份…", "正在打开本地数据库…", "正在检查数据库结构…", "正在加载界面…", "启动时间超出预期，请查看应用日志。"],
+  ja: ["ローカル整備記録", "アプリを起動中…", "アプリを準備中…", "復元待ちのバックアップを確認中…", "ローカルデータベースを開いています…", "データベース構造を確認中…", "画面を読み込み中…", "起動に時間がかかっています。ログを確認してください。"],
+  ko: ["로컬 정비 기록", "앱 시작 중…", "앱 준비 중…", "대기 중인 백업 복원 확인…", "로컬 데이터베이스 여는 중…", "데이터베이스 구조 확인 중…", "화면 불러오는 중…", "시작이 예상보다 오래 걸립니다. 로그를 확인하세요."],
+  ru: ["Локальные сервисные записи", "Запуск приложения…", "Подготовка приложения…", "Проверка ожидающего восстановления…", "Открытие локальной базы данных…", "Проверка структуры базы данных…", "Загрузка интерфейса…", "Запуск занимает слишком много времени. Проверьте журналы."],
+  nl: ["Lokale servicegegevens", "App starten…", "App voorbereiden…", "Herstel van back-up controleren…", "Lokale database openen…", "Databasestructuur controleren…", "Interface laden…", "Opstarten duurt langer dan verwacht. Controleer de logbestanden."],
+  az: ["Yerli servis qeydləri", "Tətbiq başladılır…", "Tətbiq hazırlanır…", "Gözləyən bərpa yoxlanılır…", "Yerli verilənlər bazası açılır…", "Baza strukturu yoxlanılır…", "İnterfeys yüklənir…", "Başlama gözləniləndən uzun çəkir. Jurnalları yoxlayın."],
+  it: ["Registri locali di assistenza", "Avvio dell’app…", "Preparazione dell’app…", "Verifica ripristino in sospeso…", "Apertura del database locale…", "Verifica struttura del database…", "Caricamento interfaccia…", "Avvio più lento del previsto. Controllare i registri."],
+  pl: ["Lokalne rejestry serwisowe", "Uruchamianie aplikacji…", "Przygotowywanie aplikacji…", "Sprawdzanie oczekującego przywracania…", "Otwieranie lokalnej bazy danych…", "Sprawdzanie struktury bazy…", "Ładowanie interfejsu…", "Uruchamianie trwa dłużej niż zwykle. Sprawdź dzienniki."]
+};
+function currentStartupLanguage() {
+  var _a2, _b2;
+  try {
+    const saved = JSON.parse(fs$1.readFileSync(path$1.join(app.getPath("userData"), "startup-language.json"), "utf8"));
+    if (typeof saved.language === "string" && splashCopy[saved.language]) return saved.language;
+  } catch {
+  }
+  const configured = (_b2 = (_a2 = getConfig()) == null ? void 0 : _a2.language) == null ? void 0 : _b2.split("-")[0];
+  if (configured && splashCopy[configured]) return configured;
+  const osLanguage = app.getLocale().split("-")[0];
+  return splashCopy[osLanguage] ? osLanguage : "en";
+}
+const splashLabels = () => splashCopy[currentStartupLanguage()] ?? splashCopy.en;
+async function createStartupSplash() {
+  const theme = getInitialWindowTheme();
+  const savedState = loadWindowState();
+  win = new BrowserWindow({
+    title: "Car Service Archiver",
+    icon: path$1.join(VITE_PUBLIC, "car-archiver-logo.png"),
+    ...process.platform === "win32" ? { titleBarStyle: "hidden", titleBarOverlay: { ...theme, height: 30 } } : {},
+    width: (savedState == null ? void 0 : savedState.bounds.width) ?? DEFAULT_WINDOW_SIZE.width,
+    height: (savedState == null ? void 0 : savedState.bounds.height) ?? DEFAULT_WINDOW_SIZE.height,
+    x: savedState == null ? void 0 : savedState.bounds.x,
+    y: savedState == null ? void 0 : savedState.bounds.y,
+    minWidth: 720,
+    minHeight: 520,
+    movable: true,
+    // Explicitly allow native Windows dragging of CSS app regions.
+    backgroundColor: theme.color,
+    show: false,
+    autoHideMenuBar: true,
+    webPreferences: { preload: path$1.join(__dirname$1, "preload.mjs"), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true }
+  });
+  const currentWindow = win;
+  currentWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  currentWindow.webContents.on("will-navigate", (event, url) => {
+    if (!isTrustedAppUrl(url, VITE_DEV_SERVER_URL, RENDERER_DIST)) event.preventDefault();
+  });
+  Menu.setApplicationMenu(null);
+  currentWindow.once("ready-to-show", () => {
+    if (!currentWindow.isDestroyed()) currentWindow.show();
+  });
+  currentWindow.webContents.once("did-finish-load", () => {
+    if (!currentWindow.isDestroyed() && !currentWindow.isVisible()) currentWindow.show();
+  });
+  if (savedState == null ? void 0 : savedState.isMaximized) currentWindow.maximize();
+  currentWindow.on("close", () => saveWindowState(currentWindow));
+  currentWindow.on("closed", () => {
+    if (win === currentWindow) win = null;
+  });
+  const labels = splashLabels();
+  const page = `<!DOCTYPE html><html lang="${currentStartupLanguage()}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:${theme.color};color:${theme.symbolColor};font:14px system-ui,Segoe UI,sans-serif;-webkit-user-select:none}
+  .startupDrag{position:fixed;top:0;left:0;right:140px;height:30px;-webkit-app-region:drag}main{width:min(480px,100%);padding:32px 38px}.brand{display:flex;gap:14px;align-items:center;margin-bottom:36px}.symbol{height:46px;width:46px;border-radius:12px;display:grid;place-items:center;background:#6477db;color:white;font-size:23px;font-weight:700}.title{font-weight:750;font-size:21px}.sub{opacity:.66;font-size:12px;margin-top:3px}.status{opacity:.88;margin-bottom:12px;font-size:13px;min-height:22px}.track{height:5px;overflow:hidden;border-radius:6px;background:#8d9ab033}.pulse{height:100%;width:38%;border-radius:6px;background:#8999fa;animation:slide 1.4s ease-in-out infinite alternate}@keyframes slide{from{transform:translateX(-15%)}to{transform:translateX(190%)}}</style></head>
+  <body><div class="startupDrag" aria-hidden="true"></div><main><div class="brand"><div class="symbol">C</div><div><div class="title">Car Service Archiver</div><div class="sub">${labels[0]}</div></div></div><div class="status" id="status">${labels[1]}</div><div class="track"><div class="pulse"></div></div></main></body></html>`;
+  await currentWindow.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(page));
+}
+function updateSplash(message) {
+  if (!showingStartup || !win || win.isDestroyed()) return;
+  void win.webContents.executeJavaScript(`{ const status = document.getElementById('status'); if (status) status.textContent = ${JSON.stringify(message)}; }`).catch(() => {
+  });
+}
+function createWindow() {
+  const mainWindow = win;
+  if (!mainWindow || mainWindow.isDestroyed()) throw new Error("Startup window is unavailable");
+  mainWindow.webContents.on("did-fail-load", (_event, errorCode, description) => {
+    console.error("Renderer load failed:", errorCode, description);
+  });
+  mainWindow.webContents.once("did-finish-load", () => {
+    showingStartup = false;
   });
   if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL);
+    void mainWindow.loadURL(VITE_DEV_SERVER_URL);
   } else {
-    win.loadFile(path$1.join(RENDERER_DIST, "index.html"));
+    void mainWindow.loadFile(path$1.join(RENDERER_DIST, "index.html"));
   }
 }
 app.on("before-quit", () => {
   closeDb();
+});
+app.on("browser-window-created", (_event, browserWindow) => {
+  browserWindow.setMenuBarVisibility(false);
 });
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
@@ -7476,7 +8636,7 @@ app.on("window-all-closed", () => {
 });
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
+    console.warn("No window on activate; application startup is not active.");
   }
 });
 const STARTUP_ERROR_TEXTS = {
@@ -7523,21 +8683,44 @@ ${details}
   throw error;
 }
 app.whenReady().then(async () => {
+  session.defaultSession.setSpellCheckerEnabled(false);
+  session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
+    callback({ cancel: !isPermittedRendererRequest(details.url, VITE_DEV_SERVER_URL) });
+  });
+  await createStartupSplash();
+  updateSplash(splashLabels()[2]);
   registerIpcHandlers();
   const config = getConfig();
   const finalDbPath = config == null ? void 0 : config.savePath;
   if (finalDbPath) {
     try {
+      updateSplash(splashLabels()[3]);
+      const rescue = applyPendingRestore(app.getPath("userData"), finalDbPath);
+      if (rescue) console.log("Backup restored. Original files preserved at:", rescue);
+      updateSplash(splashLabels()[4]);
       CreateDefaultDb(finalDbPath);
       initDrizzle();
+      updateSplash(splashLabels()[5]);
       await runDatabaseMigrations();
+      try {
+        retryPendingMediaDeletes();
+      } catch (error) {
+        console.error("Deferred media cleanup failed at startup:", error);
+      }
       console.log("🟢 Veritabanı bağlandı:", finalDbPath);
     } catch (error) {
       console.error("🔴 Veritabanı başlatılırken hata oluştu:", error);
-      failStartup(error, finalDbPath, config == null ? void 0 : config.language);
+      failStartup(error, finalDbPath, currentStartupLanguage());
     }
   }
+  updateSplash(splashLabels()[6]);
   createWindow();
+  setTimeout(() => {
+    if (showingStartup && win && !win.isDestroyed()) updateSplash(splashLabels()[7]);
+  }, 3e4);
+}).catch((error) => {
+  console.error("Unexpected startup failure:", error);
+  failStartup(error, "(startup)", currentStartupLanguage());
 });
 export {
   MAIN_DIST,

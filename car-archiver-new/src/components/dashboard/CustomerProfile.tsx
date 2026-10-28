@@ -1,6 +1,8 @@
+import { ProfileActions } from "../common/ProfileActions";
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import styles from "./CustomerProfile.module.css";
+import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 import { useToastStore } from "../../store/toastStore";
 import { useTabStore } from "../../store/tabStore";
 import type { CustomerProfileDto } from "../../shared/ipcApi";
@@ -10,14 +12,14 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
   const [profile, setProfile] = useState<CustomerProfileDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [brands, setBrands] = useState<Brand[]>([]);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // Silme Modalı için Stateler
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteRelated, setDeleteRelated] = useState(false);
 
   const { addToast } = useToastStore();
-  const { activeTabId, closeTab, openTab } = useTabStore();
+  const { activeTabId, closeTab, openTab, renameTab } = useTabStore();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -25,12 +27,18 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
         window.electron.ipcRenderer.invoke("get-customer-profile", customerId),
         window.electron.ipcRenderer.invoke("get-all-brands"),
       ]);
-      if (res.success) setProfile(res.data ?? null);
+      if (res.success) {
+        setProfile(res.data ?? null);
+        if (res.data?.customer) {
+          const profileTab = useTabStore.getState().tabs.find(tab => tab.type === "customer" && tab.entityId === customerId && tab.isProfile);
+          if (profileTab) renameTab(profileTab.id, [res.data.customer.firstName, res.data.customer.lastName].filter(Boolean).join(" "));
+        }
+      }
       if (brandsRes.success) setBrands(brandsRes.data ?? []);
       setLoading(false);
     };
     fetchProfile();
-  }, [customerId]);
+  }, [customerId, renameTab]);
 
   const brandMap = useMemo(() => new Map(brands.map((brand) => [brand.brandId, brand.brandName])), [brands]);
 
@@ -38,7 +46,7 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
     if (!profile) return;
     openTab({
       type: "customer",
-      title: `${profile.customer.firstName} ${profile.customer.lastName} Düzenle`,
+      title: `${profile.customer.firstName} ${profile.customer.lastName} · ${t("customerEdit")}`,
       entityId: customerId,
     });
   };
@@ -56,24 +64,24 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
 
       if (result.success) {
         const successMsg = deleteRelated
-          ? "Müşteri ve bağlı tüm kayıtları başarıyla silindi."
-          : "Müşteri başarıyla silindi.";
+          ? t('customerDeleteSuccessRelated')
+          : t('customerDeleteSuccess');
 
         addToast(successMsg, "success");
         setIsDeleteModalOpen(false);
         closeTab(activeTabId); // Sildikten sonra sekmeyi direkt kapat!
       } else {
-        addToast("Silme işlemi başarısız: " + result.message, "error");
+        addToast(t('customerDeleteFailed'), 'error');
       }
     } catch (error) {
-      addToast("Beklenmeyen bir hata oluştu.", "error");
+      addToast(t('serviceUnexpectedError'), 'error');
     }
   };
 
   if (loading)
-    return <div className={styles.loading}>Profil Yükleniyor...</div>;
+    return <div className={styles.loading}>{t("customerLoading")}</div>;
   if (!profile || !profile.customer)
-    return <div className={styles.loading}>Müşteri bulunamadı.</div>;
+    return <div className={styles.loading}>{t("customerNotFound")}</div>;
 
   return (
     <div className={styles.container}>
@@ -84,20 +92,25 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
         </div>
 
         <div className={styles.infoGroup}>
-          <div className={styles.infoLabel}>Kimlik No</div>
+          <div className={styles.infoLabel}>{t("customerNationalId")}</div>
           <div className={styles.infoValue}>
             {profile.customer.nationalId || "-"}
           </div>
         </div>
         <div className={styles.infoGroup}>
-          <div className={styles.infoLabel}>Vergi No</div>
+          <div className={styles.infoLabel}>{t("customerTaxId")}</div>
           <div className={styles.infoValue}>
             {profile.customer.taxNumber || "-"}
           </div>
         </div>
 
+        <div className={styles.infoGroup}>
+          <div className={styles.infoLabel}>{t("customerAddress")}</div>
+          <div className={styles.infoValue} style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{profile.customer.address || "-"}</div>
+        </div>
+
         {/* Telefonlar */}
-        <div className={styles.sectionTitle}>Telefonlar</div>
+        <div className={styles.sectionTitle}>{t("customerPhones")}</div>
         {profile.phones && profile.phones.length > 0 ? (
           profile.phones.map((p) => (
             <div key={p.phoneNumberId} className={styles.listItem}>
@@ -115,11 +128,11 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
             </div>
           ))
         ) : (
-          <div className={styles.listItem}>Kayıtlı telefon yok.</div>
+          <div className={styles.listItem}>{t("customerNoRecords")}</div>
         )}
 
         {/* E-Postalar */}
-        <div className={styles.sectionTitle}>E-Posta Adresleri</div>
+        <div className={styles.sectionTitle}>{t("customerEmails")}</div>
         {profile.emails && profile.emails.length > 0 ? (
           profile.emails.map((e) => (
             <div key={e.emailId} className={styles.listItem}>
@@ -138,49 +151,15 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
             </div>
           ))
         ) : (
-          <div className={styles.listItem}>Kayıtlı e-posta yok.</div>
+          <div className={styles.listItem}>{t("customerNoRecords")}</div>
         )}
 
         {/* SOL PANEL ALT KISIM: SİLME BUTONU */}
-        <div className={styles.sidebarActions}>
-          <button
-            className={styles.profileEditBtn}
-            onClick={handleEditCustomer}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              style={{ marginRight: "8px" }}
-            >
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-            </svg>
-            Bilgileri Düzenle
-          </button>
-
-          <button
-            className={styles.profileDeleteBtn}
-            onClick={() => setIsDeleteModalOpen(true)}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              style={{ marginRight: "8px" }}
-            >
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-            Müşteriyi Sil
-          </button>
-        </div>
+        <ProfileActions
+          onEdit={handleEditCustomer}
+          onDelete={() => setIsDeleteModalOpen(true)}
+          deleteLabel={t("customerDelete")}
+        />
       </aside>
 
       {/* SAĞ PANEL: Arabalar ve Servisler */}
@@ -188,14 +167,15 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
         {/* Arabalar Kartı */}
         <div className={styles.card}>
           <div className={styles.cardHeader}>
-            <span>Müşterinin Araçları</span>
+            <span>{t("customerVehicles")}</span>
+            <div className={styles.headerActions}><button className={styles.profileEditBtn} style={{ width: "auto", padding: "7px 12px" }} onClick={() => openTab({ type: "car", title: `${profile.customer?.firstName ?? ''} Araç Listesi`, contextCustomerId: customerId, contextLabel: [profile.customer?.firstName, profile.customer?.lastName].filter(Boolean).join(' ') })}>{t('showAll')}</button>
             <button
               className={styles.profileEditBtn}
               style={{ width: "auto", padding: "7px 12px" }}
               onClick={() => openTab({ type: "car", title: t("carNewTitle"), entityId: 999, parentEntityId: customerId })}
             >
               + {t("carNewButton")}
-            </button>
+            </button></div>
           </div>
           {profile.cars && profile.cars.length > 0 ? (
             <div style={{ display: "grid", gap: "10px" }}>
@@ -205,11 +185,11 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
                   style={{ border: "1px solid var(--border-color)", borderRadius: "9px", padding: "14px", cursor: "pointer" }}
                   onDoubleClick={() => openTab({ type: "car", title: car.plateNumber || t("carProfileTitle"), entityId: car.carId, isProfile: true })}
                 >
-                  <div style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-main)" }}>
+                  <div style={{ fontSize: 'calc(15px * var(--user-font-factor, 1))', fontWeight: 600, color: "var(--text-main)" }}>
                     {brandMap.get(car.brandId ?? 0) ?? "-"} {car.model ?? ""}
                   </div>
-                  <div style={{ marginTop: "6px", fontSize: "12px", color: "var(--text-muted)" }}>
-                    {car.plateNumber || "-"} · {car.year || "-"} · {car.km === null || car.km === undefined ? "-" : new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(car.km)} km
+                  <div style={{ marginTop: "6px", fontSize: 'calc(12px * var(--user-font-factor, 1))', color: "var(--text-muted)" }}>
+                    {car.plateNumber || "-"} · {car.year || "-"} · {car.km === null || car.km === undefined ? "-" : new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 0 }).format(car.km)} km
                   </div>
                 </div>
               ))}
@@ -230,7 +210,7 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
                 <path d="M9 17h6"></path>
                 <circle cx="17" cy="17" r="2"></circle>
               </svg>
-              <span>Kayıtlı araç bulunmuyor.</span>
+              <span>{t("customerNoVehicles")}</span>
             </div>
           )}
         </div>
@@ -238,16 +218,17 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
         {/* Servis Geçmişi Kartı */}
         <div className={styles.card}>
           <div className={styles.cardHeader}>
-            <span>Servis Geçmişi</span>
-            <button className={styles.profileEditBtn} style={{ width: "auto", padding: "7px 12px" }} onClick={() => openTab({ type: "service", title: t("serviceNewTitle"), entityId: 999 })}>+ {t("serviceNewButton")}</button>
+            <span>{t("carServiceHistory")}</span>
+            <div className={styles.headerActions}><button className={styles.profileEditBtn} style={{ width: "auto", padding: "7px 12px" }} onClick={() => openTab({ type: "service", title: t("serviceListTitle"), contextCustomerId: customerId, contextLabel: [profile.customer?.firstName, profile.customer?.lastName].filter(Boolean).join(' ') })}>{t('showAll')}</button>
+            <button className={styles.profileEditBtn} style={{ width: "auto", padding: "7px 12px" }} onClick={() => openTab({ type: "service", title: t("serviceNewTitle"), entityId: 999, contextCustomerId: customerId })}>+ {t("serviceNewButton")}</button></div>
           </div>
           {profile.services && profile.services.length > 0 ? (
             <div style={{ display: "grid", gap: "8px" }}>
               {[...profile.services].sort((a, b) => (b.applicationDate ? new Date(b.applicationDate).getTime() : 0) - (a.applicationDate ? new Date(a.applicationDate).getTime() : 0)).map((service) => (
                 <button key={service.serviceId} type="button" onClick={() => openTab({ type: "service", title: `#${service.serviceId}`, entityId: service.serviceId, isProfile: true })} style={{ display: "grid", gridTemplateColumns: "90px minmax(0, 1fr) 20px", gap: "10px", alignItems: "center", width: "100%", padding: "10px 12px", border: "1px solid var(--border-color)", borderRadius: "9px", background: "var(--bg-panel)", color: "var(--text-main)", textAlign: "left", cursor: "pointer" }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>{service.applicationDate ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "short" }).format(new Date(service.applicationDate)) : "-"}</span>
-                  <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "3px" }}><strong style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "12px" }}>{service.complaints}</strong><small style={{ color: "var(--text-muted)", fontSize: "10px" }}>{service.km == null ? "-" : `${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(service.km)} km`}</small></span>
-                  <span style={{ color: "var(--text-muted)", fontSize: "18px" }}>›</span>
+                  <span style={{ color: "var(--text-muted)", fontSize: 'calc(11px * var(--user-font-factor, 1))' }}>{service.applicationDate ? new Intl.DateTimeFormat(i18n.language, { dateStyle: "short" }).format(new Date(service.applicationDate)) : "-"}</span>
+                  <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "3px" }}><strong style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 'calc(12px * var(--user-font-factor, 1))' }}>{service.complaints || "—"}</strong><small style={{ color: "var(--text-muted)", fontSize: 'calc(10px * var(--user-font-factor, 1))' }}>{service.km == null ? "-" : `${new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 0 }).format(service.km)} km`}</small></span>
+                  <span style={{ color: "var(--text-muted)", fontSize: 'calc(18px * var(--user-font-factor, 1))' }}>›</span>
                 </button>
               ))}
             </div>
@@ -264,52 +245,21 @@ const CustomerProfile: React.FC<{ customerId: number }> = ({ customerId }) => {
               >
                 <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
               </svg>
-              <span>Daha önce servis kaydı açılmamış.</span>
+              <span>{t("customerNoServices")}</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* SİLME ONAY MODALI */}
-      {isDeleteModalOpen && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
-            <h3 className={styles.modalTitle}>Müşteriyi Sil</h3>
-            <p className={styles.modalText}>
-              <strong>
-                {profile.customer.firstName} {profile.customer.lastName}
-              </strong>{" "}
-              isimli müşteriyi silmek istediğinize emin misiniz? Bu işlem geri
-              alınamaz.
-            </p>
+      {isDeleteModalOpen && <DeleteConfirmDialog
+        title={t("customerDeleteTitle")}
+        option={t("customerDeleteRelated")}
+        checked={deleteRelated}
+        onCheckedChange={setDeleteRelated}
+        onCancel={() => setIsDeleteModalOpen(false)}
+        onConfirm={() => void confirmDelete()}
+      >{t("customerDeleteCustomerPrompt", { name: [profile.customer.firstName, profile.customer.lastName].filter(Boolean).join(" ") })}</DeleteConfirmDialog>}
 
-            <label className={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                checked={deleteRelated}
-                onChange={(e) => setDeleteRelated(e.target.checked)}
-                className={styles.checkbox}
-              />
-              Müşteriye ait tüm araç ve servis kayıtlarını da sil.
-            </label>
-
-            <div className={styles.modalActions}>
-              <button
-                className={styles.cancelBtn}
-                onClick={() => setIsDeleteModalOpen(false)}
-              >
-                İptal
-              </button>
-              <button
-                className={styles.deleteConfirmBtn}
-                onClick={confirmDelete}
-              >
-                Evet, Sil
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

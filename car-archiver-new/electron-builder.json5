@@ -1,9 +1,9 @@
 // @see - https://www.electron.build/configuration/configuration
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
-  "appId": "YourAppID",
+  "appId": "com.kupferdev.carservicearchiver",
   "asar": true,
-  "productName": "YourAppName",
+  "productName": "Car Service Archiver",
   "directories": {
     "output": "release/${version}"
   },
@@ -27,6 +27,13 @@
       }
     ],
     "artifactName": "${productName}-Windows-${version}-Setup.${ext}"
+  },
+  "appx": {
+    "applicationId": "CarServiceArchiver",
+    "identityName": "26613KupferSoft.CarServiceArchiver",
+    "publisher": "CN=9D509D51-623A-4DF5-A8E4-A5CD3FF2BF25",
+    "publisherDisplayName": "KupferSoft",
+    "displayName": "Car Service Archiver"
   },
   "nsis": {
     "oneClick": false,

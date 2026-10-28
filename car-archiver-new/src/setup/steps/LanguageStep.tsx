@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import '../../setup/setup.css';
 import type { SetupDataUpdater } from '../setupTypes';
@@ -25,6 +26,7 @@ const nextArrowUrl = new URL('../../assets/icons/right_arrow-blue.svg', import.m
 interface LanguageStepProps { onNext: () => void; updateData: SetupDataUpdater; }
 
 export const LanguageStep = ({ onNext, updateData }: LanguageStepProps) => {
+  const { i18n } = useTranslation();
   const systemLang = navigator.language.split('-')[0];
   const isSupported = languages.some(lang => lang.code === systemLang);
   const [selected, setSelected] = useState(isSupported ? systemLang : 'en');
@@ -34,6 +36,9 @@ export const LanguageStep = ({ onNext, updateData }: LanguageStepProps) => {
 
   const handleNext = () => {
     updateData({ language: selected });
+    void i18n.changeLanguage(selected);
+    localStorage.setItem("cararchiver-language", selected);
+    void window.electron.ipcRenderer.invoke("set-startup-language", selected).catch(console.error);
     onNext();
   };
 

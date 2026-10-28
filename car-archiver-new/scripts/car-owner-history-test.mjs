@@ -54,7 +54,7 @@ if (problem) {
     process.exit(child.status ?? 1);
   }
   console.error("better-sqlite3 could not be loaded:\n", problem.message);
-  console.error("\nTry: npm rebuild better-sqlite3   (or: npx electron-rebuild -f -w better-sqlite3)");
+  console.error("\nTry: npm rebuild better-sqlite3   (or: npm run native:rebuild)");
   process.exit(1);
 }
 

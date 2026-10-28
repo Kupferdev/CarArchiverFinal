@@ -1,13 +1,15 @@
+import { BulkSelectionActions } from "../common/BulkSelectionActions";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import styles from "./CarList.module.css";
+import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 import type { Car } from "../../shared/types/car";
 import type { Brand } from "../../shared/types/brand";
 import type { CustomerViewDto } from "../../shared/dtos/customerDtos";
 import { useTabStore } from "../../store/tabStore";
 import { useToastStore } from "../../store/toastStore";
 
-const CarList: React.FC = () => {
+const CarList: React.FC<{ customerId?: number; contextLabel?: string }> = ({ customerId, contextLabel }) => {
   const { t } = useTranslation();
   const { openTab } = useTabStore();
   const { addToast } = useToastStore();
@@ -21,6 +23,9 @@ const CarList: React.FC = () => {
   // Müşteri listesindeki çoklu seçim davranışı araç listesinde de aynı.
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [deleteTargets, setDeleteTargets] = useState<number[]>([]);
+
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -32,7 +37,7 @@ const CarList: React.FC = () => {
       ]);
 
       if (carsRes.success) setCars(carsRes.data ?? []);
-      else addToast(carsRes.message, "error");
+      else addToast(t("carUnexpectedError"), "error");
 
       if (brandsRes.success) setBrands(brandsRes.data ?? []);
       if (customerRes) setCustomers(customerRes);
@@ -63,6 +68,7 @@ const CarList: React.FC = () => {
     const term = search.toLocaleLowerCase("tr-TR");
 
     return cars.filter((car) => {
+      if (customerId && car.customerId !== customerId) return false;
       if (!term) return true;
 
       const text = [
@@ -78,7 +84,7 @@ const CarList: React.FC = () => {
 
       return text.includes(term);
     });
-  }, [cars, search, brandMap, customerMap]);
+  }, [cars, search, brandMap, customerMap, customerId]);
 
   const getCarTitle = (car: Car) => car.plateNumber || t("carProfileTitle");
 
@@ -105,6 +111,7 @@ const CarList: React.FC = () => {
     openTab({
       type: "car",
       title: t("carNewTitle"),
+      parentEntityId: customerId,
       entityId: 999,
     });
   };
@@ -134,54 +141,30 @@ const CarList: React.FC = () => {
     );
   };
 
-  const deleteCar = async (car: Car) => {
+  const deleteCar = (car: Car) => {
     if (!car.carId) return;
-    if (!window.confirm(t("carDeleteConfirm"))) return;
+    setDeleteTargets([car.carId]);
 
-    const result = await window.electron.ipcRenderer.invoke("delete-car", car.carId);
-    if (result.success) {
-      addToast(t("carDeleted"), "success");
-      void load();
-    } else {
-      addToast(result.message, "error");
-    }
   };
+  const deleteSelectedCars = () => {
+    if (!selectedIds.length) return;
+    setDeleteTargets([...selectedIds]);
 
-  const deleteSelectedCars = async () => {
-    if (selectedIds.length === 0) return;
-
-    const confirmed = window.confirm(
-      `${selectedIds.length} araç seçildi. Seçilen araçlar silinsin mi?`
-    );
-    if (!confirmed) return;
-
+  };
+  const confirmCarDelete = async () => {
+    if (!deleteTargets.length || deleting) return;
+    setDeleting(true);
     try {
-      let deletedCount = 0;
-      let failedCount = 0;
-
-      for (const carId of selectedIds) {
-        const result = await window.electron.ipcRenderer.invoke("delete-car", carId);
-        if (result.success) deletedCount += 1;
-        else failedCount += 1;
-      }
-
-      if (deletedCount > 0) {
-        addToast(
-          failedCount > 0
-            ? `${deletedCount} araç silindi, ${failedCount} araç silinemedi.`
-            : `${deletedCount} araç başarıyla silindi.`,
-          failedCount > 0 ? "error" : "success"
-        );
-      } else {
-        addToast("Seçilen araçlar silinemedi.", "error");
-      }
-
-      setIsSelectionMode(false);
-      setSelectedIds([]);
-      void load();
-    } catch {
-      addToast(t("carUnexpectedError"), "error");
-    }
+      const result = deleteTargets.length === 1
+        ? await window.electron.ipcRenderer.invoke('delete-car', { id: deleteTargets[0], deleteRelated: true })
+        : await window.electron.ipcRenderer.invoke('delete-cars-bulk', { ids: deleteTargets, deleteRelated: true });
+      if (result.success) {
+        addToast(t("carDeletedCount", { count: deleteTargets.length }), 'success');
+        setDeleteTargets([]); setSelectedIds([]); setIsSelectionMode(false);
+        await load();
+      } else addToast(t("carUnexpectedError"), "error");
+    } catch { addToast(t('carUnexpectedError'), 'error'); }
+    finally { setDeleting(false); }
   };
 
   const allFilteredSelected =
@@ -193,79 +176,11 @@ const CarList: React.FC = () => {
   return (
     <div className={styles.container}>
       <div className={styles.toolbar}>
-        <div className={styles.title}>{t("carListTitle")}</div>
+        <div className={styles.title}>{contextLabel ? `${contextLabel} ${t("carListTitle")}` : t("carListTitle")}</div>
 
         <div className={styles.toolbarRight}>
-          {isSelectionMode ? (
-            <>
-              {selectedIds.length > 0 && (
-                <button
-                  className={`${styles.selectionModeBtn} ${styles.bulkDeleteIconBtn}`}
-                  onClick={() => void deleteSelectedCars()}
-                  title="Seçilenleri Sil"
-                  type="button"
-                >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  </svg>
-                  <span className={styles.selectedCount}>{selectedIds.length}</span>
-                </button>
-              )}
-
-              <button
-                className={`${styles.selectionModeBtn} ${styles.cancelIconBtn}`}
-                onClick={toggleSelectionMode}
-                title="Seçim Modunu Kapat"
-                type="button"
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <line x1="9" y1="9" x2="15" y2="15" />
-                  <line x1="15" y1="9" x2="9" y2="15" />
-                </svg>
-              </button>
-            </>
-          ) : (
-            <button
-              className={styles.selectionModeBtn}
-              onClick={toggleSelectionMode}
-              title="Çoklu Seçim Modu"
-              type="button"
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="9 11 12 14 22 4" />
-                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-              </svg>
-            </button>
-          )}
+          <BulkSelectionActions active={isSelectionMode} selectedCount={selectedIds.length}
+            onToggle={toggleSelectionMode} onDelete={() => void deleteSelectedCars()} entityLabel={t("carLabel")} />
 
           <input
             className={styles.searchInput}
@@ -424,6 +339,13 @@ const CarList: React.FC = () => {
           </tbody>
         </table>
       </div>
+      {deleteTargets.length > 0 && <DeleteConfirmDialog
+        title={deleteTargets.length === 1 ? t("carDeleteTitle") : t("carDeleteSelectedTitle")}
+
+        onCancel={() => { if (!deleting) setDeleteTargets([]); }}
+        onConfirm={() => void confirmCarDelete()}
+        busy={deleting}
+      >{t('carDeleteRelated')} — {deleteTargets.length === 1 ? t('carDeleteConfirmation', { plate: cars.find(car => car.carId === deleteTargets[0])?.plateNumber ?? t('carLabel') }) : t("carDeleteSelectedPrompt", { count: deleteTargets.length })}</DeleteConfirmDialog>}
     </div>
   );
 };

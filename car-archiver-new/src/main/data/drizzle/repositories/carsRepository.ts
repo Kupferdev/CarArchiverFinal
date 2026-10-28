@@ -1,15 +1,37 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { InferSelectModel } from "drizzle-orm";
 // 1. DEĞİŞİKLİK: drizzleDb yerine useDb import edildi
 import { useDb } from "../drizzleDb";
 import { getDb } from "../../db"; 
 import { Cars } from "../schemas/carsSchema";
+import { Services } from "../schemas/servicesSchema";
 import { BaseRepository } from "./baseRepository";
 import { IApiResponse, ServiceResponse } from "../../../../models/response.model";
 
 export class CarsRepository extends BaseRepository<typeof Cars> {
   constructor() {
     super(Cars, "carId");
+  }
+
+  // A car with service history cannot be deleted unless explicitly authorized.
+  async deleteCarsWithServicesChoice(ids: number[], deleteRelated: boolean) {
+    try {
+      if (!ids.length || ids.some(id => !Number.isSafeInteger(id) || id <= 0) || new Set(ids).size !== ids.length) {
+        return ServiceResponse.fail("Invalid car selection.");
+      }
+      useDb().transaction(tx => {
+        const matches = tx.select({ carId: Cars.carId }).from(Cars).where(inArray(Cars.carId, ids)).all();
+        if (matches.length !== ids.length) throw new Error("Araçlardan biri bulunamadı; hiçbir kayıt silinmedi.");
+        if (!deleteRelated) {
+          const attached = tx.select({ serviceId: Services.serviceId }).from(Services).where(inArray(Services.carId, ids)).limit(1).all();
+          if (attached.length) throw new Error("Araçlara bağlı servis kayıtları bulunuyor. Silmek için bağlı servisleri de sil seçeneğini işaretleyin.");
+        }
+        tx.delete(Cars).where(inArray(Cars.carId, ids)).run();
+      });
+      return ServiceResponse.success(undefined, "Vehicles deleted.");
+    } catch (error) {
+      return this.handleError(error, "Failed to delete vehicles.");
+    }
   }
 
   async getByCustomerId(customerId: number): Promise<IApiResponse<InferSelectModel<typeof Cars>[]>> {

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTabStore } from '../../store/tabStore';
 import styles from './FabMenu.module.css';
+import { EntityIcon } from '../common/EntityIcon';
 
 const FabMenu: React.FC = () => {
   const { t } = useTranslation();
@@ -17,35 +18,29 @@ const FabMenu: React.FC = () => {
           className={styles.fabItem}
           onClick={() => {
             // Servis ekleme sayfasını yaptığımızda burası o formu açacak
-            openTab({ type: 'service', title: t('fabNewService') || 'Yeni servis kaydı', entityId: 999 });
+            openTab({ type: 'service', title: t('fabNewService'), entityId: 999 });
             setIsOpen(false); // Menüyü kapat
           }}
         >
-          <div className={styles.fabLabel}>{t('fabNewService') || 'Yeni servis kaydı'}</div>
-          <button className={`${styles.fabDot} ${styles.blue}`}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <rect x="2" y="2" width="9" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
-              <path d="M5 6h5M5 9h3M11 10l1.5 1.5L15 9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
+          <div className={styles.fabLabel}>{t('fabNewService')}</div>
+          <button className={`${styles.fabDot} ${styles.blue}`}><EntityIcon kind="service" size={16} /></button>
         </div>
 
+        <div className={styles.fabItem} onClick={() => { openTab({ type: 'car', title: t('carNewTitle'), entityId: 999 }); setIsOpen(false); }}>
+          <div className={styles.fabLabel}>{t('carNewTitle')}</div>
+          <button className={`${styles.fabDot} ${styles.amber}`} aria-label={t('carNewTitle')} type="button"><EntityIcon kind="car" size={16}/></button>
+        </div>
         {/* 2. YENİ MÜŞTERİ BUTONU */}
         <div 
           className={styles.fabItem}
           onClick={() => {
             // entityId: 999 bizim "Yeni Ekleme Formu" anahtarımız
-            openTab({ type: 'customer', title: t('fabNewCustomer') || 'Yeni müşteri', entityId: 999 });
+            openTab({ type: 'customer', title: t('fabNewCustomer'), entityId: 999 });
             setIsOpen(false); // Menüyü kapat
           }}
         >
-          <div className={styles.fabLabel}>{t('fabNewCustomer') || 'Yeni müşteri'}</div>
-          <button className={`${styles.fabDot} ${styles.teal}`}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <circle cx="7" cy="5" r="3" stroke="currentColor" strokeWidth="1.3"/>
-              <path d="M1 14c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-            </svg>
-          </button>
+          <div className={styles.fabLabel}>{t('fabNewCustomer')}</div>
+          <button className={`${styles.fabDot} ${styles.teal}`}><EntityIcon kind="customer" size={16} /></button>
         </div>
 
       </div>

@@ -1,7 +1,7 @@
 .fabWrap {
-  position: absolute;
+  position: fixed;
   bottom: 24px;
-  right: 244px;
+  right: 260px;
   z-index: 10;
 }
 
@@ -54,7 +54,7 @@
 .fabLabel {
   background: var(--bg-panel);
   color: var(--text-main);
-  font-size: 12px;
+  font-size: calc(12px * var(--user-font-factor, 1));
   padding: 6px 12px;
   border-radius: 8px;
   border: 0.5px solid var(--border-color);
@@ -84,3 +84,4 @@
     bottom: 20px;
   }
 }
+@media(max-width:1200px){.fabWrap{right:24px;bottom:24px}}@media(max-height:550px){.fabWrap{bottom:12px}.fabMenu{gap:4px;bottom:48px}}
